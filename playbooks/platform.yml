@@ -1,0 +1,15 @@
+---
+- name: Apply operating system baseline
+  hosts: platform
+  gather_facts: true
+  become: true
+  roles:
+    - role: rhel_baseline
+    - role: docker_engine
+
+- name: Deploy initial platform services
+  hosts: platform
+  gather_facts: false
+  become: true
+  roles:
+    - role: netbox

@@ -1,0 +1,34 @@
+---
+- name: Validate target compatibility
+  hosts: platform
+  gather_facts: true
+  become: false
+  tasks:
+    - name: Validate supported operating system
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.os_family == "RedHat"
+          - ansible_facts.distribution_major_version | int >= 9
+        fail_msg: >-
+          This baseline supports RHEL-compatible distributions version 9 or newer.
+        success_msg: "Operating system is compatible."
+
+    - name: Validate minimum memory
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.memtotal_mb | int >= 4096
+        fail_msg: "At least 4 GiB of RAM is required for the initial platform modules."
+
+    - name: Validate minimum processor count
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.processor_vcpus | int >= 2
+        fail_msg: "At least 2 vCPUs are required."
+
+    - name: Report detected target
+      ansible.builtin.debug:
+        msg:
+          hostname: "{{ ansible_facts.hostname }}"
+          distribution: "{{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}"
+          vcpus: "{{ ansible_facts.processor_vcpus }}"
+          memory_mb: "{{ ansible_facts.memtotal_mb }}"

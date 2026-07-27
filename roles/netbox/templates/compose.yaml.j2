@@ -1,0 +1,113 @@
+name: netbox
+
+x-netbox-common: &netbox-common
+  image: {{ netbox_image }}
+  env_file:
+    - .env
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    redis-cache:
+      condition: service_healthy
+  restart: unless-stopped
+  networks:
+    - backend
+
+services:
+  postgres:
+    image: {{ netbox_postgres_image }}
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - backend
+
+  redis:
+    image: {{ netbox_valkey_image }}
+    env_file:
+      - .env
+    command: ["valkey-server", "--appendonly", "yes", "--requirepass", "$${REDIS_PASSWORD}"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - backend
+
+  redis-cache:
+    image: {{ netbox_valkey_image }}
+    env_file:
+      - .env
+    command: ["valkey-server", "--requirepass", "$${REDIS_CACHE_PASSWORD}"]
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a \"$${REDIS_CACHE_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - backend
+
+  netbox:
+    <<: *netbox-common
+    ports:
+      - "{{ netbox_bind_address }}:{{ netbox_http_port }}:8080"
+    volumes:
+      - media_data:/opt/netbox/netbox/media
+{% if netbox_enable_traefik %}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network={{ netbox_traefik_network }}
+      - traefik.http.routers.netbox.rule=Host(`{{ netbox_traefik_hostname }}`)
+      - traefik.http.routers.netbox.entrypoints=websecure
+      - traefik.http.routers.netbox.tls=true
+      - traefik.http.services.netbox.loadbalancer.server.port=8080
+    networks:
+      - backend
+      - proxy
+{% endif %}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/login/ >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  netbox-worker:
+    <<: *netbox-common
+    command: /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py rqworker
+    volumes:
+      - media_data:/opt/netbox/netbox/media
+
+  netbox-housekeeping:
+    <<: *netbox-common
+    command: /opt/netbox/housekeeping.sh
+    volumes:
+      - media_data:/opt/netbox/netbox/media
+
+networks:
+  backend:
+    driver: bridge
+{% if netbox_enable_traefik %}
+  proxy:
+    name: {{ netbox_traefik_network }}
+    external: true
+{% endif %}
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_data:

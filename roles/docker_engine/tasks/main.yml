@@ -1,0 +1,82 @@
+---
+- name: Validate Docker target
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family == "RedHat"
+      - ansible_facts.distribution_major_version | int >= 9
+      - docker_users | reject('match', '^<.*>$') | list | length == docker_users | length
+    fail_msg: >-
+      Docker requires RHEL-compatible version 9 or newer and real usernames in
+      docker_users. Replace all example placeholders.
+
+- name: Install repository tooling
+  ansible.builtin.dnf:
+    name:
+      - dnf-plugins-core
+      - container-selinux
+    state: present
+
+- name: Configure Docker CE repository
+  ansible.builtin.get_url:
+    url: "{{ docker_repository_url }}"
+    dest: /etc/yum.repos.d/docker-ce.repo
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install Docker packages
+  ansible.builtin.dnf:
+    name: "{{ docker_packages }}"
+    state: present
+
+- name: Ensure Docker configuration directory exists
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure Docker daemon
+  ansible.builtin.copy:
+    content: "{{ docker_daemon_config | to_nice_json }}\n"
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/bin/python3 -m json.tool %s
+  notify: Restart Docker
+
+- name: Enable Docker Engine
+  ansible.builtin.service:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Add administrative users to Docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users }}"
+
+- name: Flush Docker configuration handler
+  ansible.builtin.meta: flush_handlers
+
+- name: Validate Docker Engine
+  ansible.builtin.command:
+    cmd: docker version --format "{{ '{{' }}.Server.Version{{ '}}' }}"
+  register: docker_version_result
+  changed_when: false
+
+- name: Validate Docker Compose plugin
+  ansible.builtin.command:
+    cmd: docker compose version --short
+  register: docker_compose_version_result
+  changed_when: false
+
+- name: Report Docker versions
+  ansible.builtin.debug:
+    msg:
+      engine: "{{ docker_version_result.stdout }}"
+      compose: "{{ docker_compose_version_result.stdout }}"

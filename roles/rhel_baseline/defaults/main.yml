@@ -1,0 +1,10 @@
+---
+platform_hostname: ""
+platform_timezone: UTC
+rhel_apply_updates: false
+rhel_reboot_after_updates: false
+rhel_baseline_packages: []
+rhel_harden_ssh: false
+rhel_ssh_allow_users: []
+rhel_firewalld_enabled: true
+rhel_selinux_state: enforcing

@@ -1,0 +1,40 @@
+# Secrets and local overrides
+.env
+.env.*
+!.env.example
+secrets/
+*.key
+*.pem
+*.p12
+*.pfx
+acme.json
+
+# Backups and runtime data
+backups/
+*.sql
+*.dump
+*.tar
+*.tar.gz
+*.zip
+*.log
+
+# Local tooling
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Generated validation output
+reports/
+tmp/
+
+# Environment-specific Ansible data
+inventories/validation/*
+!inventories/validation/.gitkeep
+inventories/production/*
+!inventories/production/.gitkeep
+**/vault.yml
+**/vault.yaml
+*.vault.yml
+*.vault.yaml
+vault-password*

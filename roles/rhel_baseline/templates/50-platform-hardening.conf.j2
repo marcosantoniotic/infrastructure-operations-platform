@@ -1,0 +1,10 @@
+# Managed by infrastructure-operations-platform.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+AllowUsers {{ rhel_ssh_allow_users | join(' ') }}
+X11Forwarding no
+MaxAuthTries 4
+ClientAliveInterval 300
+ClientAliveCountMax 2

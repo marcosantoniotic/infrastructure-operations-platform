@@ -1,0 +1,7 @@
+---
+- name: Install and configure Docker Engine
+  hosts: platform
+  gather_facts: true
+  become: true
+  roles:
+    - role: docker_engine

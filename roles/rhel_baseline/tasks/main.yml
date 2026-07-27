@@ -1,0 +1,76 @@
+---
+- name: Validate RHEL baseline target
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.os_family == "RedHat"
+      - ansible_facts.distribution_major_version | int >= 9
+    fail_msg: "The rhel_baseline role supports RHEL-compatible version 9 or newer."
+
+- name: Configure platform hostname
+  ansible.builtin.hostname:
+    name: "{{ platform_hostname }}"
+  when: platform_hostname | length > 0
+
+- name: Configure timezone
+  community.general.timezone:
+    name: "{{ platform_timezone }}"
+
+- name: Install baseline packages
+  ansible.builtin.dnf:
+    name: "{{ rhel_baseline_packages }}"
+    state: present
+
+- name: Apply operating system updates
+  ansible.builtin.dnf:
+    name: "*"
+    state: latest
+    update_only: true
+  register: rhel_update_result
+  when: rhel_apply_updates | bool
+
+- name: Install firewalld and SELinux tooling
+  ansible.builtin.dnf:
+    name:
+      - firewalld
+      - policycoreutils-python-utils
+    state: present
+
+- name: Configure SELinux state
+  ansible.posix.selinux:
+    policy: targeted
+    state: "{{ rhel_selinux_state }}"
+
+- name: Enable firewalld
+  ansible.builtin.service:
+    name: firewalld
+    enabled: true
+    state: started
+  when: rhel_firewalld_enabled | bool
+
+- name: Validate SSH hardening prerequisites
+  ansible.builtin.assert:
+    that:
+      - rhel_ssh_allow_users | length > 0
+    fail_msg: >-
+      rhel_ssh_allow_users must contain at least one administrative user before
+      SSH hardening is enabled.
+  when: rhel_harden_ssh | bool
+
+- name: Configure SSH hardening drop-in
+  ansible.builtin.template:
+    src: 50-platform-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/50-platform-hardening.conf
+    owner: root
+    group: root
+    mode: "0600"
+    validate: /usr/sbin/sshd -t -f %s
+  when: rhel_harden_ssh | bool
+  notify: Restart sshd
+
+- name: Reboot after updates when explicitly allowed
+  ansible.builtin.reboot:
+    reboot_timeout: 900
+  when:
+    - rhel_apply_updates | bool
+    - rhel_update_result is changed
+    - rhel_reboot_after_updates | bool

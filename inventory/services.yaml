@@ -1,0 +1,80 @@
+---
+schema_version: 1
+platform:
+  name: infrastructure-operations-platform
+  host: SRV01-RHEL9
+  operating_system: Red Hat Enterprise Linux 9.8
+  deployment_model: single-node
+
+projects:
+  - name: traefik
+    responsibility: ingress-and-tls
+    services:
+      - traefik
+      - docker-socket-proxy
+    persistent_data:
+      - acme-state
+
+  - name: zabbix
+    responsibility: events-alerts-and-maps
+    services:
+      - zabbix-server
+      - zabbix-web
+      - mysql
+    native_dependencies:
+      - zabbix-agent2
+
+  - name: netbox
+    responsibility: source-of-truth-dcim-ipam
+    services:
+      - netbox
+      - netbox-worker
+      - netbox-zabbix-sync
+      - postgresql
+      - valkey
+      - valkey-cache
+
+  - name: observability
+    responsibility: metrics-and-dashboards
+    services:
+      - prometheus
+      - grafana
+      - node-exporter
+      - cadvisor
+      - blackbox-exporter
+      - snmp-exporter
+      - unifi-poller
+
+  - name: portainer
+    responsibility: container-management
+    services:
+      - portainer
+
+native_services:
+  - name: cockpit
+    responsibility: operating-system-management
+  - name: zabbix-agent2
+    responsibility: host-monitoring
+  - name: firewalld
+    responsibility: host-firewall
+
+external_integrations:
+  - name: cloudflare
+    responsibilities:
+      - tunnel
+      - access
+      - dns
+  - name: unifi-udm
+    responsibilities:
+      - gateway
+      - local-dns
+      - network-policy
+  - name: mikrotik
+    responsibilities:
+      - routing
+      - snmp-telemetry
+
+planned_phases:
+  - name: glpi
+    status: planned
+    responsibility: service-desk-and-it-asset-workflows

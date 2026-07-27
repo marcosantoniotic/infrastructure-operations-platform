@@ -1,0 +1,59 @@
+---
+# Platform identity
+platform_hostname: srv01-validation
+platform_timezone: America/Sao_Paulo
+
+# RHEL baseline
+rhel_apply_updates: false
+rhel_reboot_after_updates: false
+rhel_baseline_packages:
+  - bash-completion
+  - bind-utils
+  - curl
+  - git
+  - jq
+  - lsof
+  - rsync
+  - tar
+  - unzip
+  - vim-enhanced
+  - wget
+
+# SSH hardening is opt-in to prevent administrative lockout.
+rhel_harden_ssh: false
+rhel_ssh_allow_users: []
+
+# Docker
+docker_users:
+  - "<ADMIN_USER>"
+docker_daemon_config:
+  log-driver: json-file
+  log-opts:
+    max-size: 10m
+    max-file: "3"
+  live-restore: true
+
+# NetBox standalone
+netbox_project_dir: /opt/netbox
+netbox_image: netboxcommunity/netbox:v4.5.10-4.0.2
+netbox_postgres_image: postgres:18-alpine
+netbox_valkey_image: valkey/valkey:9.0-alpine
+netbox_bind_address: 127.0.0.1
+netbox_http_port: 8000
+netbox_allowed_hosts:
+  - localhost
+  - "netbox.<BASE_DOMAIN>"
+
+# Secret values are supplied by the encrypted vault.yml file.
+netbox_secret_key: "{{ vault_netbox_secret_key }}"
+netbox_postgres_password: "{{ vault_netbox_postgres_password }}"
+netbox_redis_password: "{{ vault_netbox_redis_password }}"
+netbox_redis_cache_password: "{{ vault_netbox_redis_cache_password }}"
+netbox_superuser_name: admin
+netbox_superuser_email: "<ADMIN_EMAIL>"
+netbox_superuser_password: "{{ vault_netbox_superuser_password }}"
+
+netbox_enable_metrics: true
+netbox_enable_traefik: false
+netbox_traefik_hostname: "netbox.<BASE_DOMAIN>"
+netbox_traefik_network: proxy
