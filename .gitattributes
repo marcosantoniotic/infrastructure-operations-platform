@@ -1,0 +1,14 @@
+* text=auto
+
+# Linux automation and configuration must remain LF on every workstation.
+*.cfg text eol=lf
+*.j2 text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+Makefile text eol=lf
+
+# PowerShell follows the native Windows convention.
+*.ps1 text eol=crlf
