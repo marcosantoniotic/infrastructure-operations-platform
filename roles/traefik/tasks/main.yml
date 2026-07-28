@@ -8,6 +8,12 @@
       - traefik_dashboard_basic_auth | length >= 30
       - not traefik_dashboard_basic_auth.startswith("<")
       - not (traefik_redirect_http_to_https | bool) or traefik_enable_https | bool
+      - >-
+        not (traefik_enable_https | bool) or
+        traefik_tls_certificate_source | length > 0
+      - >-
+        not (traefik_enable_https | bool) or
+        traefik_tls_private_key_source | length > 0
     fail_msg: >-
       Configure the Traefik dashboard credential and ensure HTTPS is enabled
       before enabling the HTTP redirect.
@@ -35,6 +41,29 @@
       mode: "0750"
     - path: "{{ traefik_project_dir }}/dynamic"
       mode: "0750"
+    - path: "{{ traefik_project_dir }}/certs"
+      mode: "0750"
+
+- name: Install Traefik TLS certificate
+  ansible.builtin.copy:
+    src: "{{ traefik_tls_certificate_source }}"
+    dest: "{{ traefik_project_dir }}/certs/tls.crt"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart Traefik
+  when: traefik_enable_https | bool
+
+- name: Install Traefik TLS private key
+  ansible.builtin.copy:
+    src: "{{ traefik_tls_private_key_source }}"
+    dest: "{{ traefik_project_dir }}/certs/tls.key"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart Traefik
+  when: traefik_enable_https | bool
 
 - name: Render Traefik static configuration
   ansible.builtin.template:
@@ -95,20 +124,45 @@
   until: traefik_ping.status == 200
   when: not ansible_check_mode
 
-- name: Assert unauthenticated dashboard is rejected
+- name: Assert unauthenticated HTTP dashboard is rejected
   ansible.builtin.uri:
     url: "http://{{ traefik_bind_address }}:{{ traefik_http_port }}/dashboard/"
     method: GET
     headers:
       Host: "{{ traefik_dashboard_hostname }}"
     status_code: 401
-  register: traefik_dashboard_unauthenticated
+  register: traefik_dashboard_http_unauthenticated
   retries: 15
   delay: 2
-  until: traefik_dashboard_unauthenticated.status == 401
-  when: not ansible_check_mode
+  until: traefik_dashboard_http_unauthenticated.status == 401
+  when:
+    - not (traefik_enable_https | bool)
+    - not ansible_check_mode
 
-- name: Validate Docker discovery through test route
+- name: Assert unauthenticated HTTPS dashboard is rejected
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --silent
+      - --insecure
+      - --resolve
+      - "{{ traefik_dashboard_hostname }}:{{ traefik_https_port }}:{{ traefik_bind_address }}"
+      - --output
+      - /dev/null
+      - --write-out
+      - "%{http_code}"
+      - "https://{{ traefik_dashboard_hostname }}:{{ traefik_https_port }}/dashboard/"
+  register: traefik_dashboard_https_unauthenticated
+  changed_when: false
+  retries: 15
+  delay: 2
+  until: traefik_dashboard_https_unauthenticated.stdout == "401"
+  failed_when: traefik_dashboard_https_unauthenticated.stdout != "401"
+  when:
+    - traefik_enable_https | bool
+    - not ansible_check_mode
+
+- name: Validate HTTP Docker discovery through test route
   ansible.builtin.uri:
     url: "http://{{ traefik_bind_address }}:{{ traefik_http_port }}/"
     method: GET
@@ -116,22 +170,81 @@
       Host: "{{ traefik_validation_hostname }}"
     status_code: 200
     return_content: true
-  register: traefik_validation_response
+  register: traefik_http_validation_response
   retries: 15
   delay: 2
-  until: traefik_validation_response.status == 200
-  failed_when: traefik_validation_response.status != 200
+  until: traefik_http_validation_response.status == 200
+  failed_when: traefik_http_validation_response.status != 200
   when:
     - traefik_enable_validation_service | bool
+    - not (traefik_enable_https | bool)
     - not ansible_check_mode
 
-- name: Assert standard security headers are present
+- name: Assert standard HTTP security headers are present
   ansible.builtin.assert:
     that:
-      - traefik_validation_response.get('x_content_type_options', '') == 'nosniff'
-      - "'noindex' in traefik_validation_response.get('x_robots_tag', '')"
+      - traefik_http_validation_response.get('x_content_type_options', '') == 'nosniff'
+      - "'noindex' in traefik_http_validation_response.get('x_robots_tag', '')"
     fail_msg: "The reusable Traefik security middleware was not applied."
   when:
+    - traefik_enable_validation_service | bool
+    - not (traefik_enable_https | bool)
+    - not ansible_check_mode
+
+- name: Validate HTTPS discovery and security headers
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --silent
+      - --insecure
+      - --include
+      - --resolve
+      - "{{ traefik_validation_hostname }}:{{ traefik_https_port }}:{{ traefik_bind_address }}"
+      - "https://{{ traefik_validation_hostname }}:{{ traefik_https_port }}/"
+  register: traefik_https_validation_response
+  changed_when: false
+  retries: 15
+  delay: 2
+  until: >-
+    'http/1.1 200' in traefik_https_validation_response.stdout | lower or
+    'http/2 200' in traefik_https_validation_response.stdout | lower
+  failed_when: >-
+    (
+      'http/1.1 200' not in traefik_https_validation_response.stdout | lower and
+      'http/2 200' not in traefik_https_validation_response.stdout | lower
+    ) or
+    'x-content-type-options: nosniff' not in
+    traefik_https_validation_response.stdout | lower or
+    'x-robots-tag: noindex' not in
+    traefik_https_validation_response.stdout | lower or
+    'strict-transport-security: max-age=31536000' not in
+    traefik_https_validation_response.stdout | lower
+  when:
+    - traefik_enable_validation_service | bool
+    - traefik_enable_https | bool
+    - not ansible_check_mode
+
+- name: Validate HTTP to HTTPS redirect
+  ansible.builtin.uri:
+    url: "http://{{ traefik_bind_address }}:{{ traefik_http_port }}/"
+    method: GET
+    headers:
+      Host: "{{ traefik_validation_hostname }}"
+    status_code:
+      - 301
+      - 302
+      - 307
+      - 308
+    follow_redirects: none
+  register: traefik_redirect_response
+  retries: 10
+  delay: 2
+  until: traefik_redirect_response.status in [301, 302, 307, 308]
+  failed_when: >-
+    traefik_redirect_response.status not in [301, 302, 307, 308] or
+    not traefik_redirect_response.location.startswith('https://')
+  when:
+    - traefik_redirect_http_to_https | bool
     - traefik_enable_validation_service | bool
     - not ansible_check_mode
 
@@ -166,4 +279,5 @@
       bind_address: "{{ traefik_bind_address }}"
       http_port: "{{ traefik_http_port }}"
       https_enabled: "{{ traefik_enable_https | bool }}"
+      http_redirect_enabled: "{{ traefik_redirect_http_to_https | bool }}"
       docker_socket_direct_mount: false

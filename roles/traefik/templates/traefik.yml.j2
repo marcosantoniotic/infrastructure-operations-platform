@@ -24,7 +24,7 @@ entryPoints:
     http:
       redirections:
         entryPoint:
-          to: websecure
+          to: "{{ traefik_https_redirect_target }}"
           scheme: https
           permanent: true
 {% endif %}

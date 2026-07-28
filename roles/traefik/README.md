@@ -27,6 +27,7 @@ Replace `traefik_dashboard_basic_auth` with an externally generated `htpasswd`
 entry. Keep the plaintext credential in an approved password manager, never in
 the repository.
 
-The validation profile binds ports to loopback and uses an SSH tunnel. HTTPS,
-certificate automation and Cloudflare integration are intentionally separate
-promotion steps.
+The validation profile binds ports to loopback, uses an SSH tunnel and enables
+HTTPS with a private validation CA. The CA private key remains on the
+automation controller. Cloudflare and public-certificate integration are
+intentionally separate promotion steps.

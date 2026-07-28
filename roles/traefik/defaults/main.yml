@@ -17,5 +17,8 @@ traefik_proxy_network: proxy
 traefik_socket_network: socket-proxy
 traefik_enable_https: false
 traefik_redirect_http_to_https: false
+traefik_https_redirect_target: websecure
+traefik_tls_certificate_source: ""
+traefik_tls_private_key_source: ""
 traefik_enable_validation_service: false
 traefik_log_level: INFO

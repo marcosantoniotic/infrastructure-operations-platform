@@ -315,20 +315,38 @@ Certification requires:
 - Docker API mutation rejected with HTTP 403;
 - final pass with `changed=0`, `unreachable=0` and `failed=0`.
 
-Open a separate Windows Terminal and keep the tunnel running:
+The runner creates a private validation CA on `AUTOMATION-CONTROLLER`, signs a
+certificate for `traefik.localhost` and `whoami.localhost`, and copies only the
+public CA certificate to `.validation/traefik-validation-ca.crt`. The CA
+private key never leaves the controller.
+
+Open a separate Windows Terminal and keep both tunnels running:
 
 ```powershell
-ssh -N -L 8080:127.0.0.1:8080 `
+ssh -N `
+  -L 8080:127.0.0.1:8080 `
+  -L 8443:127.0.0.1:8443 `
   -i ".validation\id_ed25519" `
   automation@<PLATFORM_ADDRESS>
 ```
 
-Open `http://traefik.localhost:8080/dashboard/` and use the credential stored
-in `.validation/traefik-initial-credentials.txt`. The validation route is
-available at `http://whoami.localhost:8080/`.
+After explicitly reviewing the certificate, install the public validation CA
+in the current user's Windows trust store:
 
-This stage validates secure discovery and HTTP routing. HTTPS remains disabled
-until the certificate and DNS strategy is validated independently.
+```powershell
+Import-Certificate `
+  -FilePath ".validation\traefik-validation-ca.crt" `
+  -CertStoreLocation "Cert:\CurrentUser\Root"
+```
+
+Open `https://traefik.localhost:8443/dashboard/` and use the credential stored
+in `.validation/traefik-initial-credentials.txt`. The validation route is
+available at `https://whoami.localhost:8443/`. HTTP on port `8080` redirects to
+HTTPS on port `8443`.
+
+This private CA exists only for the isolated validation environment. Production
+promotion still requires the certificate, DNS and renewal strategy for the
+real application domain.
 
 ## Lifecycle commands
 

@@ -15,6 +15,9 @@ $groupVars = Join-Path $groupVarsRoot 'main.yml'
 $vaultFile = Join-Path $groupVarsRoot 'vault.yml'
 $vaultPasswordFile = Join-Path $ansibleRoot 'vault-password.txt'
 $credentialFile = Join-Path $validationRoot 'traefik-initial-credentials.txt'
+$caCertificateFile = Join-Path $validationRoot 'traefik-validation-ca.crt'
+$opensslConfigFile = Join-Path $validationRoot 'traefik-openssl.cnf'
+$pkiScriptFile = Join-Path $validationRoot 'traefik-create-pki.sh'
 $requirements = Join-Path $projectRoot 'requirements.yml'
 $playbook = Join-Path $projectRoot 'playbooks\traefik.yml'
 $dockerRole = Join-Path $projectRoot 'roles\docker_engine'
@@ -94,6 +97,70 @@ $commonOptions = @(
 
 New-Item -ItemType Directory -Path $groupVarsRoot -Force | Out-Null
 $utf8WithoutBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+
+$opensslConfig = @"
+[req]
+prompt = no
+distinguished_name = dn
+req_extensions = v3_req
+
+[dn]
+CN = traefik.localhost
+
+[v3_req]
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = traefik.localhost
+DNS.2 = whoami.localhost
+"@
+$opensslConfig = $opensslConfig -replace "`r`n", "`n"
+[IO.File]::WriteAllText($opensslConfigFile, $opensslConfig, $utf8WithoutBom)
+
+Write-Host 'Preparing the isolated validation PKI on AUTOMATION-CONTROLLER.'
+& ssh.exe @commonOptions $controller `
+    "install -d -m 0700 /home/automation/.ansible/validation-pki; install -d -m 0755 $remoteRoot/inventories/validation/files/traefik"
+if ($LASTEXITCODE -ne 0) { throw 'Failed to prepare validation PKI directories.' }
+& scp.exe @commonOptions $opensslConfigFile "${controller}:/tmp/traefik-openssl.cnf"
+if ($LASTEXITCODE -ne 0) { throw 'Failed to stage the OpenSSL configuration.' }
+
+$remotePkiScript = @"
+set -e
+pki=/home/automation/.ansible/validation-pki
+files=$remoteRoot/inventories/validation/files/traefik
+if [ ! -s "`$pki/ca.key" ] || [ ! -s "`$pki/ca.crt" ]; then
+  openssl req -x509 -newkey rsa:3072 -nodes -sha256 -days 3650 \
+    -subj "/CN=Infrastructure-Operations-Validation-CA" \
+    -keyout "`$pki/ca.key" -out "`$pki/ca.crt"
+fi
+if [ ! -s "`$pki/tls.key" ] || [ ! -s "`$pki/tls.crt" ]; then
+  openssl req -new -newkey rsa:3072 -nodes \
+    -config /tmp/traefik-openssl.cnf \
+    -keyout "`$pki/tls.key" -out "`$pki/tls.csr"
+  openssl x509 -req -sha256 -days 825 \
+    -in "`$pki/tls.csr" -CA "`$pki/ca.crt" -CAkey "`$pki/ca.key" \
+    -CAcreateserial -extfile /tmp/traefik-openssl.cnf -extensions v3_req \
+    -out "`$pki/tls.crt"
+fi
+install -m 0644 "`$pki/tls.crt" "`$files/tls.crt"
+install -m 0600 "`$pki/tls.key" "`$files/tls.key"
+rm -f /tmp/traefik-openssl.cnf
+"@
+$remotePkiScript = $remotePkiScript -replace "`r`n", "`n"
+[IO.File]::WriteAllText($pkiScriptFile, $remotePkiScript, $utf8WithoutBom)
+& scp.exe @commonOptions $pkiScriptFile "${controller}:/tmp/traefik-create-pki.sh"
+if ($LASTEXITCODE -ne 0) { throw 'Failed to stage the validation PKI script.' }
+& ssh.exe @commonOptions $controller `
+    "bash /tmp/traefik-create-pki.sh; rc=`$?; rm -f /tmp/traefik-create-pki.sh; exit `$rc"
+if ($LASTEXITCODE -ne 0) { throw 'Failed to create the validation certificate.' }
+& scp.exe @commonOptions "${controller}:/home/automation/.ansible/validation-pki/ca.crt" $caCertificateFile
+if ($LASTEXITCODE -ne 0) { throw 'Failed to retrieve the public validation CA certificate.' }
+Remove-Item -LiteralPath $opensslConfigFile -Force
+Remove-Item -LiteralPath $pkiScriptFile -Force
+
 $groupVarsContent = if (Test-Path -LiteralPath $groupVars) {
     Get-Content -LiteralPath $groupVars -Raw
 }
@@ -118,9 +185,18 @@ else {
         -Password $initialCredential
     [IO.File]::WriteAllText(
         $credentialFile,
-        "URL (via SSH tunnel): http://traefik.localhost:8080/dashboard/`r`nUsername: admin`r`nPassword: $initialCredential`r`n",
+        "URL (via SSH tunnel): https://traefik.localhost:8443/dashboard/`r`nUsername: admin`r`nPassword: $initialCredential`r`n",
         $utf8WithoutBom
     )
+    Set-CurrentUserFileAcl -Path $credentialFile
+}
+
+if (Test-Path -LiteralPath $credentialFile -PathType Leaf) {
+    $credentialContent = Get-Content -LiteralPath $credentialFile -Raw
+    $credentialContent = $credentialContent -replace (
+        '(?m)^URL \(via SSH tunnel\): .+$'
+    ), 'URL (via SSH tunnel): https://traefik.localhost:8443/dashboard/'
+    [IO.File]::WriteAllText($credentialFile, $credentialContent, $utf8WithoutBom)
     Set-CurrentUserFileAcl -Path $credentialFile
 }
 
@@ -141,8 +217,11 @@ traefik_validation_hostname: whoami.localhost
 traefik_dashboard_basic_auth: '$dashboardCredential'
 traefik_proxy_network: proxy
 traefik_socket_network: socket-proxy
-traefik_enable_https: false
-traefik_redirect_http_to_https: false
+traefik_enable_https: true
+traefik_redirect_http_to_https: true
+traefik_https_redirect_target: ':8443'
+traefik_tls_certificate_source: '$remoteRoot/inventories/validation/files/traefik/tls.crt'
+traefik_tls_private_key_source: '$remoteRoot/inventories/validation/files/traefik/tls.key'
 traefik_enable_validation_service: true
 # END VALIDATION TRAEFIK
 "@
@@ -154,7 +233,7 @@ traefik_enable_validation_service: true
 
 Write-Host 'Staging the Traefik module on AUTOMATION-CONTROLLER.'
 & ssh.exe @commonOptions $controller `
-    "install -d -m 0755 $remoteRoot/playbooks $remoteRoot/roles $remoteRoot/inventories/validation/group_vars/all"
+    "install -d -m 0755 $remoteRoot/playbooks $remoteRoot/roles $remoteRoot/inventories/validation/group_vars/all; sudo chown -R automation:automation $remoteRoot/roles; chmod -R u+rwX $remoteRoot/roles"
 if ($LASTEXITCODE -ne 0) { throw 'Failed to prepare remote directories.' }
 
 & scp.exe @commonOptions $requirements "${controller}:$remoteRoot/requirements.yml"
