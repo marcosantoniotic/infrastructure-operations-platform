@@ -295,6 +295,41 @@ The local backup proves recoverability but is not disaster recovery. Production
 promotion also requires encrypted replication to storage outside the platform
 host and monitoring of backup age and timer failures.
 
+### 11. Deploy and certify Traefik ingress
+
+Deploy Traefik, its restricted Docker Socket Proxy and a disposable discovery
+target:
+
+```powershell
+.\automation\scripts\Run-ValidationTraefik.ps1 -VerifyIdempotence
+```
+
+Certification requires:
+
+- Traefik and Socket Proxy healthy;
+- no direct Docker Socket mount in the Traefik container;
+- unauthenticated dashboard request returning HTTP 401;
+- Docker-discovered validation route returning HTTP 200;
+- reusable security headers present;
+- read-only Docker API request accepted through Socket Proxy;
+- Docker API mutation rejected with HTTP 403;
+- final pass with `changed=0`, `unreachable=0` and `failed=0`.
+
+Open a separate Windows Terminal and keep the tunnel running:
+
+```powershell
+ssh -N -L 8080:127.0.0.1:8080 `
+  -i ".validation\id_ed25519" `
+  automation@<PLATFORM_ADDRESS>
+```
+
+Open `http://traefik.localhost:8080/dashboard/` and use the credential stored
+in `.validation/traefik-initial-credentials.txt`. The validation route is
+available at `http://whoami.localhost:8080/`.
+
+This stage validates secure discovery and HTTP routing. HTTPS remains disabled
+until the certificate and DNS strategy is validated independently.
+
 ## Lifecycle commands
 
 From `automation\vagrant`:
@@ -322,4 +357,6 @@ The environment is not considered validated until:
 - RHEL baseline is idempotent;
 - Docker installation is idempotent;
 - NetBox survives restart and container recreation;
+- NetBox backup restores in an isolated database;
+- Traefik discovery, authentication and Socket Proxy restrictions pass;
 - no local secret or RHEL artifact appears in Git.

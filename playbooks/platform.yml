@@ -12,5 +12,6 @@
   gather_facts: false
   become: true
   roles:
+    - role: traefik
     - role: netbox
     - role: netbox_backup

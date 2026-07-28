@@ -35,6 +35,7 @@ all:
           ansible_ssh_private_key_file: "/home/$adminUsername/.ssh/id_ed25519"
 "@
 $utf8WithoutBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+$inventoryContent = $inventoryContent -replace "`r`n", "`n"
 [System.IO.File]::WriteAllText($inventory, $inventoryContent, $utf8WithoutBom)
 
 $sshOptions = @(
@@ -74,7 +75,7 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Failed to stage the preflight playbook.'
 }
 
-& ssh.exe @sshOptions $controller @"
+$remotePreflight = @"
 set -e
 install -m 0600 /tmp/validation_id_ed25519 /home/$adminUsername/.ssh/id_ed25519
 rm -f /tmp/validation_id_ed25519
@@ -88,6 +89,8 @@ else
   ansible-playbook -i inventories/validation/hosts.yml playbooks/preflight.yml
 fi
 "@
+$remotePreflight = $remotePreflight -replace "`r`n", "`n"
+& ssh.exe @sshOptions $controller $remotePreflight
 if ($LASTEXITCODE -ne 0) {
     throw 'Ansible preflight failed.'
 }

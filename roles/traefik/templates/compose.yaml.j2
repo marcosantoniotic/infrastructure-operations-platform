@@ -1,0 +1,106 @@
+name: traefik
+
+services:
+  docker-socket-proxy:
+    image: {{ traefik_socket_proxy_image }}
+    environment:
+      CONTAINERS: "1"
+      EVENTS: "1"
+      INFO: "1"
+      NETWORKS: "1"
+      PING: "1"
+      POST: "0"
+      VERSION: "1"
+      LOG_LEVEL: warning
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+      - label=disable
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:2375/_ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      socket-proxy:
+        aliases:
+          - docker-socket-proxy
+
+  traefik:
+    image: {{ traefik_image }}
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
+    ports:
+      - "{{ traefik_bind_address }}:{{ traefik_http_port }}:80"
+{% if traefik_enable_https %}
+      - "{{ traefik_bind_address }}:{{ traefik_https_port }}:443"
+{% endif %}
+      - "{{ traefik_bind_address }}:{{ traefik_metrics_port }}:8082"
+    volumes:
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic:/etc/traefik/dynamic:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network={{ traefik_proxy_network }}
+      - >-
+        traefik.http.routers.traefik-dashboard.rule=Host(`{{ traefik_dashboard_hostname }}`)
+        && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
+      - traefik.http.routers.traefik-dashboard.entrypoints=web
+      - traefik.http.routers.traefik-dashboard.middlewares=dashboard-auth@file,security-headers@file
+      - traefik.http.routers.traefik-dashboard.service=api@internal
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - proxy
+      - socket-proxy
+
+{% if traefik_enable_validation_service %}
+  whoami:
+    image: {{ traefik_validation_image }}
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network={{ traefik_proxy_network }}
+      - traefik.http.routers.whoami.rule=Host(`{{ traefik_validation_hostname }}`)
+      - traefik.http.routers.whoami.entrypoints=web
+      - traefik.http.routers.whoami.middlewares=security-headers@file
+      - traefik.http.services.whoami.loadbalancer.server.port=80
+    restart: unless-stopped
+    networks:
+      - proxy
+{% endif %}
+
+networks:
+  proxy:
+    name: {{ traefik_proxy_network }}
+    driver: bridge
+  socket-proxy:
+    name: {{ traefik_socket_network }}
+    driver: bridge
+    internal: true

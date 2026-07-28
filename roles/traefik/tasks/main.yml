@@ -1,0 +1,169 @@
+---
+- name: Validate Traefik variables
+  ansible.builtin.assert:
+    that:
+      - traefik_project_dir.startswith("/")
+      - traefik_bind_address | length > 0
+      - traefik_dashboard_hostname | length > 0
+      - traefik_dashboard_basic_auth | length >= 30
+      - not traefik_dashboard_basic_auth.startswith("<")
+      - not (traefik_redirect_http_to_https | bool) or traefik_enable_https | bool
+    fail_msg: >-
+      Configure the Traefik dashboard credential and ensure HTTPS is enabled
+      before enabling the HTTP redirect.
+  no_log: true
+
+- name: Validate Docker service
+  ansible.builtin.service_facts: {}
+
+- name: Assert Docker is running
+  ansible.builtin.assert:
+    that:
+      - "'docker.service' in ansible_facts.services"
+      - ansible_facts.services.get('docker.service', {}).get('state', '') == 'running'
+    fail_msg: "Docker must be installed and running before Traefik deployment."
+
+- name: Create Traefik configuration directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ traefik_project_dir }}"
+      mode: "0750"
+    - path: "{{ traefik_project_dir }}/dynamic"
+      mode: "0750"
+
+- name: Render Traefik static configuration
+  ansible.builtin.template:
+    src: traefik.yml.j2
+    dest: "{{ traefik_project_dir }}/traefik.yml"
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Restart Traefik
+
+- name: Render Traefik dynamic configuration
+  ansible.builtin.template:
+    src: dynamic-security.yml.j2
+    dest: "{{ traefik_project_dir }}/dynamic/security.yml"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: Restart Traefik
+
+- name: Render Traefik Compose project
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ traefik_project_dir }}/compose.yaml"
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Restart Traefik
+
+- name: Validate rendered Traefik Compose configuration
+  ansible.builtin.command:
+    cmd: docker compose --project-directory {{ traefik_project_dir }} config --quiet
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Deploy Traefik project
+  community.docker.docker_compose_v2:
+    project_src: "{{ traefik_project_dir }}"
+    files:
+      - compose.yaml
+    state: present
+    pull: missing
+    wait: true
+    wait_timeout: 180
+  when: not ansible_check_mode
+
+- name: Apply pending Traefik restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for Traefik health endpoint
+  ansible.builtin.uri:
+    url: "http://{{ traefik_bind_address }}:{{ traefik_metrics_port }}/ping"
+    method: GET
+    status_code: 200
+  register: traefik_ping
+  retries: 20
+  delay: 3
+  until: traefik_ping.status == 200
+  when: not ansible_check_mode
+
+- name: Assert unauthenticated dashboard is rejected
+  ansible.builtin.uri:
+    url: "http://{{ traefik_bind_address }}:{{ traefik_http_port }}/dashboard/"
+    method: GET
+    headers:
+      Host: "{{ traefik_dashboard_hostname }}"
+    status_code: 401
+  register: traefik_dashboard_unauthenticated
+  retries: 15
+  delay: 2
+  until: traefik_dashboard_unauthenticated.status == 401
+  when: not ansible_check_mode
+
+- name: Validate Docker discovery through test route
+  ansible.builtin.uri:
+    url: "http://{{ traefik_bind_address }}:{{ traefik_http_port }}/"
+    method: GET
+    headers:
+      Host: "{{ traefik_validation_hostname }}"
+    status_code: 200
+    return_content: true
+  register: traefik_validation_response
+  retries: 15
+  delay: 2
+  until: traefik_validation_response.status == 200
+  failed_when: traefik_validation_response.status != 200
+  when:
+    - traefik_enable_validation_service | bool
+    - not ansible_check_mode
+
+- name: Assert standard security headers are present
+  ansible.builtin.assert:
+    that:
+      - traefik_validation_response.get('x_content_type_options', '') == 'nosniff'
+      - "'noindex' in traefik_validation_response.get('x_robots_tag', '')"
+    fail_msg: "The reusable Traefik security middleware was not applied."
+  when:
+    - traefik_enable_validation_service | bool
+    - not ansible_check_mode
+
+- name: Verify Socket Proxy permits read-only Docker API access
+  ansible.builtin.command:
+    cmd: >-
+      docker run --rm --network {{ traefik_socket_network }}
+      curlimages/curl:8.17.0
+      --silent --show-error --fail
+      http://docker-socket-proxy:2375/version
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Verify Socket Proxy rejects Docker API mutations
+  ansible.builtin.command:
+    cmd: >-
+      docker run --rm --network {{ traefik_socket_network }}
+      curlimages/curl:8.17.0
+      --silent --output /dev/null --write-out %{http_code}
+      --request POST
+      http://docker-socket-proxy:2375/containers/nonexistent/start
+  register: traefik_socket_mutation_result
+  changed_when: false
+  failed_when: traefik_socket_mutation_result.stdout != "403"
+  when: not ansible_check_mode
+
+- name: Report Traefik deployment
+  ansible.builtin.debug:
+    msg:
+      project_directory: "{{ traefik_project_dir }}"
+      dashboard_hostname: "{{ traefik_dashboard_hostname }}"
+      bind_address: "{{ traefik_bind_address }}"
+      http_port: "{{ traefik_http_port }}"
+      https_enabled: "{{ traefik_enable_https | bool }}"
+      docker_socket_direct_mount: false

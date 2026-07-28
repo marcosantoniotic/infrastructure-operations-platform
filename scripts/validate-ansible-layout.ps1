@@ -25,6 +25,7 @@ $requiredPaths = @(
     'automation/scripts/Run-ValidationDocker.ps1',
     'automation/scripts/Run-ValidationNetBox.ps1',
     'automation/scripts/Run-ValidationNetBoxBackup.ps1',
+    'automation/scripts/Run-ValidationTraefik.ps1',
     'automation/scripts/Initialize-Validation.ps1',
     'automation/scripts/Build-RhelBox.ps1',
     'automation/scripts/Register-RhelBox.ps1',
@@ -34,6 +35,7 @@ $requiredPaths = @(
     'playbooks/docker.yml',
     'playbooks/netbox.yml',
     'playbooks/netbox-backup.yml',
+    'playbooks/traefik.yml',
     'playbooks/platform.yml',
     'roles/rhel_baseline/defaults/main.yml',
     'roles/rhel_baseline/tasks/main.yml',
@@ -44,7 +46,13 @@ $requiredPaths = @(
     'roles/netbox/templates/compose.yaml.j2',
     'roles/netbox_backup/defaults/main.yml',
     'roles/netbox_backup/tasks/main.yml',
-    'roles/netbox_backup/templates/netbox-backup.sh.j2'
+    'roles/netbox_backup/templates/netbox-backup.sh.j2',
+    'roles/traefik/defaults/main.yml',
+    'roles/traefik/tasks/main.yml',
+    'roles/traefik/README.md',
+    'roles/traefik/templates/compose.yaml.j2',
+    'roles/traefik/templates/traefik.yml.j2',
+    'roles/traefik/templates/dynamic-security.yml.j2'
 )
 
 foreach ($relativePath in $requiredPaths) {
@@ -99,7 +107,8 @@ $requiredPlaceholders = @(
     '<POSTGRES_PASSWORD>',
     '<REDIS_PASSWORD>',
     '<REDIS_CACHE_PASSWORD>',
-    '<NETBOX_ADMIN_PASSWORD>'
+    '<NETBOX_ADMIN_PASSWORD>',
+    '<TRAEFIK_DASHBOARD_BASIC_AUTH>'
 )
 
 foreach ($placeholder in $requiredPlaceholders) {

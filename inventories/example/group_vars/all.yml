@@ -65,3 +65,20 @@ netbox_backup_retention_days: 14
 netbox_backup_schedule: "*-*-* 02:30:00"
 netbox_backup_run_now: false
 netbox_backup_verify_restore: false
+
+# Traefik ingress
+traefik_project_dir: /opt/traefik
+traefik_image: traefik:v3.7.1
+traefik_socket_proxy_image: >-
+  ghcr.io/tecnativa/docker-socket-proxy@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+traefik_bind_address: 127.0.0.1
+traefik_http_port: 8080
+traefik_https_port: 8443
+traefik_metrics_port: 8082
+traefik_dashboard_hostname: "traefik.<BASE_DOMAIN>"
+traefik_dashboard_basic_auth: "<TRAEFIK_DASHBOARD_BASIC_AUTH>"
+traefik_proxy_network: proxy
+traefik_socket_network: socket-proxy
+traefik_enable_https: false
+traefik_redirect_http_to_https: false
+traefik_enable_validation_service: false
