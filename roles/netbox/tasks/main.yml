@@ -4,6 +4,8 @@
     that:
       - netbox_secret_key | length >= 50
       - not netbox_secret_key.startswith("<")
+      - netbox_api_token_pepper | length >= 32
+      - not netbox_api_token_pepper.startswith("<")
       - netbox_postgres_password | length >= 16
       - not netbox_postgres_password.startswith("<")
       - netbox_redis_password | length >= 16

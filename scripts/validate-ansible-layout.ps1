@@ -13,10 +13,27 @@ $requiredPaths = @(
     'inventories/example/group_vars/vault.example.yml',
     'inventories/validation/.gitkeep',
     'inventories/production/.gitkeep',
+    'automation/packer/rhel9/rhel9.pkr.hcl',
+    'automation/packer/rhel9/variables.pkr.hcl',
+    'automation/packer/rhel9/http/kickstart.cfg.pkrtpl',
+    'automation/vagrant/Vagrantfile',
+    'automation/scripts/Test-ValidationPrerequisites.ps1',
+    'automation/scripts/Install-ValidationPrerequisites.ps1',
+    'automation/scripts/Install-InfrastructureWorkstation.ps1',
+    'automation/scripts/Run-ValidationPreflight.ps1',
+    'automation/scripts/Run-ValidationBaseline.ps1',
+    'automation/scripts/Run-ValidationDocker.ps1',
+    'automation/scripts/Run-ValidationNetBox.ps1',
+    'automation/scripts/Run-ValidationNetBoxBackup.ps1',
+    'automation/scripts/Initialize-Validation.ps1',
+    'automation/scripts/Build-RhelBox.ps1',
+    'automation/scripts/Register-RhelBox.ps1',
+    'automation/scripts/Start-ValidationEnvironment.ps1',
     'playbooks/preflight.yml',
     'playbooks/bootstrap-rhel.yml',
     'playbooks/docker.yml',
     'playbooks/netbox.yml',
+    'playbooks/netbox-backup.yml',
     'playbooks/platform.yml',
     'roles/rhel_baseline/defaults/main.yml',
     'roles/rhel_baseline/tasks/main.yml',
@@ -24,7 +41,10 @@ $requiredPaths = @(
     'roles/docker_engine/tasks/main.yml',
     'roles/netbox/defaults/main.yml',
     'roles/netbox/tasks/main.yml',
-    'roles/netbox/templates/compose.yaml.j2'
+    'roles/netbox/templates/compose.yaml.j2',
+    'roles/netbox_backup/defaults/main.yml',
+    'roles/netbox_backup/tasks/main.yml',
+    'roles/netbox_backup/templates/netbox-backup.sh.j2'
 )
 
 foreach ($relativePath in $requiredPaths) {
@@ -34,8 +54,19 @@ foreach ($relativePath in $requiredPaths) {
     }
 }
 
-$yamlFiles = Get-ChildItem -LiteralPath $projectRoot -Recurse -File |
-    Where-Object { $_.Extension -in @('.yml', '.yaml') }
+$publishablePaths = & git -C $projectRoot ls-files --cached --others --exclude-standard
+if ($LASTEXITCODE -ne 0) {
+    throw 'Unable to enumerate publishable files with Git.'
+}
+
+$yamlFiles = foreach ($relativePath in $publishablePaths) {
+    if ([System.IO.Path]::GetExtension($relativePath) -in @('.yml', '.yaml')) {
+        $fullPath = Join-Path $projectRoot $relativePath
+        if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
+            Get-Item -LiteralPath $fullPath
+        }
+    }
+}
 
 foreach ($file in $yamlFiles) {
     $content = Get-Content -LiteralPath $file.FullName -Raw
@@ -64,6 +95,7 @@ $requiredPlaceholders = @(
     '<ADMIN_USER>',
     '<BASE_DOMAIN>',
     '<NETBOX_SECRET_KEY>',
+    '<NETBOX_API_TOKEN_PEPPER>',
     '<POSTGRES_PASSWORD>',
     '<REDIS_PASSWORD>',
     '<REDIS_CACHE_PASSWORD>',

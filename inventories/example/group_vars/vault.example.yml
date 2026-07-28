@@ -2,6 +2,7 @@
 # Copy this file as vault.yml inside the target inventory, replace every
 # placeholder and encrypt it with ansible-vault before the first execution.
 vault_netbox_secret_key: "<NETBOX_SECRET_KEY>"
+vault_netbox_api_token_pepper: "<NETBOX_API_TOKEN_PEPPER>"
 vault_netbox_postgres_password: "<POSTGRES_PASSWORD>"
 vault_netbox_redis_password: "<REDIS_PASSWORD>"
 vault_netbox_redis_cache_password: "<REDIS_CACHE_PASSWORD>"

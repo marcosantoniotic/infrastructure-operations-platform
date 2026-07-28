@@ -1,0 +1,46 @@
+#version=RHEL9
+text
+cdrom
+reboot --eject
+
+lang pt_BR.UTF-8
+keyboard --xlayouts='br'
+timezone America/Sao_Paulo --utc
+
+network --bootproto=dhcp --device=link --activate --onboot=yes
+network --hostname=${guest_hostname}
+
+rootpw --lock
+user --name=${admin_username} --groups=wheel --password=${admin_password} --plaintext --gecos="Automation Administrator"
+sshkey --username=${admin_username} "${ssh_public_key}"
+
+firewall --enabled --service=ssh
+selinux --enforcing
+services --enabled=sshd,NetworkManager,vmtoolsd
+
+zerombr
+clearpart --all --initlabel
+autopart --type=lvm
+
+%packages
+@^minimal-environment
+ansible-core
+bash-completion
+curl
+git-core
+open-vm-tools
+openssh-server
+python3
+sudo
+vim-enhanced
+%end
+
+%post --erroronfail --log=/root/kickstart-post.log
+cat > /etc/sudoers.d/90-automation <<'EOF'
+${admin_username} ALL=(ALL) NOPASSWD: ALL
+EOF
+chmod 0440 /etc/sudoers.d/90-automation
+
+install -d -m 0700 -o ${admin_username} -g ${admin_username} /home/${admin_username}/.ssh
+restorecon -RF /home/${admin_username}/.ssh
+%end

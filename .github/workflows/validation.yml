@@ -1,0 +1,60 @@
+---
+name: Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository:
+    name: Repository and PowerShell validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate repository structure
+        shell: pwsh
+        run: ./scripts/validate-ansible-layout.ps1
+
+      - name: Detect publication risks
+        shell: pwsh
+        run: ./scripts/validate-publication.ps1
+
+      - name: Parse PowerShell sources
+        shell: pwsh
+        run: |
+          $errorsFound = @()
+          Get-ChildItem -Recurse -Filter '*.ps1' | ForEach-Object {
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName,
+              [ref]$null,
+              [ref]$parseErrors
+            )
+            foreach ($parseError in $parseErrors) {
+              $errorsFound += "$($_.FullName): $($parseError.Message)"
+            }
+          }
+          if ($errorsFound.Count -gt 0) {
+            $errorsFound | Write-Error
+            exit 1
+          }
+
+      - name: Reject whitespace errors
+        shell: bash
+        run: git diff --check HEAD^ HEAD

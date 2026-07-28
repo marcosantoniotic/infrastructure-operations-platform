@@ -25,8 +25,17 @@ $forbiddenContentPatterns = @(
 )
 
 $errors = [System.Collections.Generic.List[string]]::new()
-$files = Get-ChildItem -LiteralPath $projectRoot -Recurse -File -Force |
-    Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
+$publishablePaths = & git -C $projectRoot ls-files --cached --others --exclude-standard
+if ($LASTEXITCODE -ne 0) {
+    throw 'Unable to enumerate publishable files with Git.'
+}
+
+$files = foreach ($relativePath in $publishablePaths) {
+    $fullPath = Join-Path $projectRoot $relativePath
+    if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
+        Get-Item -LiteralPath $fullPath -Force
+    }
+}
 
 foreach ($pattern in $forbiddenFilePatterns) {
     foreach ($file in $files | Where-Object { $_.Name -like $pattern }) {
@@ -47,6 +56,13 @@ foreach ($file in $files) {
         if ($pattern -eq '\b(?:\d{1,3}\.){3}\d{1,3}\b') {
             # Loopback is a public implementation constant, not infrastructure data.
             $contentToInspect = $contentToInspect -replace '\b127(?:\.\d{1,3}){3}\b', '<LOOPBACK>'
+        }
+        if ($pattern -match 'password\|passwd') {
+            # HCL variable references are wiring, not embedded secret values.
+            $contentToInspect = $contentToInspect -replace (
+                '(?i)((?:password|passwd|secret|token|api[_-]?key)\s*[:=]\s*)' +
+                'var\.[A-Za-z_][A-Za-z0-9_]*'
+            ), '$1<VARIABLE_REFERENCE>'
         }
         if ($contentToInspect -match $pattern) {
             $errors.Add("Conteúdo potencialmente sensível em: $($file.FullName) (padrão: $pattern)")

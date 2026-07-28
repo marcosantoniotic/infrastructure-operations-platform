@@ -1,0 +1,12 @@
+---
+netbox_backup_project_dir: /opt/netbox
+netbox_backup_root: /var/backups/infrastructure-platform/netbox
+netbox_backup_retention_days: 14
+netbox_backup_schedule: "*-*-* 02:30:00"
+netbox_backup_postgres_service: postgres
+netbox_backup_application_service: netbox
+netbox_backup_database_name: netbox
+netbox_backup_database_user: netbox
+netbox_backup_postgres_image: postgres:18-alpine
+netbox_backup_run_now: false
+netbox_backup_verify_restore: false

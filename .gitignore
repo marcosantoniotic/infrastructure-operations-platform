@@ -38,3 +38,16 @@ inventories/production/*
 *.vault.yml
 *.vault.yaml
 vault-password*
+
+# Local validation infrastructure
+.validation/
+automation/packer/rhel9/local.auto.pkrvars.hcl
+automation/packer/rhel9/output/
+automation/packer/rhel9/packer_cache/
+automation/vagrant/.vagrant/
+*.box
+*.vmdk
+*.vmem
+*.vmss
+*.vmsn
+*.vmx

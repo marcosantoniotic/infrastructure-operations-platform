@@ -1,0 +1,7 @@
+---
+- name: Configure and validate NetBox backups
+  hosts: platform
+  gather_facts: true
+  become: true
+  roles:
+    - role: netbox_backup

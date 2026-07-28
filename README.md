@@ -8,6 +8,7 @@
 ![Ingress](https://img.shields.io/badge/ingress-Traefik-24A1C1?logo=traefikproxy&logoColor=white)
 ![Security](https://img.shields.io/badge/security-Zero%20Trust-0F9D58)
 ![Documentation](https://img.shields.io/badge/documentation-portfolio--ready-6F42C1)
+[![Validation](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml/badge.svg)](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml)
 
 Plataforma profissional de operações de infraestrutura criada para demonstrar, validar e documentar práticas aplicáveis a ambientes corporativos. O projeto integra inventário técnico, proxy reverso, Zero Trust, observabilidade, monitoramento, gestão de containers, automação e governança operacional em uma arquitetura coesa.
 
@@ -115,6 +116,7 @@ flowchart LR
 - [Referência de configuração](docs/configuration-reference.md)
 - [Catálogo de módulos executáveis](docs/modules.md)
 - [Inventários e gestão de segredos](docs/secrets-and-inventories.md)
+- [Ambiente de validação como código](docs/testing/validation-environment.md)
 - [Observabilidade](docs/observability.md)
 - [Segurança](docs/security.md)
 - [Operação diária](docs/runbooks/daily-operations.md)
@@ -131,6 +133,7 @@ flowchart LR
 ```text
 .
 ├── inventories/         # exemplos públicos e ambientes ignorados
+├── automation/          # Packer, Kickstart, Vagrant e scripts de validação
 ├── playbooks/           # pontos de entrada independentes
 ├── roles/               # módulos Ansible idempotentes
 ├── config/              # exemplos sanitizados e convenções

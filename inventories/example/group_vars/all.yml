@@ -46,6 +46,7 @@ netbox_allowed_hosts:
 
 # Secret values are supplied by the encrypted vault.yml file.
 netbox_secret_key: "{{ vault_netbox_secret_key }}"
+netbox_api_token_pepper: "{{ vault_netbox_api_token_pepper }}"
 netbox_postgres_password: "{{ vault_netbox_postgres_password }}"
 netbox_redis_password: "{{ vault_netbox_redis_password }}"
 netbox_redis_cache_password: "{{ vault_netbox_redis_cache_password }}"
@@ -57,3 +58,10 @@ netbox_enable_metrics: true
 netbox_enable_traefik: false
 netbox_traefik_hostname: "netbox.<BASE_DOMAIN>"
 netbox_traefik_network: proxy
+
+# NetBox backup
+netbox_backup_root: /var/backups/infrastructure-platform/netbox
+netbox_backup_retention_days: 14
+netbox_backup_schedule: "*-*-* 02:30:00"
+netbox_backup_run_now: false
+netbox_backup_verify_restore: false

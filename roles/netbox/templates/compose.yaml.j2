@@ -21,7 +21,7 @@ services:
     env_file:
       - .env
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -35,7 +35,10 @@ services:
     image: {{ netbox_valkey_image }}
     env_file:
       - .env
-    command: ["valkey-server", "--appendonly", "yes", "--requirepass", "$${REDIS_PASSWORD}"]
+    command:
+      - sh
+      - -c
+      - 'exec valkey-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"'
     volumes:
       - redis_data:/data
     healthcheck:
@@ -51,7 +54,10 @@ services:
     image: {{ netbox_valkey_image }}
     env_file:
       - .env
-    command: ["valkey-server", "--requirepass", "$${REDIS_CACHE_PASSWORD}"]
+    command:
+      - sh
+      - -c
+      - 'exec valkey-server --requirepass "$${REDIS_CACHE_PASSWORD}"'
     healthcheck:
       test: ["CMD-SHELL", "valkey-cli -a \"$${REDIS_CACHE_PASSWORD}\" ping | grep PONG"]
       interval: 10s
@@ -94,7 +100,14 @@ services:
 
   netbox-housekeeping:
     <<: *netbox-common
-    command: /opt/netbox/housekeeping.sh
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        while true; do
+          /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py housekeeping;
+          sleep 86400;
+        done
     volumes:
       - media_data:/opt/netbox/netbox/media
 

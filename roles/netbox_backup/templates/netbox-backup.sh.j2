@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+readonly PROJECT_DIR="{{ netbox_backup_project_dir }}"
+readonly BACKUP_ROOT="{{ netbox_backup_root }}"
+readonly RETENTION_DAYS="{{ netbox_backup_retention_days }}"
+readonly POSTGRES_SERVICE="{{ netbox_backup_postgres_service }}"
+readonly APPLICATION_SERVICE="{{ netbox_backup_application_service }}"
+readonly DATABASE_NAME="{{ netbox_backup_database_name }}"
+readonly DATABASE_USER="{{ netbox_backup_database_user }}"
+readonly POSTGRES_IMAGE="{{ netbox_backup_postgres_image }}"
+
+log() {
+  logger -t netbox-backup -- "$*"
+  printf '%s\n' "$*"
+}
+
+latest_backup() {
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' \
+    -printf '%f\n' | sort | tail -n 1
+}
+
+create_backup() {
+  local timestamp staging final
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  staging="${BACKUP_ROOT}/.${timestamp}.partial"
+  final="${BACKUP_ROOT}/${timestamp}"
+  install -d -m 0700 "$staging"
+
+  cleanup_partial() {
+    rm -rf -- "$staging"
+  }
+  trap cleanup_partial ERR INT TERM
+
+  cd "$PROJECT_DIR"
+  docker compose exec -T "$POSTGRES_SERVICE" \
+    pg_dump --username "$DATABASE_USER" --dbname "$DATABASE_NAME" \
+    --format=custom --compress=6 > "${staging}/database.dump"
+
+  docker compose exec -T "$APPLICATION_SERVICE" \
+    tar -C /opt/netbox/netbox/media -czf - . > "${staging}/media.tar.gz"
+
+  install -m 0600 "${PROJECT_DIR}/compose.yaml" "${staging}/compose.yaml"
+  {
+    printf 'created_utc=%s\n' "$timestamp"
+    printf 'database=%s\n' "$DATABASE_NAME"
+    printf 'postgres_image=%s\n' "$POSTGRES_IMAGE"
+    docker compose images --format json | tr '\n' ' '
+    printf '\n'
+  } > "${staging}/metadata.txt"
+
+  (
+    cd "$staging"
+    sha256sum database.dump media.tar.gz compose.yaml metadata.txt > SHA256SUMS
+  )
+  mv -- "$staging" "$final"
+  trap - ERR INT TERM
+
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' \
+    -mtime "+${RETENTION_DAYS}" -exec rm -rf -- {} +
+  log "NetBox backup completed: ${final}"
+}
+
+verify_backup() {
+  local selected directory container verify_password
+  selected="${1:-$(latest_backup)}"
+  if [[ -z "$selected" ]]; then
+    log "No NetBox backup is available for verification."
+    exit 1
+  fi
+  directory="${BACKUP_ROOT}/${selected}"
+  [[ -d "$directory" ]] || {
+    log "Backup directory does not exist: ${directory}"
+    exit 1
+  }
+
+  (
+    cd "$directory"
+    sha256sum --check SHA256SUMS
+  )
+  tar -tzf "${directory}/media.tar.gz" >/dev/null
+
+  container="netbox-restore-check-${RANDOM}-$$"
+  verify_password="$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
+  cleanup_container() {
+    docker rm -f "$container" >/dev/null 2>&1 || true
+  }
+  trap cleanup_container EXIT INT TERM
+
+  docker run --detach --rm --name "$container" \
+    --env "POSTGRES_PASSWORD=${verify_password}" \
+    --env POSTGRES_DB=restore_validation \
+    --env POSTGRES_USER=restore_validator \
+    "$POSTGRES_IMAGE" >/dev/null
+
+  for _ in {1..30}; do
+    if docker exec "$container" pg_isready \
+      --username restore_validator --dbname restore_validation >/dev/null 2>&1; then
+      break
+    fi
+    sleep 2
+  done
+  docker exec "$container" pg_isready \
+    --username restore_validator --dbname restore_validation >/dev/null
+  docker cp "${directory}/database.dump" "${container}:/tmp/database.dump" >/dev/null
+  docker exec "$container" pg_restore \
+    --username restore_validator --dbname restore_validation \
+    --no-owner --no-privileges --exit-on-error /tmp/database.dump
+  docker exec "$container" psql \
+    --username restore_validator --dbname restore_validation \
+    --tuples-only --command \
+    "SELECT COUNT(*) FROM django_migrations;" | grep -Eq '[1-9][0-9]*'
+
+  cleanup_container
+  trap - EXIT INT TERM
+  log "NetBox isolated restore verified: ${directory}"
+}
+
+case "${1:-backup}" in
+  backup)
+    create_backup
+    ;;
+  verify)
+    verify_backup "${2:-}"
+    ;;
+  *)
+    printf 'Usage: %s {backup|verify [TIMESTAMP]}\n' "$0" >&2
+    exit 2
+    ;;
+esac
