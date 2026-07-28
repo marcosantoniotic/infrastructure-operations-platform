@@ -11,6 +11,7 @@ netbox_allowed_hosts:
 netbox_database_name: netbox
 netbox_database_user: netbox
 netbox_secret_key: "<NETBOX_SECRET_KEY>"
+netbox_api_token_pepper: "<NETBOX_API_TOKEN_PEPPER>"
 netbox_postgres_password: "<POSTGRES_PASSWORD>"
 netbox_redis_password: "<REDIS_PASSWORD>"
 netbox_redis_cache_password: "<REDIS_CACHE_PASSWORD>"

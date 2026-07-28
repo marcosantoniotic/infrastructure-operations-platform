@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily NetBox backup schedule
+
+[Timer]
+OnCalendar={{ netbox_backup_schedule }}
+Persistent=true
+RandomizedDelaySec=15m
+Unit=netbox-backup.service
+
+[Install]
+WantedBy=timers.target

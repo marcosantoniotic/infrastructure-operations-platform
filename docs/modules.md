@@ -6,6 +6,7 @@
 | Baseline RHEL | `playbooks/bootstrap-rhel.yml` | implementado | RHEL 9+ |
 | Docker Engine | `playbooks/docker.yml` | implementado | RHEL 9+ |
 | NetBox | `playbooks/netbox.yml` | implementado | Docker |
+| Backup do NetBox | `playbooks/netbox-backup.yml` | implementado e validado | systemd + Docker |
 | Traefik | `playbooks/traefik.yml` | planejado | Docker |
 | Zabbix | `playbooks/zabbix.yml` | planejado | Docker |
 | Observabilidade | `playbooks/observability.yml` | planejado | Docker |

@@ -1,0 +1,78 @@
+---
+- name: Validate NetBox backup variables
+  ansible.builtin.assert:
+    that:
+      - netbox_backup_root.startswith("/")
+      - netbox_backup_project_dir.startswith("/")
+      - netbox_backup_retention_days | int >= 1
+      - netbox_backup_database_name | length > 0
+      - netbox_backup_database_user | length > 0
+
+- name: Create protected NetBox backup directory
+  ansible.builtin.file:
+    path: "{{ netbox_backup_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install NetBox backup utility
+  ansible.builtin.template:
+    src: netbox-backup.sh.j2
+    dest: /usr/local/sbin/netbox-backup
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install NetBox backup service
+  ansible.builtin.template:
+    src: netbox-backup.service.j2
+    dest: /etc/systemd/system/netbox-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install NetBox backup timer
+  ansible.builtin.template:
+    src: netbox-backup.timer.j2
+    dest: /etc/systemd/system/netbox-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Apply systemd unit changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start NetBox backup timer
+  ansible.builtin.systemd:
+    name: netbox-backup.timer
+    enabled: true
+    state: started
+
+- name: Create an immediate NetBox backup
+  ansible.builtin.command:
+    cmd: /usr/local/sbin/netbox-backup backup
+  register: netbox_backup_result
+  changed_when: true
+  when:
+    - netbox_backup_run_now | bool
+    - not ansible_check_mode
+
+- name: Verify latest backup through an isolated restore
+  ansible.builtin.command:
+    cmd: /usr/local/sbin/netbox-backup verify
+  register: netbox_restore_verification
+  changed_when: false
+  when:
+    - netbox_backup_verify_restore | bool
+    - not ansible_check_mode
+
+- name: Report NetBox backup state
+  ansible.builtin.debug:
+    msg:
+      backup_root: "{{ netbox_backup_root }}"
+      timer: netbox-backup.timer
+      immediate_backup: "{{ netbox_backup_run_now | bool }}"
+      isolated_restore_verified: "{{ netbox_backup_verify_restore | bool }}"

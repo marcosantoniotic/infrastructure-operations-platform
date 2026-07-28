@@ -115,6 +115,7 @@ flowchart LR
 - [Referência de configuração](docs/configuration-reference.md)
 - [Catálogo de módulos executáveis](docs/modules.md)
 - [Inventários e gestão de segredos](docs/secrets-and-inventories.md)
+- [Ambiente de validação como código](docs/testing/validation-environment.md)
 - [Observabilidade](docs/observability.md)
 - [Segurança](docs/security.md)
 - [Operação diária](docs/runbooks/daily-operations.md)
@@ -131,6 +132,7 @@ flowchart LR
 ```text
 .
 ├── inventories/         # exemplos públicos e ambientes ignorados
+├── automation/          # Packer, Kickstart, Vagrant e scripts de validação
 ├── playbooks/           # pontos de entrada independentes
 ├── roles/               # módulos Ansible idempotentes
 ├── config/              # exemplos sanitizados e convenções
