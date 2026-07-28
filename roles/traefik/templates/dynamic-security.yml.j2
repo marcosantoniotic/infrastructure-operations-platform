@@ -1,0 +1,33 @@
+---
+http:
+  middlewares:
+    dashboard-auth:
+      basicAuth:
+        users:
+          - "{{ traefik_dashboard_basic_auth }}"
+        removeHeader: true
+    security-headers:
+      headers:
+        browserXssFilter: true
+        contentTypeNosniff: true
+        customFrameOptionsValue: "SAMEORIGIN"
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: >-
+          camera=(), microphone=(), geolocation=(), payment=(),
+          usb=(), interest-cohort=()
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow, nosnippet, noarchive"
+          Server: ""
+        stsSeconds: {{ (31536000 if traefik_enable_https else 0) }}
+        stsIncludeSubdomains: {{ traefik_enable_https | bool | lower }}
+        stsPreload: false
+{% if traefik_enable_https %}
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/tls.crt
+      keyFile: /etc/traefik/certs/tls.key
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: true
+{% endif %}

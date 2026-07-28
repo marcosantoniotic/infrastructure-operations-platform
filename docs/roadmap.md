@@ -25,7 +25,9 @@
 - [ ] limitar a porta do Zabbix Server por origem;
 - [ ] revisar permissões dos tokens;
 - [ ] formalizar rotação de credenciais;
-- [ ] validar headers de segurança;
+- [x] validar headers de segurança no gateway Traefik;
+- [x] restringir descoberta Docker por Socket Proxy somente leitura;
+- [x] proteger o dashboard do Traefik sem modo inseguro;
 - [ ] revisar imagens privilegiadas;
 - [ ] implantar análise de dependências e imagens.
 
