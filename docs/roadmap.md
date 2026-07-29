@@ -35,7 +35,7 @@
 
 - [ ] gerar inventário sanitizado automaticamente;
 - [x] validar Compose e Prometheus em CI;
-- [ ] detectar tags não fixadas;
+- [x] detectar tags não fixadas;
 - [ ] automatizar teste HTTP 200/302;
 - [ ] registrar mudanças por pull request;
 - [ ] avaliar Infrastructure as Code para DNS e Access.
