@@ -16,6 +16,12 @@
       - not netbox_superuser_password.startswith("<")
       - not netbox_superuser_email.startswith("<")
       - netbox_allowed_hosts | length > 0
+      - >-
+        not (netbox_enable_traefik | bool) or
+        netbox_traefik_hostname in netbox_allowed_hosts
+      - >-
+        not (netbox_enable_traefik | bool) or
+        netbox_traefik_origin in netbox_csrf_trusted_origins
     fail_msg: >-
       Replace all NetBox placeholders with Ansible Vault values. Passwords must
       contain at least 16 characters and SECRET_KEY at least 50 characters.
@@ -30,6 +36,18 @@
       - "'docker.service' in ansible_facts.services"
       - ansible_facts.services.get('docker.service', {}).get('state', '') == 'running'
     fail_msg: "Docker must be installed and running before NetBox deployment."
+
+- name: Verify the external Traefik network exists
+  ansible.builtin.command:
+    argv:
+      - docker
+      - network
+      - inspect
+      - "{{ netbox_traefik_network }}"
+  changed_when: false
+  when:
+    - netbox_enable_traefik | bool
+    - not ansible_check_mode
 
 - name: Create NetBox project directory
   ansible.builtin.file:
@@ -87,6 +105,36 @@
   until: netbox_http_result.status in [200, 302]
   when: not ansible_check_mode
 
+- name: Validate NetBox through Traefik HTTPS
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --silent
+      - --insecure
+      - --include
+      - --resolve
+      - "{{ netbox_traefik_hostname }}:{{ netbox_traefik_https_port }}:{{ netbox_traefik_validation_address }}"
+      - "https://{{ netbox_traefik_hostname }}:{{ netbox_traefik_https_port }}/login/"
+  register: netbox_traefik_response
+  changed_when: false
+  retries: 20
+  delay: 3
+  until: >-
+    'http/1.1 200' in netbox_traefik_response.stdout | lower or
+    'http/2 200' in netbox_traefik_response.stdout | lower
+  failed_when: >-
+    (
+      'http/1.1 200' not in netbox_traefik_response.stdout | lower and
+      'http/2 200' not in netbox_traefik_response.stdout | lower
+    ) or
+    'x-content-type-options: nosniff' not in
+    netbox_traefik_response.stdout | lower or
+    'strict-transport-security: max-age=31536000' not in
+    netbox_traefik_response.stdout | lower
+  when:
+    - netbox_enable_traefik | bool
+    - not ansible_check_mode
+
 - name: Report NetBox deployment
   ansible.builtin.debug:
     msg:
@@ -94,3 +142,5 @@
       bind_address: "{{ netbox_bind_address }}"
       port: "{{ netbox_http_port }}"
       traefik_enabled: "{{ netbox_enable_traefik }}"
+      traefik_hostname: >-
+        {{ netbox_traefik_hostname if netbox_enable_traefik else 'disabled' }}

@@ -25,10 +25,19 @@ netbox_http_port: 8000
 ```yaml
 netbox_enable_traefik: true
 netbox_traefik_hostname: "netbox.<BASE_DOMAIN>"
+netbox_traefik_origin: "https://netbox.<BASE_DOMAIN>"
 netbox_traefik_network: proxy
+netbox_traefik_middlewares:
+  - security-headers@file
+netbox_allowed_hosts:
+  - "netbox.<BASE_DOMAIN>"
+netbox_csrf_trusted_origins:
+  - "https://netbox.<BASE_DOMAIN>"
 ```
 
-A rede externa do proxy deve existir antes da implantação.
+A rede externa do proxy e o middleware informado devem existir antes da
+implantação. O bind direto pode permanecer em loopback como acesso de
+contingência sem exposição à rede.
 
 ## Execução
 
@@ -52,6 +61,9 @@ O cache não é tratado como dado crítico.
 - containers iniciados;
 - healthchecks;
 - endpoint `/login/` respondendo com HTTP 200 ou 302.
+- rota HTTPS do Traefik respondendo com HTTP 200;
+- HSTS e proteção contra content-type sniffing presentes;
+- segundo passe do Ansible sem alterações.
 
 ## Remoção
 

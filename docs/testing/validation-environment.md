@@ -344,6 +344,25 @@ in `.validation/traefik-initial-credentials.txt`. The validation route is
 available at `https://whoami.localhost:8443/`. HTTP on port `8080` redirects to
 HTTPS on port `8443`.
 
+### 12. Publish NetBox through the validated ingress
+
+After Traefik has created the external `proxy` network, connect NetBox to it
+and retain the loopback-only direct binding as a recovery path:
+
+```powershell
+.\automation\scripts\Run-ValidationNetBox.ps1 `
+  -AdminEmail "<ADMIN_EMAIL>" `
+  -EnableTraefik `
+  -VerifyIdempotence
+```
+
+Open `https://netbox.localhost:8443/`. Certification requires a trusted
+certificate containing `netbox.localhost`, HTTP 200 on `/login/`, HSTS and
+`X-Content-Type-Options: nosniff`. HTTP port `8080` must redirect the same
+hostname to HTTPS. For emergency access, add `-L 8000:127.0.0.1:8000` to the
+SSH tunnel and open `http://127.0.0.1:8000`; this fallback never binds to the
+host-only network.
+
 This private CA exists only for the isolated validation environment. Production
 promotion still requires the certificate, DNS and renewal strategy for the
 real application domain.
@@ -377,4 +396,5 @@ The environment is not considered validated until:
 - NetBox survives restart and container recreation;
 - NetBox backup restores in an isolated database;
 - Traefik discovery, authentication and Socket Proxy restrictions pass;
+- NetBox responds through Traefik with TLS and reusable security headers;
 - no local secret or RHEL artifact appears in Git.

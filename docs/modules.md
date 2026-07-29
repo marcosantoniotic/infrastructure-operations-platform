@@ -5,7 +5,7 @@
 | Preflight | `playbooks/preflight.yml` | implementado | nenhuma |
 | Baseline RHEL | `playbooks/bootstrap-rhel.yml` | implementado | RHEL 9+ |
 | Docker Engine | `playbooks/docker.yml` | implementado | RHEL 9+ |
-| NetBox | `playbooks/netbox.yml` | implementado | Docker |
+| NetBox | `playbooks/netbox.yml` | implementado, validado e integrado ao Traefik | Docker; Traefik opcional |
 | Backup do NetBox | `playbooks/netbox-backup.yml` | implementado e validado | systemd + Docker |
 | Traefik | `playbooks/traefik.yml` | implementado e validado | Docker |
 | Zabbix | `playbooks/zabbix.yml` | planejado | Docker |
