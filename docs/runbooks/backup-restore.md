@@ -83,13 +83,16 @@ O banco ativo não é interrompido ou alterado.
 - retenção local configurável;
 - cópia externa criptografada;
 - alerta para timer com falha ou backup antigo;
+- teste mensal de restauração de banco;
+- teste trimestral de reconstrução completa.
 
 O Prometheus recebe `infrastructure_backup_last_run_success` e
 `infrastructure_backup_last_success_timestamp_seconds` pelo Node Exporter.
 Consulte o dashboard `Infrastructure Operations — Backup Health` para verificar
 as duas rotinas de forma centralizada.
-- teste mensal de restauração de banco;
-- teste trimestral de reconstrução completa.
+
+Os objetivos formais e períodos de retenção estão definidos em
+[Reliability objectives](../reliability-objectives.md).
 
 ## Ordem de restauração
 

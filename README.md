@@ -122,6 +122,7 @@ flowchart LR
 - [Operação diária](docs/runbooks/daily-operations.md)
 - [Inicialização e desligamento](docs/runbooks/startup-shutdown.md)
 - [Backup e restauração](docs/runbooks/backup-restore.md)
+- [Objetivos de confiabilidade, RPO, RTO e retenção](docs/reliability-objectives.md)
 - [Resposta a incidentes](docs/runbooks/incident-response.md)
 - [Gestão de mudanças](docs/runbooks/change-management.md)
 - [Publicação segura](docs/publishing-checklist.md)
