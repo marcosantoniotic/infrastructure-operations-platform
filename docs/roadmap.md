@@ -34,7 +34,7 @@
 ## Fase 3 — Automação
 
 - [ ] gerar inventário sanitizado automaticamente;
-- [ ] validar Compose e Prometheus em CI;
+- [x] validar Compose e Prometheus em CI;
 - [ ] detectar tags não fixadas;
 - [ ] automatizar teste HTTP 200/302;
 - [ ] registrar mudanças por pull request;

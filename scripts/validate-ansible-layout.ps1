@@ -89,6 +89,8 @@ $requiredPaths = @(
     'roles/observability/templates/infrastructure-host-containers.json.j2',
     'roles/observability/templates/application-tls-health.json.j2',
     'roles/observability/templates/backup-health.json.j2',
+    'scripts/ci/render-validation-artifacts.yml',
+    'scripts/ci/validate-service-artifacts.sh',
     'roles/observability/README.md',
     'roles/cockpit/defaults/main.yml',
     'roles/cockpit/handlers/main.yml',
