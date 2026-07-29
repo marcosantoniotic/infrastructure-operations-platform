@@ -9,7 +9,7 @@
 | Backup do NetBox | `playbooks/netbox-backup.yml` | implementado e validado | systemd + Docker |
 | Traefik | `playbooks/traefik.yml` | implementado e validado | Docker |
 | Zabbix | `playbooks/zabbix.yml` | implementado e validado | Docker; Traefik opcional |
-| Observabilidade | `playbooks/observability.yml` | planejado | Docker |
+| Observabilidade | `playbooks/observability.yml` | implementado com host e containers | Docker; Traefik opcional |
 | Portainer | `playbooks/portainer.yml` | implementado e integrado ao Traefik | Docker; Traefik opcional |
 | Integrações | `playbooks/integrations.yml` | planejado | módulos correspondentes |
 | GLPI | `playbooks/glpi.yml` | fase futura | Docker e proxy opcional |

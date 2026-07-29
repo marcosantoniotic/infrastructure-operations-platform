@@ -1,0 +1,266 @@
+---
+- name: Validate observability variables
+  ansible.builtin.assert:
+    that:
+      - observability_project_dir.startswith("/")
+      - observability_grafana_admin_password | length >= 16
+      - not observability_grafana_admin_password.startswith("<")
+      - observability_prometheus_retention_time | length > 0
+      - observability_prometheus_retention_size | length > 0
+      - >-
+        not (observability_enable_traefik | bool) or
+        observability_grafana_hostname | length > 0
+    fail_msg: >-
+      Replace the Grafana password placeholder with a strong Ansible Vault
+      value and configure retention and ingress variables.
+  no_log: true
+
+- name: Validate Docker service
+  ansible.builtin.service_facts: {}
+
+- name: Assert Docker is running
+  ansible.builtin.assert:
+    that:
+      - "'docker.service' in ansible_facts.services"
+      - ansible_facts.services.get('docker.service', {}).get('state', '') == 'running'
+    fail_msg: "Docker must be installed and running before observability deployment."
+
+- name: Verify the external Traefik network exists
+  ansible.builtin.command:
+    argv:
+      - docker
+      - network
+      - inspect
+      - "{{ observability_traefik_network }}"
+  changed_when: false
+  when:
+    - observability_enable_traefik | bool
+    - not ansible_check_mode
+
+- name: Create observability project directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ observability_project_dir }}"
+      mode: "0750"
+    - path: "{{ observability_project_dir }}/secrets"
+      mode: "0700"
+    - path: "{{ observability_project_dir }}/prometheus"
+      mode: "0750"
+    - path: "{{ observability_project_dir }}/grafana"
+      mode: "0750"
+    - path: "{{ observability_project_dir }}/grafana/provisioning"
+      mode: "0750"
+    - path: "{{ observability_project_dir }}/grafana/provisioning/datasources"
+      mode: "0750"
+    - path: "{{ observability_project_dir }}/grafana/provisioning/dashboards"
+      mode: "0750"
+    - path: "{{ observability_project_dir }}/grafana/dashboards"
+      mode: "0750"
+
+- name: Install Grafana administrator secret
+  ansible.builtin.copy:
+    content: "{{ observability_grafana_admin_password }}"
+    dest: "{{ observability_project_dir }}/secrets/grafana_admin_password"
+    owner: root
+    group: root
+    mode: "0644"
+  no_log: true
+
+- name: Render observability configuration
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ observability_project_dir }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - src: prometheus.yml.j2
+      dest: prometheus/prometheus.yml
+    - src: grafana-datasource.yml.j2
+      dest: grafana/provisioning/datasources/prometheus.yml
+    - src: grafana-dashboards.yml.j2
+      dest: grafana/provisioning/dashboards/platform.yml
+    - src: infrastructure-host-containers.json.j2
+      dest: grafana/dashboards/infrastructure-host-containers.json
+
+- name: Render observability Compose project
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ observability_project_dir }}/compose.yaml"
+    owner: root
+    group: root
+    mode: "0640"
+
+- name: Validate rendered observability Compose configuration
+  ansible.builtin.command:
+    cmd: docker compose --project-directory {{ observability_project_dir }} config --quiet
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Validate Prometheus configuration
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --entrypoint
+      - /bin/promtool
+      - -v
+      - "{{ observability_project_dir }}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z"
+      - "{{ observability_prometheus_image }}"
+      - check
+      - config
+      - /etc/prometheus/prometheus.yml
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Deploy observability project
+  community.docker.docker_compose_v2:
+    project_src: "{{ observability_project_dir }}"
+    files:
+      - compose.yaml
+    state: present
+    pull: missing
+    wait: true
+    wait_timeout: 420
+  when: not ansible_check_mode
+
+- name: Wait for Prometheus readiness
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/-/ready
+    method: GET
+    status_code: 200
+  register: observability_prometheus_ready
+  retries: 30
+  delay: 5
+  until: observability_prometheus_ready.status == 200
+  when: not ansible_check_mode
+
+- name: Validate all Prometheus scrape targets
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/api/v1/targets?state=active
+    method: GET
+    status_code: 200
+    return_content: true
+  register: observability_prometheus_targets
+  retries: 20
+  delay: 5
+  until: >-
+    observability_prometheus_targets.json.status == 'success' and
+    observability_prometheus_targets.json.data.activeTargets | length >= 3 and
+    (
+      observability_prometheus_targets.json.data.activeTargets |
+      rejectattr('health', 'equalto', 'up') |
+      list |
+      length
+    ) == 0
+  failed_when: >-
+    observability_prometheus_targets.json.status != 'success' or
+    observability_prometheus_targets.json.data.activeTargets | length < 3 or
+    (
+      observability_prometheus_targets.json.data.activeTargets |
+      rejectattr('health', 'equalto', 'up') |
+      list |
+      length
+    ) > 0
+  when: not ansible_check_mode
+
+- name: Wait for Grafana health endpoint
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_grafana_validation_host }}:{{ observability_grafana_port }}/api/health
+    method: GET
+    status_code: 200
+    return_content: true
+  register: observability_grafana_health
+  retries: 30
+  delay: 5
+  until: >-
+    observability_grafana_health.status == 200 and
+    observability_grafana_health.json.database == 'ok'
+  when: not ansible_check_mode
+
+- name: Validate provisioned Prometheus datasource
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_grafana_validation_host }}:{{ observability_grafana_port }}/api/datasources/uid/prometheus
+    method: GET
+    user: "{{ observability_grafana_admin_user }}"
+    password: "{{ observability_grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    return_content: true
+  register: observability_grafana_datasource
+  failed_when: >-
+    observability_grafana_datasource.json.uid != 'prometheus' or
+    observability_grafana_datasource.json.type != 'prometheus'
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Validate provisioned platform dashboard
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_grafana_validation_host }}:{{ observability_grafana_port }}/api/dashboards/uid/infrastructure-host-containers
+    method: GET
+    user: "{{ observability_grafana_admin_user }}"
+    password: "{{ observability_grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    return_content: true
+  register: observability_grafana_dashboard
+  failed_when: >-
+    observability_grafana_dashboard.json.dashboard.uid !=
+    'infrastructure-host-containers'
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Validate Grafana through Traefik HTTPS
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --silent
+      - --insecure
+      - --include
+      - --resolve
+      - "{{ observability_grafana_hostname }}:{{ observability_traefik_https_port }}:{{ observability_traefik_validation_address }}"
+      - "https://{{ observability_grafana_hostname }}:{{ observability_traefik_https_port }}/login"
+  register: observability_traefik_response
+  changed_when: false
+  retries: 20
+  delay: 3
+  until: >-
+    'http/1.1 200' in observability_traefik_response.stdout | lower or
+    'http/2 200' in observability_traefik_response.stdout | lower
+  failed_when: >-
+    (
+      'http/1.1 200' not in observability_traefik_response.stdout | lower and
+      'http/2 200' not in observability_traefik_response.stdout | lower
+    ) or
+    'x-content-type-options: nosniff' not in
+    observability_traefik_response.stdout | lower or
+    'strict-transport-security: max-age=31536000' not in
+    observability_traefik_response.stdout | lower
+  when:
+    - observability_enable_traefik | bool
+    - not ansible_check_mode
+
+- name: Report observability deployment
+  ansible.builtin.debug:
+    msg:
+      project_directory: "{{ observability_project_dir }}"
+      prometheus_fallback: >-
+        http://{{ observability_prometheus_bind_address }}:{{ observability_prometheus_port }}
+      grafana_fallback: >-
+        http://{{ observability_grafana_bind_address }}:{{ observability_grafana_port }}
+      active_targets: >-
+        {{ observability_prometheus_targets.json.data.activeTargets | length
+           if not ansible_check_mode else 'not checked' }}
+      grafana_hostname: >-
+        {{ observability_grafana_hostname if observability_enable_traefik else 'disabled' }}

@@ -83,6 +83,16 @@ Grafana:
 - dashboards provisionados por arquivo;
 - frontend publicado pelo Traefik.
 
+Núcleo implementado:
+
+- Prometheus com retenção simultânea por tempo e tamanho;
+- Grafana com credencial administrativa em Ansible Vault;
+- Node Exporter para métricas do RHEL;
+- cAdvisor isolado para métricas de containers;
+- dashboard `Infrastructure Operations — Host & Containers`;
+- portas de fallback limitadas ao loopback;
+- exporters acessíveis apenas na rede interna de métricas.
+
 Exporters:
 
 - Node Exporter com filesystems do host em somente leitura;
@@ -102,7 +112,7 @@ Consulte os exemplos de [Prometheus](../config/examples/prometheus.yml) e [Black
 | PostgreSQL do NetBox | arquivo/variável externa ao Git |
 | token Zabbix API | arquivo `.env` restrito |
 | credencial UniFi | arquivo `.env` restrito |
-| senha administrativa Grafana | arquivo/variável externa |
 | senha administrativa Portainer | Ansible Vault + arquivo read-only |
+| senha administrativa Grafana | Ansible Vault + arquivo read-only |
 
 O valor nunca é documentado ou versionado.

@@ -418,6 +418,28 @@ Portainer is an operational interface. Changes intended to persist as platform
 configuration must be implemented in Ansible and Compose and promoted through
 the repository workflow.
 
+### 15. Deploy metrics and visualization
+
+Deploy Prometheus, Grafana, Node Exporter and cAdvisor, provision the datasource
+and platform dashboard, and publish Grafana through Traefik:
+
+```powershell
+.\automation\scripts\Run-ValidationObservability.ps1 `
+  -EnableTraefik `
+  -VerifyPersistence `
+  -VerifyIdempotence
+```
+
+Open `https://grafana.localhost:8443/` and use the credential stored in
+`.validation/grafana-initial-credentials.txt`. The Prometheus and Grafana
+fallbacks remain limited to `127.0.0.1:9090` and `127.0.0.1:3000`.
+
+Certification requires healthy containers, all Prometheus targets in state
+`up`, a working provisioned datasource, the dashboard
+`Infrastructure Operations — Host & Containers`, HTTP 200 through Traefik,
+persisted data after reload and a final Ansible pass with `changed=0`,
+`unreachable=0` and `failed=0`.
+
 ## Lifecycle commands
 
 From `automation\vagrant`:
