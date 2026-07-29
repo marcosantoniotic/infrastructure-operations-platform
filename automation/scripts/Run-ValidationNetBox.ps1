@@ -4,6 +4,7 @@ param(
     [ValidatePattern('^[^@\s]+@[^@\s]+\.[^@\s]+$')]
     [string]$AdminEmail,
 
+    [switch]$EnableTraefik,
     [switch]$VerifyIdempotence,
     [switch]$VerifyPersistence
 )
@@ -80,8 +81,52 @@ New-Item -ItemType Directory -Path $groupVarsRoot -Force | Out-Null
 $utf8WithoutBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
 
 $escapedAdminEmail = $AdminEmail.Replace("'", "''")
-$groupVarsContent = @"
----
+$netboxAllowedHosts = @(
+    '  - localhost'
+    '  - 127.0.0.1'
+)
+$netboxCsrfOrigins = @()
+$netboxTraefikVariables = @(
+    'netbox_enable_traefik: false'
+)
+if ($EnableTraefik) {
+    $netboxAllowedHosts += '  - netbox.localhost'
+    $netboxCsrfOrigins = @(
+        'netbox_csrf_trusted_origins:'
+        '  - https://netbox.localhost:8443'
+    )
+    $netboxTraefikVariables = @(
+        'netbox_enable_traefik: true'
+        'netbox_traefik_hostname: netbox.localhost'
+        'netbox_traefik_origin: https://netbox.localhost:8443'
+        'netbox_traefik_network: proxy'
+        'netbox_traefik_middlewares:'
+        '  - security-headers@file'
+        'netbox_traefik_validation_address: 127.0.0.1'
+        'netbox_traefik_https_port: 8443'
+    )
+}
+$netboxAllowedHostsYaml = $netboxAllowedHosts -join "`n"
+$netboxCsrfOriginsYaml = $netboxCsrfOrigins -join "`n"
+$netboxTraefikVariablesYaml = $netboxTraefikVariables -join "`n"
+$groupVarsContent = if (Test-Path -LiteralPath $groupVars) {
+    Get-Content -LiteralPath $groupVars -Raw
+}
+else {
+    "---`n"
+}
+$netboxSectionPattern = '(?ms)^# BEGIN VALIDATION NETBOX\r?\n.*?^# END VALIDATION NETBOX\r?\n?'
+$managedSectionPattern = '(?ms)^# BEGIN VALIDATION (?!NETBOX\b)[^\r\n]+\r?\n.*?^# END VALIDATION [^\r\n]+\r?\n?'
+$preservedManagedSections = [regex]::Matches(
+    $groupVarsContent,
+    $managedSectionPattern
+) | ForEach-Object { $_.Value.Trim() }
+$groupVarsContent = "---`n"
+if ($preservedManagedSections.Count -gt 0) {
+    $groupVarsContent += "`n" + ($preservedManagedSections -join "`n`n") + "`n"
+}
+$netboxSection = @"
+# BEGIN VALIDATION NETBOX
 docker_users:
   - automation
 docker_daemon_config:
@@ -98,8 +143,8 @@ netbox_valkey_image: valkey/valkey:9.0-alpine
 netbox_bind_address: 127.0.0.1
 netbox_http_port: 8000
 netbox_allowed_hosts:
-  - localhost
-  - 127.0.0.1
+$netboxAllowedHostsYaml
+$netboxCsrfOriginsYaml
 netbox_secret_key: "{{ vault_netbox_secret_key }}"
 netbox_api_token_pepper: "{{ vault_netbox_api_token_pepper }}"
 netbox_postgres_password: "{{ vault_netbox_postgres_password }}"
@@ -109,11 +154,16 @@ netbox_superuser_name: admin
 netbox_superuser_email: '$escapedAdminEmail'
 netbox_superuser_password: "{{ vault_netbox_superuser_password }}"
 netbox_enable_metrics: true
-netbox_enable_traefik: false
+$netboxTraefikVariablesYaml
 netbox_manage_firewall: false
 netbox_validation_host: 127.0.0.1
+# END VALIDATION NETBOX
 "@
-[IO.File]::WriteAllText($groupVars, $groupVarsContent, $utf8WithoutBom)
+[IO.File]::WriteAllText(
+    $groupVars,
+    $groupVarsContent.TrimEnd() + "`n`n" + $netboxSection,
+    $utf8WithoutBom
+)
 
 $commonOptions = @(
     '-i', $privateKey,
@@ -148,7 +198,7 @@ vault_netbox_superuser_password: "$initialAdminCredential"
     [IO.File]::WriteAllText($vaultPasswordFile, $vaultKeyMaterial, $utf8WithoutBom)
     [IO.File]::WriteAllText(
         $credentialFile,
-        "URL (via SSH tunnel): http://127.0.0.1:8000`r`nUsername: admin`r`nPassword: $initialAdminCredential`r`n",
+        "Direct fallback URL (via SSH tunnel): http://127.0.0.1:8000`r`nTraefik URL (when enabled): https://netbox.localhost:8443/`r`nUsername: admin`r`nPassword: $initialAdminCredential`r`n",
         $utf8WithoutBom
     )
     Set-CurrentUserFileAcl -Path $plainVault
@@ -179,6 +229,18 @@ else {
     & ssh.exe @commonOptions $controller `
         "install -m 0600 /tmp/netbox-vault-password /home/$adminUsername/.ansible/vault-password; rm -f /tmp/netbox-vault-password"
     if ($LASTEXITCODE -ne 0) { throw 'Failed to install the Vault password.' }
+}
+
+if (Test-Path -LiteralPath $credentialFile -PathType Leaf) {
+    $credentialContent = Get-Content -LiteralPath $credentialFile -Raw
+    $credentialContent = $credentialContent -replace (
+        '(?m)^URL \(via SSH tunnel\): .+\r?\n'
+    ), (
+        "Direct fallback URL (via SSH tunnel): http://127.0.0.1:8000`r`n" +
+        "Traefik URL (when enabled): https://netbox.localhost:8443/`r`n"
+    )
+    [IO.File]::WriteAllText($credentialFile, $credentialContent, $utf8WithoutBom)
+    Set-CurrentUserFileAcl -Path $credentialFile
 }
 
 & scp.exe @commonOptions $requirements "${controller}:$remoteRoot/requirements.yml"

@@ -7,6 +7,7 @@ netbox_bind_address: 127.0.0.1
 netbox_http_port: 8000
 netbox_allowed_hosts:
   - localhost
+netbox_csrf_trusted_origins: []
 
 netbox_database_name: netbox
 netbox_database_user: netbox
@@ -22,6 +23,11 @@ netbox_superuser_password: "<NETBOX_ADMIN_PASSWORD>"
 netbox_enable_metrics: true
 netbox_enable_traefik: false
 netbox_traefik_hostname: "netbox.<BASE_DOMAIN>"
+netbox_traefik_origin: "https://netbox.<BASE_DOMAIN>"
 netbox_traefik_network: proxy
+netbox_traefik_middlewares:
+  - security-headers@file
+netbox_traefik_validation_address: 127.0.0.1
+netbox_traefik_https_port: 443
 netbox_manage_firewall: false
 netbox_validation_host: 127.0.0.1

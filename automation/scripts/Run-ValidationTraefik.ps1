@@ -116,6 +116,7 @@ subjectAltName = @alt_names
 [alt_names]
 DNS.1 = traefik.localhost
 DNS.2 = whoami.localhost
+DNS.3 = netbox.localhost
 "@
 $opensslConfig = $opensslConfig -replace "`r`n", "`n"
 [IO.File]::WriteAllText($opensslConfigFile, $opensslConfig, $utf8WithoutBom)
@@ -136,7 +137,9 @@ if [ ! -s "`$pki/ca.key" ] || [ ! -s "`$pki/ca.crt" ]; then
     -subj "/CN=Infrastructure-Operations-Validation-CA" \
     -keyout "`$pki/ca.key" -out "`$pki/ca.crt"
 fi
-if [ ! -s "`$pki/tls.key" ] || [ ! -s "`$pki/tls.crt" ]; then
+if [ ! -s "`$pki/tls.key" ] || [ ! -s "`$pki/tls.crt" ] || \
+   ! openssl x509 -in "`$pki/tls.crt" -noout -checkhost netbox.localhost >/dev/null 2>&1; then
+  rm -f "`$pki/tls.key" "`$pki/tls.crt" "`$pki/tls.csr"
   openssl req -new -newkey rsa:3072 -nodes \
     -config /tmp/traefik-openssl.cnf \
     -keyout "`$pki/tls.key" -out "`$pki/tls.csr"

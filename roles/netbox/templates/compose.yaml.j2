@@ -80,6 +80,9 @@ services:
       - traefik.http.routers.netbox.rule=Host(`{{ netbox_traefik_hostname }}`)
       - traefik.http.routers.netbox.entrypoints=websecure
       - traefik.http.routers.netbox.tls=true
+{% if netbox_traefik_middlewares | length > 0 %}
+      - traefik.http.routers.netbox.middlewares={{ netbox_traefik_middlewares | join(',') }}
+{% endif %}
       - traefik.http.services.netbox.loadbalancer.server.port=8080
     networks:
       - backend
