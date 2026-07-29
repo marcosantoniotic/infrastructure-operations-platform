@@ -7,6 +7,7 @@
       - netbox_backup_retention_days | int >= 1
       - netbox_backup_database_name | length > 0
       - netbox_backup_database_user | length > 0
+      - netbox_backup_metrics_dir.startswith("/")
 
 - name: Create protected NetBox backup directory
   ansible.builtin.file:
@@ -15,6 +16,14 @@
     owner: root
     group: root
     mode: "0700"
+
+- name: Create Node Exporter textfile collector directory
+  ansible.builtin.file:
+    path: "{{ netbox_backup_metrics_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
 
 - name: Install NetBox backup utility
   ansible.builtin.template:

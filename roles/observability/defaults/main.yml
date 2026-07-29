@@ -1,5 +1,6 @@
 ---
 observability_project_dir: /opt/observability
+observability_textfile_collector_dir: /var/lib/node_exporter/textfile_collector
 observability_prometheus_image: prom/prometheus:v3.13.1
 observability_grafana_image: grafana/grafana:13.1.1
 observability_node_exporter_image: prom/node-exporter:v1.12.1

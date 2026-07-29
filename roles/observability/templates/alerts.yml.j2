@@ -32,3 +32,25 @@ groups:
         annotations:
           summary: "TLS certificate expires within 15 days"
           description: "Certificate for {{ '{{' }} $labels.service {{ '}}' }} requires immediate renewal."
+
+  - name: backup-health
+    rules:
+      - alert: PlatformBackupFailed
+        expr: infrastructure_backup_last_run_success == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup failed: {{ '{{' }} $labels.service {{ '}}' }}"
+          description: "The latest scheduled backup execution did not complete successfully."
+
+      - alert: PlatformBackupStale
+        expr: >-
+          time() - infrastructure_backup_last_success_timestamp_seconds
+          > 26 * 60 * 60
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup is older than 26 hours: {{ '{{' }} $labels.service {{ '}}' }}"
+          description: "No recent successful backup was recorded for this service."

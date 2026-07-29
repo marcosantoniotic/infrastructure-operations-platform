@@ -9,6 +9,7 @@
       - zabbix_backup_mysql_service | length > 0
       - zabbix_backup_server_service | length > 0
       - zabbix_backup_mysql_image | length > 0
+      - zabbix_backup_metrics_dir.startswith("/")
 
 - name: Check the Zabbix Compose project
   ansible.builtin.stat:
@@ -31,6 +32,14 @@
     owner: root
     group: root
     mode: "0700"
+
+- name: Create Node Exporter textfile collector directory
+  ansible.builtin.file:
+    path: "{{ zabbix_backup_metrics_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
 
 - name: Install Zabbix backup utility
   ansible.builtin.template:

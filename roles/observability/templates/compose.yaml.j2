@@ -45,10 +45,12 @@ services:
     image: {{ observability_node_exporter_image }}
     command:
       - --path.rootfs=/host
+      - --collector.textfile.directory=/textfile
       - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/containers/storage/.+)($$|/)
     pid: host
     volumes:
       - /:/host:ro,rslave
+      - {{ observability_textfile_collector_dir }}:/textfile:ro,Z
     read_only: true
     cap_drop:
       - ALL

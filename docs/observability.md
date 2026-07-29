@@ -93,6 +93,17 @@ Cada alvo gera um módulo Blackbox próprio e pode declarar URL, cabeçalho
 - container reiniciando repetidamente;
 - certificado com menos de 30 e 15 dias;
 - falha de backup ou ausência de arquivo recente;
+
+## Saúde dos backups
+
+As rotinas de backup do NetBox e Zabbix publicam métricas no textfile collector
+do Node Exporter. O dashboard `Infrastructure Operations — Backup Health`
+apresenta o resultado da última execução e a idade do último backup válido.
+
+Os alertas `PlatformBackupFailed` e `PlatformBackupStale` sinalizam,
+respectivamente, uma execução malsucedida e a ausência de backup válido nas
+últimas 26 horas. As métricas contêm apenas nome lógico, estado e timestamp;
+arquivos, conteúdo e credenciais de backup não são expostos.
 - Prometheus target down;
 - sincronização NetBox-Zabbix sem execução recente.
 

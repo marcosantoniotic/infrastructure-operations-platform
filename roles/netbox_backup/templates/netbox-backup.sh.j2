@@ -9,6 +9,28 @@ readonly APPLICATION_SERVICE="{{ netbox_backup_application_service }}"
 readonly DATABASE_NAME="{{ netbox_backup_database_name }}"
 readonly DATABASE_USER="{{ netbox_backup_database_user }}"
 readonly POSTGRES_IMAGE="{{ netbox_backup_postgres_image }}"
+readonly METRICS_DIR="{{ netbox_backup_metrics_dir }}"
+readonly METRICS_FILE="${METRICS_DIR}/netbox_backup.prom"
+
+write_metrics() {
+  local run_success="$1" success_timestamp="${2:-}"
+  local temporary="${METRICS_FILE}.$$"
+  install -d -m 0755 "$METRICS_DIR"
+  {
+    printf '# HELP infrastructure_backup_last_run_success Whether the last backup execution succeeded.\n'
+    printf '# TYPE infrastructure_backup_last_run_success gauge\n'
+    printf 'infrastructure_backup_last_run_success{service="netbox"} %s\n' "$run_success"
+    if [[ -n "$success_timestamp" ]]; then
+      printf '# HELP infrastructure_backup_last_success_timestamp_seconds Unix timestamp of the last successful backup.\n'
+      printf '# TYPE infrastructure_backup_last_success_timestamp_seconds gauge\n'
+      printf 'infrastructure_backup_last_success_timestamp_seconds{service="netbox"} %s\n' "$success_timestamp"
+    elif [[ -f "$METRICS_FILE" ]]; then
+      grep '^infrastructure_backup_last_success_timestamp_seconds' "$METRICS_FILE" || true
+    fi
+  } > "$temporary"
+  chmod 0644 "$temporary"
+  mv -f -- "$temporary" "$METRICS_FILE"
+}
 
 log() {
   logger -t netbox-backup -- "$*"
@@ -29,6 +51,7 @@ create_backup() {
 
   cleanup_partial() {
     rm -rf -- "$staging"
+    write_metrics 0
   }
   trap cleanup_partial ERR INT TERM
 
@@ -55,6 +78,7 @@ create_backup() {
   )
   mv -- "$staging" "$final"
   trap - ERR INT TERM
+  write_metrics 1 "$(date +%s)"
 
   find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' \
     -mtime "+${RETENTION_DAYS}" -exec rm -rf -- {} +
