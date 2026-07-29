@@ -1,0 +1,128 @@
+name: zabbix
+
+services:
+  mysql:
+    image: {{ zabbix_mysql_image }}
+    environment:
+      MYSQL_DATABASE: {{ zabbix_database_name }}
+      MYSQL_USER: {{ zabbix_database_user }}
+      MYSQL_PASSWORD_FILE: /run/secrets/zabbix_database_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/zabbix_database_root_password
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_bin
+      - --log-bin-trust-function-creators=1
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./secrets/zabbix_database_password:/run/secrets/zabbix_database_password:ro,Z
+      - ./secrets/zabbix_database_root_password:/run/secrets/zabbix_database_root_password:ro,Z
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mysqladmin ping --silent --host=127.0.0.1 --user=root
+          --password="$$(cat /run/secrets/zabbix_database_root_password)"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - backend
+
+  zabbix-server:
+    image: {{ zabbix_server_image }}
+    init: true
+    environment:
+      DB_SERVER_HOST: mysql
+      MYSQL_DATABASE: {{ zabbix_database_name }}
+      MYSQL_USER: {{ zabbix_database_user }}
+      MYSQL_PASSWORD_FILE: /run/secrets/zabbix_database_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/zabbix_database_root_password
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "{{ zabbix_server_bind_address }}:{{ zabbix_server_port }}:10051"
+    volumes:
+      - ./secrets/zabbix_database_password:/run/secrets/zabbix_database_password:ro,Z
+      - ./secrets/zabbix_database_root_password:/run/secrets/zabbix_database_root_password:ro,Z
+      - server_alertscripts:/usr/lib/zabbix/alertscripts
+      - server_externalscripts:/usr/lib/zabbix/externalscripts
+      - server_export:/var/lib/zabbix/export
+      - server_snmptraps:/var/lib/zabbix/snmptraps
+    healthcheck:
+      test: ["CMD-SHELL", "ps | grep -q '[z]abbix_server'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+    restart: unless-stopped
+    networks:
+      - backend
+      - agent
+
+  zabbix-web:
+    image: {{ zabbix_web_image }}
+    environment:
+      DB_SERVER_HOST: mysql
+      MYSQL_DATABASE: {{ zabbix_database_name }}
+      MYSQL_USER: {{ zabbix_database_user }}
+      MYSQL_PASSWORD_FILE: /run/secrets/zabbix_database_password
+      ZBX_SERVER_HOST: zabbix-server
+      ZBX_SERVER_NAME: Infrastructure Operations Platform
+      PHP_TZ: {{ zabbix_timezone }}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      zabbix-server:
+        condition: service_healthy
+    ports:
+      - "{{ zabbix_web_bind_address }}:{{ zabbix_web_port }}:8080"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget --quiet --spider http://127.0.0.1:8080/ || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    labels:
+      - traefik.enable={{ zabbix_enable_traefik | bool | lower }}
+{% if zabbix_enable_traefik %}
+      - traefik.docker.network={{ zabbix_traefik_network }}
+      - traefik.http.routers.zabbix.rule=Host(`{{ zabbix_traefik_hostname }}`)
+      - traefik.http.routers.zabbix.entrypoints=websecure
+      - traefik.http.routers.zabbix.tls=true
+{% if zabbix_traefik_middlewares | length > 0 %}
+      - traefik.http.routers.zabbix.middlewares={{ zabbix_traefik_middlewares | join(',') }}
+{% endif %}
+      - traefik.http.services.zabbix.loadbalancer.server.port=8080
+{% endif %}
+    restart: unless-stopped
+    volumes:
+      - ./secrets/zabbix_database_password:/run/secrets/zabbix_database_password:ro,Z
+    networks:
+      - backend
+{% if zabbix_enable_traefik %}
+      - proxy
+{% endif %}
+
+networks:
+  backend:
+    driver: bridge
+    internal: true
+  agent:
+    driver: bridge
+{% if zabbix_enable_traefik %}
+  proxy:
+    name: {{ zabbix_traefik_network }}
+    external: true
+{% endif %}
+
+volumes:
+  mysql_data:
+  server_alertscripts:
+  server_externalscripts:
+  server_export:
+  server_snmptraps:

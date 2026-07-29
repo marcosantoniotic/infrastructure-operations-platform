@@ -37,11 +37,13 @@ Consulte [exemplo sanitizado](../config/examples/traefik-static.yml).
 
 - frontend e servidor na mesma versão;
 - MySQL dedicado;
-- senha por Docker secret;
+- credenciais em arquivos read-only com relabel privado do SELinux;
 - Agent 2 instalado diretamente no RHEL;
 - mapa do ecossistema com triggers reais;
 - integração NetBox-Zabbix com token restrito;
-- servidor conectado apenas às redes internas necessárias para testes.
+- banco conectado somente ao backend interno;
+- tráfego de agentes separado em rede dedicada;
+- frontend publicado pelo Traefik, com fallback limitado ao loopback.
 
 ## NetBox
 

@@ -63,6 +63,10 @@ foreach ($file in $files) {
                 '(?i)((?:password|passwd|secret|token|api[_-]?key)\s*[:=]\s*)' +
                 'var\.[A-Za-z_][A-Za-z0-9_]*'
             ), '$1<VARIABLE_REFERENCE>'
+            # Container secret file paths are references, not credential values.
+            $contentToInspect = $contentToInspect -replace (
+                '(?i)(?:\./)?(?:run/)?secrets/[A-Za-z0-9_.-]+'
+            ), '<SECRET_FILE_PATH>'
         }
         if ($contentToInspect -match $pattern) {
             $errors.Add("Conteúdo potencialmente sensível em: $($file.FullName) (padrão: $pattern)")

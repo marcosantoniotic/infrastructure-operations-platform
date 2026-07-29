@@ -1,0 +1,290 @@
+---
+- name: Validate Zabbix variables
+  ansible.builtin.assert:
+    that:
+      - zabbix_project_dir.startswith("/")
+      - zabbix_database_password | length >= 24
+      - not zabbix_database_password.startswith("<")
+      - zabbix_database_root_password | length >= 24
+      - not zabbix_database_root_password.startswith("<")
+      - zabbix_admin_password | length >= 16
+      - not zabbix_admin_password.startswith("<")
+      - zabbix_admin_password != zabbix_default_admin_password
+      - >-
+        not (zabbix_enable_traefik | bool) or
+        zabbix_traefik_hostname | length > 0
+    fail_msg: >-
+      Replace all Zabbix placeholders with strong Ansible Vault values and
+      configure a hostname before enabling Traefik.
+  no_log: true
+
+- name: Validate Docker service
+  ansible.builtin.service_facts: {}
+
+- name: Assert Docker is running
+  ansible.builtin.assert:
+    that:
+      - "'docker.service' in ansible_facts.services"
+      - ansible_facts.services.get('docker.service', {}).get('state', '') == 'running'
+    fail_msg: "Docker must be installed and running before Zabbix deployment."
+
+- name: Verify the external Traefik network exists
+  ansible.builtin.command:
+    argv:
+      - docker
+      - network
+      - inspect
+      - "{{ zabbix_traefik_network }}"
+  changed_when: false
+  when:
+    - zabbix_enable_traefik | bool
+    - not ansible_check_mode
+
+- name: Create Zabbix project directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ zabbix_project_dir }}"
+      mode: "0750"
+    - path: "{{ zabbix_project_dir }}/secrets"
+      mode: "0700"
+
+- name: Install Zabbix Compose secrets
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: "{{ zabbix_project_dir }}/secrets/{{ item.name }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - name: zabbix_database_password
+      content: "{{ zabbix_database_password }}"
+    - name: zabbix_database_root_password
+      content: "{{ zabbix_database_root_password }}"
+  no_log: true
+
+- name: Render Zabbix Compose project
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ zabbix_project_dir }}/compose.yaml"
+    owner: root
+    group: root
+    mode: "0640"
+
+- name: Validate rendered Zabbix Compose configuration
+  ansible.builtin.command:
+    cmd: docker compose --project-directory {{ zabbix_project_dir }} config --quiet
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Deploy Zabbix project
+  community.docker.docker_compose_v2:
+    project_src: "{{ zabbix_project_dir }}"
+    files:
+      - compose.yaml
+    state: present
+    pull: missing
+    wait: true
+    wait_timeout: 420
+  when: not ansible_check_mode
+
+- name: Wait for Zabbix frontend
+  ansible.builtin.uri:
+    url: "http://{{ zabbix_web_validation_host }}:{{ zabbix_web_port }}/"
+    method: GET
+    status_code: 200
+  register: zabbix_web_response
+  retries: 40
+  delay: 5
+  until: zabbix_web_response.status == 200
+  when: not ansible_check_mode
+
+- name: Test desired Zabbix administrator credential
+  ansible.builtin.uri:
+    url: >-
+      http://{{ zabbix_web_validation_host }}:{{ zabbix_web_port }}/api_jsonrpc.php
+    method: POST
+    body_format: json
+    headers:
+      Content-Type: application/json-rpc
+    body:
+      jsonrpc: "2.0"
+      method: user.login
+      params:
+        username: "{{ zabbix_admin_user }}"
+        password: "{{ zabbix_admin_password }}"
+      id: 1
+    return_content: true
+    status_code: 200
+  register: zabbix_desired_login
+  failed_when: false
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Authenticate with the initial Zabbix administrator credential
+  ansible.builtin.uri:
+    url: >-
+      http://{{ zabbix_web_validation_host }}:{{ zabbix_web_port }}/api_jsonrpc.php
+    method: POST
+    body_format: json
+    headers:
+      Content-Type: application/json-rpc
+    body:
+      jsonrpc: "2.0"
+      method: user.login
+      params:
+        username: "{{ zabbix_admin_user }}"
+        password: "{{ zabbix_default_admin_password }}"
+      id: 2
+    return_content: true
+    status_code: 200
+  register: zabbix_initial_login
+  no_log: true
+  when:
+    - not ansible_check_mode
+    - zabbix_desired_login.json.result is not defined
+
+- name: Replace the initial Zabbix administrator password
+  ansible.builtin.uri:
+    url: >-
+      http://{{ zabbix_web_validation_host }}:{{ zabbix_web_port }}/api_jsonrpc.php
+    method: POST
+    body_format: json
+    headers:
+      Content-Type: application/json-rpc
+      Authorization: "Bearer {{ zabbix_initial_login.json.result }}"
+    body:
+      jsonrpc: "2.0"
+      method: user.update
+      params:
+        userid: "1"
+        passwd: "{{ zabbix_admin_password }}"
+        current_passwd: "{{ zabbix_default_admin_password }}"
+      id: 3
+    return_content: true
+    status_code: 200
+  register: zabbix_password_update
+  changed_when: zabbix_password_update.json.result is defined
+  no_log: true
+  when:
+    - not ansible_check_mode
+    - zabbix_desired_login.json.result is not defined
+
+- name: Validate the managed Zabbix administrator credential
+  ansible.builtin.uri:
+    url: >-
+      http://{{ zabbix_web_validation_host }}:{{ zabbix_web_port }}/api_jsonrpc.php
+    method: POST
+    body_format: json
+    headers:
+      Content-Type: application/json-rpc
+    body:
+      jsonrpc: "2.0"
+      method: user.login
+      params:
+        username: "{{ zabbix_admin_user }}"
+        password: "{{ zabbix_admin_password }}"
+      id: 4
+    return_content: true
+    status_code: 200
+  register: zabbix_managed_login
+  failed_when: zabbix_managed_login.json.result is not defined
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Assert the initial Zabbix administrator credential is rejected
+  ansible.builtin.uri:
+    url: >-
+      http://{{ zabbix_web_validation_host }}:{{ zabbix_web_port }}/api_jsonrpc.php
+    method: POST
+    body_format: json
+    headers:
+      Content-Type: application/json-rpc
+    body:
+      jsonrpc: "2.0"
+      method: user.login
+      params:
+        username: "{{ zabbix_admin_user }}"
+        password: "{{ zabbix_default_admin_password }}"
+      id: 5
+    return_content: true
+    status_code: 200
+  register: zabbix_default_login_check
+  failed_when: zabbix_default_login_check.json.result is defined
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Close the Zabbix API validation session
+  ansible.builtin.uri:
+    url: >-
+      http://{{ zabbix_web_validation_host }}:{{ zabbix_web_port }}/api_jsonrpc.php
+    method: POST
+    body_format: json
+    headers:
+      Content-Type: application/json-rpc
+      Authorization: "Bearer {{ zabbix_managed_login.json.result }}"
+    body:
+      jsonrpc: "2.0"
+      method: user.logout
+      params: []
+      id: 6
+    return_content: true
+    status_code: 200
+  register: zabbix_logout
+  failed_when: zabbix_logout.json.result | default(false) != true
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Validate Zabbix Server listener
+  ansible.builtin.wait_for:
+    host: "{{ zabbix_server_validation_host }}"
+    port: "{{ zabbix_server_port }}"
+    state: started
+    timeout: 30
+  when: not ansible_check_mode
+
+- name: Validate Zabbix through Traefik HTTPS
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --silent
+      - --insecure
+      - --include
+      - --resolve
+      - "{{ zabbix_traefik_hostname }}:{{ zabbix_traefik_https_port }}:{{ zabbix_traefik_validation_address }}"
+      - "https://{{ zabbix_traefik_hostname }}:{{ zabbix_traefik_https_port }}/"
+  register: zabbix_traefik_response
+  changed_when: false
+  retries: 20
+  delay: 3
+  until: >-
+    'http/1.1 200' in zabbix_traefik_response.stdout | lower or
+    'http/2 200' in zabbix_traefik_response.stdout | lower
+  failed_when: >-
+    (
+      'http/1.1 200' not in zabbix_traefik_response.stdout | lower and
+      'http/2 200' not in zabbix_traefik_response.stdout | lower
+    ) or
+    'x-content-type-options: nosniff' not in
+    zabbix_traefik_response.stdout | lower or
+    'strict-transport-security: max-age=31536000' not in
+    zabbix_traefik_response.stdout | lower
+  when:
+    - zabbix_enable_traefik | bool
+    - not ansible_check_mode
+
+- name: Report Zabbix deployment
+  ansible.builtin.debug:
+    msg:
+      project_directory: "{{ zabbix_project_dir }}"
+      frontend_fallback: >-
+        http://{{ zabbix_web_bind_address }}:{{ zabbix_web_port }}
+      server_listener: >-
+        {{ zabbix_server_bind_address }}:{{ zabbix_server_port }}
+      traefik_enabled: "{{ zabbix_enable_traefik | bool }}"
+      traefik_hostname: >-
+        {{ zabbix_traefik_hostname if zabbix_enable_traefik else 'disabled' }}

@@ -82,3 +82,22 @@ traefik_socket_network: socket-proxy
 traefik_enable_https: false
 traefik_redirect_http_to_https: false
 traefik_enable_validation_service: false
+
+# Zabbix monitoring
+zabbix_project_dir: /opt/zabbix
+zabbix_server_image: zabbix/zabbix-server-mysql:7.4.12-alpine
+zabbix_web_image: zabbix/zabbix-web-nginx-mysql:7.4.12-alpine
+zabbix_mysql_image: mysql:8.4.10-oraclelinux9
+zabbix_database_name: zabbix
+zabbix_database_user: zabbix
+zabbix_database_password: "{{ vault_zabbix_database_password }}"
+zabbix_database_root_password: "{{ vault_zabbix_database_root_password }}"
+zabbix_admin_password: "{{ vault_zabbix_admin_password }}"
+zabbix_timezone: America/Sao_Paulo
+zabbix_web_bind_address: 127.0.0.1
+zabbix_web_port: 8081
+zabbix_server_bind_address: 127.0.0.1
+zabbix_server_port: 10051
+zabbix_enable_traefik: false
+zabbix_traefik_hostname: "zabbix.<BASE_DOMAIN>"
+zabbix_traefik_network: proxy

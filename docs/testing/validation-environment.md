@@ -363,6 +363,31 @@ hostname to HTTPS. For emergency access, add `-L 8000:127.0.0.1:8000` to the
 SSH tunnel and open `http://127.0.0.1:8000`; this fallback never binds to the
 host-only network.
 
+### 13. Deploy and publish Zabbix
+
+Deploy the Zabbix 7.4 Server, Nginx frontend and dedicated MySQL 8.4 LTS
+database, rotate the default administrator password and publish the frontend
+through the validated ingress:
+
+```powershell
+.\automation\scripts\Run-ValidationZabbix.ps1 `
+  -EnableTraefik `
+  -VerifyPersistence `
+  -VerifyIdempotence
+```
+
+Open `https://zabbix.localhost:8443/` and use the credential stored in
+`.validation/zabbix-initial-credentials.txt`. The database remains on an
+internal Docker network. The server listener uses a dedicated agent network
+and binds only to `127.0.0.1:10051` in validation. The frontend fallback is
+`127.0.0.1:8081`; add both ports to an SSH tunnel only when testing those
+recovery paths.
+
+Certification requires three healthy containers, successful login with the
+managed credential, rejection of the initial default credential, active Server
+listener, HTTP 200 through Traefik, reusable security headers and a final
+Ansible pass with `changed=0`, `unreachable=0` and `failed=0`.
+
 This private CA exists only for the isolated validation environment. Production
 promotion still requires the certificate, DNS and renewal strategy for the
 real application domain.
@@ -397,4 +422,5 @@ The environment is not considered validated until:
 - NetBox backup restores in an isolated database;
 - Traefik discovery, authentication and Socket Proxy restrictions pass;
 - NetBox responds through Traefik with TLS and reusable security headers;
+- Zabbix persists its database, rejects the default credential and is idempotent;
 - no local secret or RHEL artifact appears in Git.
