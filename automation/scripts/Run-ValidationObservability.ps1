@@ -145,6 +145,9 @@ observability_blackbox_targets:
     url: http://portainer:9000/
   - name: traefik
     url: http://traefik:8082/metrics
+  - name: cockpit
+    url: https://host.containers.internal:9091/ping
+    tls_insecure: true
 $traefikVariablesYaml
 # END VALIDATION OBSERVABILITY
 "@

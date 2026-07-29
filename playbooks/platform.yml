@@ -13,6 +13,7 @@
   become: true
   roles:
     - role: traefik
+    - role: cockpit
     - role: netbox
     - role: netbox_backup
     - role: zabbix

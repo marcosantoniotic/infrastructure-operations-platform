@@ -1,0 +1,7 @@
+[WebService]
+Origins = https://{{ cockpit_hostname }} wss://{{ cockpit_hostname }}
+ProtocolHeader = X-Forwarded-Proto
+ForwardedForHeader = X-Forwarded-For
+LoginTitle = {{ cockpit_login_title }}
+LoginTo = false
+AllowUnencrypted = false

@@ -30,6 +30,7 @@ $requiredPaths = @(
     'automation/scripts/Run-ValidationZabbixBackup.ps1',
     'automation/scripts/Run-ValidationPortainer.ps1',
     'automation/scripts/Run-ValidationObservability.ps1',
+    'automation/scripts/Run-ValidationCockpit.ps1',
     'automation/scripts/Initialize-Validation.ps1',
     'automation/scripts/Build-RhelBox.ps1',
     'automation/scripts/Register-RhelBox.ps1',
@@ -44,6 +45,7 @@ $requiredPaths = @(
     'playbooks/zabbix-backup.yml',
     'playbooks/portainer.yml',
     'playbooks/observability.yml',
+    'playbooks/cockpit.yml',
     'playbooks/platform.yml',
     'roles/rhel_baseline/defaults/main.yml',
     'roles/rhel_baseline/tasks/main.yml',
@@ -86,7 +88,13 @@ $requiredPaths = @(
     'roles/observability/templates/grafana-dashboards.yml.j2',
     'roles/observability/templates/infrastructure-host-containers.json.j2',
     'roles/observability/templates/application-tls-health.json.j2',
-    'roles/observability/README.md'
+    'roles/observability/README.md',
+    'roles/cockpit/defaults/main.yml',
+    'roles/cockpit/handlers/main.yml',
+    'roles/cockpit/tasks/main.yml',
+    'roles/cockpit/templates/cockpit.conf.j2',
+    'roles/cockpit/templates/listen.conf.j2',
+    'roles/cockpit/README.md'
 )
 
 foreach ($relativePath in $requiredPaths) {

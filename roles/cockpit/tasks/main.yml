@@ -1,0 +1,90 @@
+---
+- name: Validate Cockpit variables
+  ansible.builtin.assert:
+    that:
+      - cockpit_hostname | length > 0
+      - cockpit_packages | length > 0
+
+- name: Install RHEL web console packages
+  ansible.builtin.dnf:
+    name: "{{ cockpit_packages }}"
+    state: present
+
+- name: Create Cockpit configuration directory
+  ansible.builtin.file:
+    path: /etc/cockpit
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create Cockpit socket override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/cockpit.socket.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Configure conflict-free Cockpit socket port
+  ansible.builtin.template:
+    src: listen.conf.j2
+    dest: /etc/systemd/system/cockpit.socket.d/listen.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart Cockpit socket
+
+- name: Permit Cockpit socket port in SELinux policy
+  community.general.seport:
+    ports: "{{ cockpit_listen_port }}"
+    proto: tcp
+    setype: websm_port_t
+    state: present
+
+- name: Configure Cockpit for reverse proxy
+  ansible.builtin.template:
+    src: cockpit.conf.j2
+    dest: /etc/cockpit/cockpit.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart Cockpit socket
+
+- name: Enable Cockpit socket activation
+  ansible.builtin.systemd:
+    name: cockpit.socket
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Apply Cockpit configuration
+  ansible.builtin.meta: flush_handlers
+
+- name: Allow optional direct Cockpit firewall access
+  ansible.posix.firewalld:
+    service: cockpit
+    permanent: true
+    immediate: true
+    state: enabled
+  when: cockpit_direct_firewall_access | bool
+
+- name: Validate Cockpit HTTPS endpoint
+  ansible.builtin.uri:
+    url: "https://{{ cockpit_validation_address }}:{{ cockpit_validation_port }}/ping"
+    validate_certs: false
+    status_code: 200
+    return_content: true
+  register: cockpit_ping
+  retries: 20
+  delay: 3
+  until: cockpit_ping.status == 200
+
+- name: Report Cockpit deployment
+  ansible.builtin.debug:
+    msg:
+      socket: cockpit.socket
+      direct_endpoint: >-
+        https://{{ cockpit_validation_address }}:{{ cockpit_validation_port }}
+      traefik_hostname: >-
+        {{ cockpit_hostname if cockpit_enable_traefik else 'disabled' }}

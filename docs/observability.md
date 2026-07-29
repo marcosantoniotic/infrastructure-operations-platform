@@ -81,9 +81,8 @@ O ambiente de validação comprova probes para:
 - endpoint interno de métricas do Traefik.
 
 Cada alvo gera um módulo Blackbox próprio e pode declarar URL, cabeçalho
-`Host`, códigos HTTP aceitos e política TLS. O Cockpit será incluído quando seu
-módulo estiver implantado na VM; não é criado um alvo fictício para um serviço
-ausente.
+`Host`, códigos HTTP aceitos e política TLS. O Cockpit utiliza o endpoint
+`/ping` do serviço nativo e também participa dos probes HTTP centralizados.
 
 ## Alertas recomendados
 

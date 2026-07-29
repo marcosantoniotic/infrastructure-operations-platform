@@ -460,6 +460,18 @@ MySQL container, validates essential Zabbix tables, reloads the platform VM,
 checks the persistent timer, verifies the backup again, and completes with an
 idempotent Ansible pass.
 
+### 17. Validate Cockpit
+
+```powershell
+.\automation\scripts\Run-ValidationCockpit.ps1 `
+  -VerifyIdempotence `
+  -VerifyPersistence
+```
+
+The workflow installs Cockpit natively, keeps SELinux enforcing, checks the
+dedicated `9091/tcp` socket, publishes `cockpit.localhost` through Traefik and
+confirms that the service remains enabled and healthy after a VM reload.
+
 ## Lifecycle commands
 
 From `automation\vagrant`:
@@ -489,6 +501,7 @@ The environment is not considered validated until:
 - NetBox survives restart and container recreation;
 - NetBox backup restores in an isolated database;
 - Zabbix backup restores in an isolated database and its timer survives reload;
+- Cockpit remains enabled, healthy and reachable through Traefik after reload;
 - Traefik discovery, authentication and Socket Proxy restrictions pass;
 - NetBox responds through Traefik with TLS and reusable security headers;
 - Zabbix persists its database, rejects the default credential and is idempotent;

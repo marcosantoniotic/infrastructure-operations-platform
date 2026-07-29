@@ -1,0 +1,13 @@
+---
+cockpit_packages:
+  - cockpit
+  - cockpit-system
+  - cockpit-storaged
+  - policycoreutils-python-utils
+cockpit_hostname: "cockpit.<BASE_DOMAIN>"
+cockpit_enable_traefik: false
+cockpit_direct_firewall_access: false
+cockpit_login_title: Infrastructure Operations Platform
+cockpit_validation_address: 127.0.0.1
+cockpit_validation_port: 9091
+cockpit_listen_port: 9091

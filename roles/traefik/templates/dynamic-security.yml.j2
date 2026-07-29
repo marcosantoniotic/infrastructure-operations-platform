@@ -1,5 +1,25 @@
 ---
 http:
+{% if traefik_enable_cockpit %}
+  routers:
+    cockpit:
+      rule: "Host(`{{ traefik_cockpit_hostname }}`)"
+      entryPoints:
+        - websecure
+      middlewares:
+        - security-headers
+      service: cockpit
+      tls: {}
+  services:
+    cockpit:
+      loadBalancer:
+        serversTransport: cockpit-local
+        servers:
+          - url: "{{ traefik_cockpit_backend_url }}"
+  serversTransports:
+    cockpit-local:
+      insecureSkipVerify: true
+{% endif %}
   middlewares:
     dashboard-auth:
       basicAuth:
