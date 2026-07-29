@@ -60,6 +60,8 @@ services:
       - NET_BIND_SERVICE
     security_opt:
       - no-new-privileges:true
+    extra_hosts:
+      - host.containers.internal:host-gateway
     labels:
       - traefik.enable=true
       - traefik.docker.network={{ traefik_proxy_network }}

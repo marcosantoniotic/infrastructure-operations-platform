@@ -125,6 +125,18 @@ portainer_enable_traefik: false
 portainer_traefik_hostname: "portainer.<BASE_DOMAIN>"
 portainer_traefik_network: proxy
 
+# Native RHEL web console
+cockpit_hostname: "cockpit.<BASE_DOMAIN>"
+cockpit_enable_traefik: false
+cockpit_direct_firewall_access: false
+cockpit_login_title: Infrastructure Operations Platform
+cockpit_listen_port: 9091
+
+# Optional Cockpit backend published by Traefik
+traefik_enable_cockpit: false
+traefik_cockpit_hostname: "cockpit.<BASE_DOMAIN>"
+traefik_cockpit_backend_url: https://host.containers.internal:9091
+
 # Metrics and visualization
 observability_project_dir: /opt/observability
 observability_prometheus_image: prom/prometheus:v3.13.1

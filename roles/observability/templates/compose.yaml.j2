@@ -89,6 +89,8 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    extra_hosts:
+      - host.containers.internal:host-gateway
     healthcheck:
       test:
         - CMD

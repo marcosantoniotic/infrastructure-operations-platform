@@ -1,0 +1,9 @@
+---
+- name: Deploy RHEL web console
+  hosts: platform
+  gather_facts: true
+  become: true
+  roles:
+    - role: cockpit
+    - role: traefik
+      when: cockpit_enable_traefik | bool

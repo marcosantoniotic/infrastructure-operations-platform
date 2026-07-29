@@ -10,6 +10,21 @@
 | Observabilidade | `/opt/observability` | `compose.yaml`, `prometheus/`, `grafana/`, `blackbox/`, `snmp/` |
 | Portainer | `/opt/portainer` | `compose.yaml` |
 
+## Cockpit
+
+O Cockpit é instalado como serviço nativo do RHEL e publicado pelo Traefik.
+Como a porta `9090` é reservada ao fallback local do Prometheus, o socket do
+Cockpit utiliza `9091`. A automação aplica o rótulo SELinux `websm_port_t` à
+porta sem desabilitar o modo enforcing.
+
+| Variável | Padrão | Finalidade |
+|---|---|---|
+| `cockpit_hostname` | `cockpit.<BASE_DOMAIN>` | nome DNS publicado |
+| `cockpit_listen_port` | `9091` | porta HTTPS nativa |
+| `cockpit_enable_traefik` | `false` | publica o serviço no proxy |
+| `cockpit_direct_firewall_access` | `false` | permite acesso direto pela rede |
+| `cockpit_login_title` | `Infrastructure Operations Platform` | identificação da tela de login |
+
 ## Traefik
 
 Configuração estática esperada:

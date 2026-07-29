@@ -21,4 +21,7 @@ traefik_https_redirect_target: websecure
 traefik_tls_certificate_source: ""
 traefik_tls_private_key_source: ""
 traefik_enable_validation_service: false
+traefik_enable_cockpit: false
+traefik_cockpit_hostname: "cockpit.<BASE_DOMAIN>"
+traefik_cockpit_backend_url: https://host.containers.internal:9091
 traefik_log_level: INFO
