@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 0077
+
+readonly PROJECT_DIR="{{ zabbix_backup_project_dir }}"
+readonly BACKUP_ROOT="{{ zabbix_backup_root }}"
+readonly RETENTION_DAYS="{{ zabbix_backup_retention_days }}"
+readonly MYSQL_SERVICE="{{ zabbix_backup_mysql_service }}"
+readonly SERVER_SERVICE="{{ zabbix_backup_server_service }}"
+readonly DATABASE_NAME="{{ zabbix_backup_database_name }}"
+readonly MYSQL_IMAGE="{{ zabbix_backup_mysql_image }}"
+
+log() {
+  logger -t zabbix-backup -- "$*"
+  printf '%s\n' "$*"
+}
+
+latest_backup() {
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' \
+    -printf '%f\n' | sort | tail -n 1
+}
+
+create_backup() {
+  local timestamp staging final
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  staging="${BACKUP_ROOT}/.${timestamp}.partial"
+  final="${BACKUP_ROOT}/${timestamp}"
+  install -d -m 0700 "$staging"
+
+  cleanup_partial() {
+    rm -rf -- "$staging"
+  }
+  trap cleanup_partial ERR INT TERM
+
+  cd "$PROJECT_DIR"
+  docker compose exec -T "$MYSQL_SERVICE" sh -c \
+    'MYSQL_PWD="$(cat /run/secrets/zabbix_database_root_password)" exec mysqldump --user=root --single-transaction --quick --routines --triggers --events --hex-blob --no-tablespaces --set-gtid-purged=OFF "$1"' \
+    _ "$DATABASE_NAME" > "${staging}/database.sql"
+
+  docker compose exec -T "$SERVER_SERVICE" \
+    tar -czf - \
+      /usr/lib/zabbix/alertscripts \
+      /usr/lib/zabbix/externalscripts \
+      /var/lib/zabbix/export \
+      /var/lib/zabbix/snmptraps \
+      2>/dev/null > "${staging}/server-data.tar.gz"
+
+  install -m 0600 "${PROJECT_DIR}/compose.yaml" "${staging}/compose.yaml"
+  {
+    printf 'created_utc=%s\n' "$timestamp"
+    printf 'database=%s\n' "$DATABASE_NAME"
+    printf 'mysql_image=%s\n' "$MYSQL_IMAGE"
+    printf 'format=zabbix-platform-backup-v1\n'
+    docker compose images --format json | tr '\n' ' '
+    printf '\n'
+  } > "${staging}/metadata.txt"
+
+  (
+    cd "$staging"
+    sha256sum database.sql server-data.tar.gz compose.yaml metadata.txt > SHA256SUMS
+  )
+  mv -- "$staging" "$final"
+  trap - ERR INT TERM
+
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' \
+    -mtime "+${RETENTION_DAYS}" -exec rm -rf -- {} +
+  log "Zabbix backup completed: ${final}"
+}
+
+verify_backup() {
+  local selected directory container verify_password database
+  selected="${1:-$(latest_backup)}"
+  if [[ -z "$selected" ]]; then
+    log "No Zabbix backup is available for verification."
+    exit 1
+  fi
+  directory="${BACKUP_ROOT}/${selected}"
+  [[ -d "$directory" ]] || {
+    log "Backup directory does not exist: ${directory}"
+    exit 1
+  }
+
+  (
+    cd "$directory"
+    sha256sum --check SHA256SUMS
+  )
+  tar -tzf "${directory}/server-data.tar.gz" >/dev/null
+
+  container="zabbix-restore-check-${RANDOM}-$$"
+  database="zabbix_restore"
+  verify_password="$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
+  cleanup_container() {
+    docker rm -f "$container" >/dev/null 2>&1 || true
+  }
+  trap cleanup_container EXIT INT TERM
+
+  docker run --detach --rm --name "$container" \
+    --env "MYSQL_ROOT_PASSWORD=${verify_password}" \
+    --env "MYSQL_DATABASE=${database}" \
+    "$MYSQL_IMAGE" >/dev/null
+
+  for _ in {1..60}; do
+    if docker exec \
+      --env "MYSQL_PWD=${verify_password}" \
+      "$container" mysqladmin ping --silent --host=127.0.0.1 --user=root \
+      >/dev/null 2>&1; then
+      break
+    fi
+    sleep 2
+  done
+  docker exec \
+    --env "MYSQL_PWD=${verify_password}" \
+    "$container" mysqladmin ping --silent --host=127.0.0.1 --user=root \
+    >/dev/null
+
+  docker cp "${directory}/database.sql" "${container}:/tmp/database.sql" >/dev/null
+  docker exec \
+    --env "MYSQL_PWD=${verify_password}" \
+    "$container" sh -c \
+    'exec mysql --user=root "$1" < /tmp/database.sql' _ "$database"
+
+  docker exec \
+    --env "MYSQL_PWD=${verify_password}" \
+    "$container" mysql --batch --skip-column-names --user=root "$database" \
+    --execute \
+    "SELECT COUNT(*) FROM information_schema.tables
+     WHERE table_schema='${database}' AND table_name IN ('dbversion','hosts');" \
+    | grep -qx '2'
+  docker exec \
+    --env "MYSQL_PWD=${verify_password}" \
+    "$container" mysql --batch --skip-column-names --user=root "$database" \
+    --execute "SELECT COUNT(*) FROM dbversion;" \
+    | grep -Eq '[1-9][0-9]*'
+
+  cleanup_container
+  trap - EXIT INT TERM
+  log "Zabbix isolated restore verified: ${directory}"
+}
+
+case "${1:-backup}" in
+  backup)
+    create_backup
+    ;;
+  verify)
+    verify_backup "${2:-}"
+    ;;
+  *)
+    printf 'Usage: %s {backup|verify [TIMESTAMP]}\n' "$0" >&2
+    exit 2
+    ;;
+esac

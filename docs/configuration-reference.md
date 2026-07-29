@@ -45,6 +45,15 @@ Consulte [exemplo sanitizado](../config/examples/traefik-static.yml).
 - tráfego de agentes separado em rede dedicada;
 - frontend publicado pelo Traefik, com fallback limitado ao loopback.
 
+### Backup do Zabbix
+
+- dump MySQL consistente com transação única, rotinas, triggers e eventos;
+- dados operacionais de scripts, exportações e traps em arquivo separado;
+- manifesto SHA-256 e metadados sem segredos;
+- timer `systemd` persistente com retenção configurável;
+- restauração validada em MySQL temporário e isolado;
+- banco ativo preservado durante backup e verificação.
+
 ## NetBox
 
 - imagem local customizada e versionada;

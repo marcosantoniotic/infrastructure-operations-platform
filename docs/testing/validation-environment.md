@@ -440,6 +440,22 @@ Certification requires healthy containers, all Prometheus targets in state
 persisted data after reload and a final Ansible pass with `changed=0`,
 `unreachable=0` and `failed=0`.
 
+### 16. Validate Zabbix backup and isolated restore
+
+After the Zabbix module has been deployed:
+
+```powershell
+.\automation\scripts\Run-ValidationZabbixBackup.ps1 `
+  -VerifyRestore `
+  -VerifyPersistence `
+  -VerifyIdempotence
+```
+
+The workflow creates a real consistent backup, restores it into a disposable
+MySQL container, validates essential Zabbix tables, reloads the platform VM,
+checks the persistent timer, verifies the backup again, and completes with an
+idempotent Ansible pass.
+
 ## Lifecycle commands
 
 From `automation\vagrant`:
@@ -468,6 +484,7 @@ The environment is not considered validated until:
 - Docker installation is idempotent;
 - NetBox survives restart and container recreation;
 - NetBox backup restores in an isolated database;
+- Zabbix backup restores in an isolated database and its timer survives reload;
 - Traefik discovery, authentication and Socket Proxy restrictions pass;
 - NetBox responds through Traefik with TLS and reusable security headers;
 - Zabbix persists its database, rejects the default credential and is idempotent;
