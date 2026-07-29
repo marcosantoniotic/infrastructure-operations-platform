@@ -121,6 +121,7 @@ observability_prometheus_image: prom/prometheus:v3.13.1
 observability_grafana_image: grafana/grafana:13.1.1
 observability_node_exporter_image: prom/node-exporter:v1.12.1
 observability_cadvisor_image: ghcr.io/google/cadvisor:v0.60.5
+observability_blackbox_image: prom/blackbox-exporter:v0.28.0
 observability_scrape_interval: 30s
 observability_prometheus_retention_time: 30d
 observability_prometheus_retention_size: 8GB
@@ -130,6 +131,11 @@ observability_grafana_bind_address: 127.0.0.1
 observability_grafana_port: 3000
 observability_grafana_admin_user: admin
 observability_grafana_admin_password: "{{ vault_grafana_admin_password }}"
+observability_blackbox_targets:
+  - name: prometheus
+    url: http://prometheus:9090/-/ready
+  - name: grafana
+    url: http://grafana:3000/api/health
 $traefikVariablesYaml
 # END VALIDATION OBSERVABILITY
 "@

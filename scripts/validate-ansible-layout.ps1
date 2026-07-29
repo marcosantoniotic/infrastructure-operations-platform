@@ -80,9 +80,12 @@ $requiredPaths = @(
     'roles/observability/tasks/main.yml',
     'roles/observability/templates/compose.yaml.j2',
     'roles/observability/templates/prometheus.yml.j2',
+    'roles/observability/templates/blackbox.yml.j2',
+    'roles/observability/templates/alerts.yml.j2',
     'roles/observability/templates/grafana-datasource.yml.j2',
     'roles/observability/templates/grafana-dashboards.yml.j2',
     'roles/observability/templates/infrastructure-host-containers.json.j2',
+    'roles/observability/templates/application-tls-health.json.j2',
     'roles/observability/README.md'
 )
 

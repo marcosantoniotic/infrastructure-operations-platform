@@ -51,6 +51,8 @@
       mode: "0700"
     - path: "{{ observability_project_dir }}/prometheus"
       mode: "0750"
+    - path: "{{ observability_project_dir }}/blackbox"
+      mode: "0750"
     - path: "{{ observability_project_dir }}/grafana"
       mode: "0750"
     - path: "{{ observability_project_dir }}/grafana/provisioning"
@@ -81,12 +83,18 @@
   loop:
     - src: prometheus.yml.j2
       dest: prometheus/prometheus.yml
+    - src: alerts.yml.j2
+      dest: prometheus/alerts.yml
+    - src: blackbox.yml.j2
+      dest: blackbox/blackbox.yml
     - src: grafana-datasource.yml.j2
       dest: grafana/provisioning/datasources/prometheus.yml
     - src: grafana-dashboards.yml.j2
       dest: grafana/provisioning/dashboards/platform.yml
     - src: infrastructure-host-containers.json.j2
       dest: grafana/dashboards/infrastructure-host-containers.json
+    - src: application-tls-health.json.j2
+      dest: grafana/dashboards/application-tls-health.json
 
 - name: Render observability Compose project
   ansible.builtin.template:
@@ -112,10 +120,26 @@
       - /bin/promtool
       - -v
       - "{{ observability_project_dir }}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z"
+      - -v
+      - "{{ observability_project_dir }}/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro,Z"
       - "{{ observability_prometheus_image }}"
       - check
       - config
       - /etc/prometheus/prometheus.yml
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Validate Blackbox Exporter configuration
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - -v
+      - "{{ observability_project_dir }}/blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro,Z"
+      - "{{ observability_blackbox_image }}"
+      - --config.file=/etc/blackbox_exporter/blackbox.yml
+      - --config.check
   changed_when: false
   when: not ansible_check_mode
 
@@ -172,6 +196,22 @@
     ) > 0
   when: not ansible_check_mode
 
+- name: Validate all configured application probes
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/api/v1/query?query=min(probe_success%7Bjob%3D%22blackbox-http%22%7D)
+    method: GET
+    status_code: 200
+    return_content: true
+  register: observability_blackbox_probes
+  retries: 20
+  delay: 5
+  until: >-
+    observability_blackbox_probes.json.status == 'success' and
+    observability_blackbox_probes.json.data.result | length == 1 and
+    observability_blackbox_probes.json.data.result[0].value[1] == '1'
+  when: not ansible_check_mode
+
 - name: Wait for Grafana health endpoint
   ansible.builtin.uri:
     url: >-
@@ -218,6 +258,23 @@
   failed_when: >-
     observability_grafana_dashboard.json.dashboard.uid !=
     'infrastructure-host-containers'
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Validate provisioned application health dashboard
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_grafana_validation_host }}:{{ observability_grafana_port }}/api/dashboards/uid/application-tls-health
+    method: GET
+    user: "{{ observability_grafana_admin_user }}"
+    password: "{{ observability_grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    return_content: true
+  register: observability_application_dashboard
+  failed_when: >-
+    observability_application_dashboard.json.dashboard.uid !=
+    'application-tls-health'
   no_log: true
   when: not ansible_check_mode
 

@@ -98,7 +98,9 @@ Núcleo implementado:
 - Grafana com credencial administrativa em Ansible Vault;
 - Node Exporter para métricas do RHEL;
 - cAdvisor isolado para métricas de containers;
+- Blackbox Exporter para disponibilidade HTTP, latência e certificados;
 - dashboard `Infrastructure Operations — Host & Containers`;
+- dashboard `Infrastructure Operations — Application & TLS Health`;
 - portas de fallback limitadas ao loopback;
 - exporters acessíveis apenas na rede interna de métricas.
 
