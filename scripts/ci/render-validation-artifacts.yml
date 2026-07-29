@@ -1,0 +1,95 @@
+---
+- name: Render sanitized service artifacts for CI
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ci_output_dir: "{{ lookup('env', 'CI_ARTIFACT_DIR') }}"
+  tasks:
+    - name: Require an explicit CI output directory
+      ansible.builtin.assert:
+        that:
+          - ci_output_dir | length > 0
+          - ci_output_dir.startswith("/")
+
+    - name: Create isolated render directories
+      ansible.builtin.file:
+        path: "{{ ci_output_dir }}/{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - traefik
+        - zabbix
+        - netbox
+        - portainer
+        - observability
+
+    - name: Load Traefik defaults
+      ansible.builtin.include_vars:
+        file: ../../roles/traefik/defaults/main.yml
+
+    - name: Render Traefik Compose definition
+      ansible.builtin.template:
+        src: ../../roles/traefik/templates/compose.yaml.j2
+        dest: "{{ ci_output_dir }}/traefik/compose.yaml"
+        mode: "0644"
+
+    - name: Load Zabbix defaults
+      ansible.builtin.include_vars:
+        file: ../../roles/zabbix/defaults/main.yml
+
+    - name: Render Zabbix Compose definition
+      ansible.builtin.template:
+        src: ../../roles/zabbix/templates/compose.yaml.j2
+        dest: "{{ ci_output_dir }}/zabbix/compose.yaml"
+        mode: "0644"
+
+    - name: Load NetBox defaults
+      ansible.builtin.include_vars:
+        file: ../../roles/netbox/defaults/main.yml
+
+    - name: Render NetBox Compose definition
+      ansible.builtin.template:
+        src: ../../roles/netbox/templates/compose.yaml.j2
+        dest: "{{ ci_output_dir }}/netbox/compose.yaml"
+        mode: "0644"
+
+    - name: Create sanitized NetBox environment fixture
+      ansible.builtin.copy:
+        dest: "{{ ci_output_dir }}/netbox/.env"
+        mode: "0644"
+        content: |
+          POSTGRES_DB=netbox
+          POSTGRES_USER=netbox
+          POSTGRES_PASSWORD=ci
+          REDIS_PASSWORD=ci
+          REDIS_CACHE_PASSWORD=ci
+
+    - name: Load Portainer defaults
+      ansible.builtin.include_vars:
+        file: ../../roles/portainer/defaults/main.yml
+
+    - name: Render Portainer Compose definition
+      ansible.builtin.template:
+        src: ../../roles/portainer/templates/compose.yaml.j2
+        dest: "{{ ci_output_dir }}/portainer/compose.yaml"
+        mode: "0644"
+
+    - name: Load observability defaults
+      ansible.builtin.include_vars:
+        file: ../../roles/observability/defaults/main.yml
+
+    - name: Render observability definitions
+      ansible.builtin.template:
+        src: "../../roles/observability/templates/{{ item.source }}"
+        dest: "{{ ci_output_dir }}/observability/{{ item.destination }}"
+        mode: "0644"
+      loop:
+        - source: compose.yaml.j2
+          destination: compose.yaml
+        - source: prometheus.yml.j2
+          destination: prometheus.yml
+        - source: alerts.yml.j2
+          destination: alerts.yml
+        - source: blackbox.yml.j2
+          destination: blackbox.yml
