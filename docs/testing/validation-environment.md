@@ -440,6 +440,10 @@ Certification requires healthy containers, all Prometheus targets in state
 persisted data after reload and a final Ansible pass with `changed=0`,
 `unreachable=0` and `failed=0`.
 
+The workflow also validates the Blackbox Exporter configuration, requires every
+configured HTTP probe to report `probe_success=1`, loads the application alert
+rules, and verifies the provisioned `Application & TLS Health` dashboard.
+
 ### 16. Validate Zabbix backup and isolated restore
 
 After the Zabbix module has been deployed:

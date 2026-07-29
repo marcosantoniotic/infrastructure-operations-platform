@@ -1,0 +1,34 @@
+---
+groups:
+  - name: application-health
+    rules:
+      - alert: ApplicationProbeFailed
+        expr: probe_success{job="blackbox-http"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Application probe failed: {{ '{{' }} $labels.service {{ '}}' }}"
+          description: "The HTTP probe for {{ '{{' }} $labels.instance {{ '}}' }} failed."
+
+      - alert: TLSCertificateExpiringSoon
+        expr: >-
+          probe_ssl_earliest_cert_expiry{job="blackbox-http"} - time()
+          < 30 * 24 * 60 * 60
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "TLS certificate expires within 30 days"
+          description: "Certificate for {{ '{{' }} $labels.service {{ '}}' }} is nearing expiry."
+
+      - alert: TLSCertificateExpiringCritical
+        expr: >-
+          probe_ssl_earliest_cert_expiry{job="blackbox-http"} - time()
+          < 15 * 24 * 60 * 60
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "TLS certificate expires within 15 days"
+          description: "Certificate for {{ '{{' }} $labels.service {{ '}}' }} requires immediate renewal."

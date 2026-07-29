@@ -14,6 +14,7 @@ services:
       - "{{ observability_prometheus_bind_address }}:{{ observability_prometheus_port }}:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro,Z
       - prometheus_data:/prometheus
     read_only: true
     tmpfs:
@@ -74,6 +75,37 @@ services:
     restart: unless-stopped
     networks:
       - metrics
+
+  blackbox-exporter:
+    image: {{ observability_blackbox_image }}
+    command:
+      - --config.file=/etc/blackbox_exporter/blackbox.yml
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro,Z
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --spider
+        - http://127.0.0.1:9115/-/healthy
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - metrics
+{% if observability_enable_traefik %}
+      - proxy
+{% endif %}
 
   grafana:
     image: {{ observability_grafana_image }}

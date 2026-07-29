@@ -1,13 +1,14 @@
 # Observability role
 
-Deploys Prometheus, Grafana, Node Exporter and cAdvisor as an independent
-Compose project.
+Deploys Prometheus, Grafana, Node Exporter, cAdvisor and Blackbox Exporter as
+an independent Compose project.
 
 ## Responsibilities
 
 - Prometheus stores high-resolution time series with bounded retention;
 - Node Exporter provides RHEL host metrics;
 - cAdvisor provides container resource metrics;
+- Blackbox Exporter provides HTTP/TLS availability and latency probes;
 - Grafana provides provisioned, version-controlled visualization.
 
 Zabbix remains responsible for operational triggers, events and maps. This
@@ -17,6 +18,7 @@ module does not duplicate that responsibility.
 
 - Prometheus and Grafana fallback ports bind to loopback;
 - exporter endpoints remain on an internal Docker network;
+- Blackbox Exporter has no published host port;
 - Grafana public signup, anonymous access and telemetry are disabled;
 - the Grafana administrator password is supplied through Ansible Vault;
 - only Grafana is optionally published through Traefik;

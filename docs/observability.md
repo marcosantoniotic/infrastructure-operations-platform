@@ -54,6 +54,7 @@ Cada elemento possui trigger real. Os vínculos mudam de estado conforme a trigg
 | Traefik Official | requisições, latência e respostas |
 | Blackbox HTTP | disponibilidade e tempo de resposta |
 | SSL Certificate Monitor | validade dos certificados |
+| Application & TLS Health | disponibilidade, HTTP, latência e validade TLS |
 | UniFi/UDM | gateway, clientes e dispositivos |
 | MikroTik | interfaces, CPU, memória e tráfego |
 
