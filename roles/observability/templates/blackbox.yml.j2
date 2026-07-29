@@ -1,12 +1,21 @@
 ---
 modules:
-  http_2xx:
+{% for target in observability_blackbox_targets %}
+  http_{{ target.name | regex_replace('[^A-Za-z0-9_]', '_') }}:
     prober: http
     timeout: 10s
     http:
       method: GET
       preferred_ip_protocol: ip4
       follow_redirects: true
+{% if target.valid_status_codes is defined %}
+      valid_status_codes: {{ target.valid_status_codes | to_json }}
+{% endif %}
+{% if target.host_header is defined %}
+      headers:
+        Host: {{ target.host_header | quote }}
+{% endif %}
       fail_if_not_ssl: false
       tls_config:
-        insecure_skip_verify: false
+        insecure_skip_verify: {{ target.tls_insecure | default(false) | bool | lower }}
+{% endfor %}

@@ -37,3 +37,8 @@ ansible-playbook \
 The initial dashboard is
 `Infrastructure Operations — Host & Containers`. Network monitoring exporters
 are intentionally implemented as later extensions.
+
+Each item in `observability_blackbox_targets` creates an independent probe
+module. Optional fields include `host_header`, `valid_status_codes`, and
+`tls_insecure`, allowing environment-specific behavior without hard-coding
+application endpoints in the role.

@@ -95,6 +95,7 @@
       dest: grafana/dashboards/infrastructure-host-containers.json
     - src: application-tls-health.json.j2
       dest: grafana/dashboards/application-tls-health.json
+  register: observability_rendered_configuration
 
 - name: Render observability Compose project
   ansible.builtin.template:
@@ -154,6 +155,32 @@
     wait_timeout: 420
   when: not ansible_check_mode
 
+- name: Recreate configuration consumers after atomic file replacement
+  ansible.builtin.command:
+    cmd: >-
+      docker compose --project-directory {{ observability_project_dir }}
+      up --detach --force-recreate prometheus blackbox-exporter
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - observability_rendered_configuration.changed
+
+- name: Reload Blackbox Exporter configuration
+  ansible.builtin.command:
+    cmd: >-
+      docker compose --project-directory {{ observability_project_dir }}
+      kill --signal SIGHUP blackbox-exporter
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Reload Prometheus configuration
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/-/reload
+    method: POST
+    status_code: 200
+  when: not ansible_check_mode
+
 - name: Wait for Prometheus readiness
   ansible.builtin.uri:
     url: >-
@@ -199,7 +226,7 @@
 - name: Validate all configured application probes
   ansible.builtin.uri:
     url: >-
-      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/api/v1/query?query=min(probe_success%7Bjob%3D%22blackbox-http%22%7D)
+      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/api/v1/query?query=count(probe_success%7Bjob%3D%22blackbox-http%22%2Cmodule%3D%22%22%7D%20%3D%3D%201)
     method: GET
     status_code: 200
     return_content: true
@@ -209,7 +236,8 @@
   until: >-
     observability_blackbox_probes.json.status == 'success' and
     observability_blackbox_probes.json.data.result | length == 1 and
-    observability_blackbox_probes.json.data.result[0].value[1] == '1'
+    observability_blackbox_probes.json.data.result[0].value[1] ==
+    (observability_blackbox_targets | length | string)
   when: not ansible_check_mode
 
 - name: Wait for Grafana health endpoint
