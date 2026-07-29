@@ -172,6 +172,9 @@ ansible-playbook -i inventories/validation/hosts.yml playbooks/zabbix.yml
 # Somente Portainer
 ansible-playbook -i inventories/validation/hosts.yml playbooks/portainer.yml
 
+# Prometheus, Grafana e exporters do host
+ansible-playbook -i inventories/validation/hosts.yml playbooks/observability.yml
+
 # Baseline inicial completa
 ansible-playbook -i inventories/validation/hosts.yml playbooks/platform.yml
 ```

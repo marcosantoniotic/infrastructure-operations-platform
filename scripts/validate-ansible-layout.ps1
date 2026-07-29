@@ -28,6 +28,7 @@ $requiredPaths = @(
     'automation/scripts/Run-ValidationTraefik.ps1',
     'automation/scripts/Run-ValidationZabbix.ps1',
     'automation/scripts/Run-ValidationPortainer.ps1',
+    'automation/scripts/Run-ValidationObservability.ps1',
     'automation/scripts/Initialize-Validation.ps1',
     'automation/scripts/Build-RhelBox.ps1',
     'automation/scripts/Register-RhelBox.ps1',
@@ -40,6 +41,7 @@ $requiredPaths = @(
     'playbooks/traefik.yml',
     'playbooks/zabbix.yml',
     'playbooks/portainer.yml',
+    'playbooks/observability.yml',
     'playbooks/platform.yml',
     'roles/rhel_baseline/defaults/main.yml',
     'roles/rhel_baseline/tasks/main.yml',
@@ -64,7 +66,15 @@ $requiredPaths = @(
     'roles/portainer/defaults/main.yml',
     'roles/portainer/tasks/main.yml',
     'roles/portainer/templates/compose.yaml.j2',
-    'roles/portainer/README.md'
+    'roles/portainer/README.md',
+    'roles/observability/defaults/main.yml',
+    'roles/observability/tasks/main.yml',
+    'roles/observability/templates/compose.yaml.j2',
+    'roles/observability/templates/prometheus.yml.j2',
+    'roles/observability/templates/grafana-datasource.yml.j2',
+    'roles/observability/templates/grafana-dashboards.yml.j2',
+    'roles/observability/templates/infrastructure-host-containers.json.j2',
+    'roles/observability/README.md'
 )
 
 foreach ($relativePath in $requiredPaths) {
@@ -124,7 +134,8 @@ $requiredPlaceholders = @(
     '<ZABBIX_DATABASE_PASSWORD>',
     '<ZABBIX_DATABASE_ROOT_PASSWORD>',
     '<ZABBIX_ADMIN_PASSWORD>',
-    '<PORTAINER_ADMIN_PASSWORD>'
+    '<PORTAINER_ADMIN_PASSWORD>',
+    '<GRAFANA_ADMIN_PASSWORD>'
 )
 
 foreach ($placeholder in $requiredPlaceholders) {

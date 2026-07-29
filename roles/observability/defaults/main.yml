@@ -1,0 +1,26 @@
+---
+observability_project_dir: /opt/observability
+observability_prometheus_image: prom/prometheus:v3.13.1
+observability_grafana_image: grafana/grafana:13.1.1
+observability_node_exporter_image: prom/node-exporter:v1.12.1
+observability_cadvisor_image: ghcr.io/google/cadvisor:v0.60.5
+
+observability_scrape_interval: 30s
+observability_prometheus_retention_time: 30d
+observability_prometheus_retention_size: 8GB
+observability_prometheus_bind_address: 127.0.0.1
+observability_prometheus_port: 9090
+observability_grafana_bind_address: 127.0.0.1
+observability_grafana_port: 3000
+observability_grafana_admin_user: admin
+observability_grafana_admin_password: "<GRAFANA_ADMIN_PASSWORD>"
+observability_grafana_validation_host: 127.0.0.1
+observability_prometheus_validation_host: 127.0.0.1
+
+observability_enable_traefik: false
+observability_grafana_hostname: "grafana.<BASE_DOMAIN>"
+observability_traefik_network: proxy
+observability_traefik_middlewares:
+  - security-headers@file
+observability_traefik_validation_address: 127.0.0.1
+observability_traefik_https_port: 443

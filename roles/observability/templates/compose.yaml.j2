@@ -1,0 +1,149 @@
+name: observability
+
+services:
+  prometheus:
+    image: {{ observability_prometheus_image }}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time={{ observability_prometheus_retention_time }}
+      - --storage.tsdb.retention.size={{ observability_prometheus_retention_size }}
+      - --storage.tsdb.wal-compression
+      - --web.enable-lifecycle
+    ports:
+      - "{{ observability_prometheus_bind_address }}:{{ observability_prometheus_port }}:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
+      - prometheus_data:/prometheus
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --spider
+        - http://127.0.0.1:9090/-/ready
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - metrics
+{% if observability_enable_traefik %}
+      - proxy
+{% endif %}
+
+  node-exporter:
+    image: {{ observability_node_exporter_image }}
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/containers/storage/.+)($$|/)
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+      - label=disable
+    restart: unless-stopped
+    networks:
+      - metrics
+
+  cadvisor:
+    image: {{ observability_cadvisor_image }}
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    security_opt:
+      - label=disable
+    restart: unless-stopped
+    networks:
+      - metrics
+
+  grafana:
+    image: {{ observability_grafana_image }}
+    environment:
+      GF_SECURITY_ADMIN_USER: {{ observability_grafana_admin_user }}
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_SECURITY_COOKIE_SECURE: "{{ observability_enable_traefik | bool | lower }}"
+      GF_SECURITY_COOKIE_SAMESITE: strict
+      GF_SERVER_DOMAIN: {{ observability_grafana_hostname }}
+      GF_SERVER_ROOT_URL: >-
+        {{ ('https://' + observability_grafana_hostname)
+           if observability_enable_traefik
+           else ('http://' + observability_grafana_bind_address + ':' +
+                 (observability_grafana_port | string)) }}
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    ports:
+      - "{{ observability_grafana_bind_address }}:{{ observability_grafana_port }}:3000"
+    volumes:
+      - ./secrets/grafana_admin_password:/run/secrets/grafana_admin_password:ro,Z
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro,Z
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro,Z
+      - grafana_data:/var/lib/grafana
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget --quiet --spider http://127.0.0.1:3000/api/health
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    labels:
+      - traefik.enable={{ observability_enable_traefik | bool | lower }}
+{% if observability_enable_traefik %}
+      - traefik.docker.network={{ observability_traefik_network }}
+      - traefik.http.routers.grafana.rule=Host(`{{ observability_grafana_hostname }}`)
+      - traefik.http.routers.grafana.entrypoints=websecure
+      - traefik.http.routers.grafana.tls=true
+{% if observability_traefik_middlewares | length > 0 %}
+      - traefik.http.routers.grafana.middlewares={{ observability_traefik_middlewares | join(',') }}
+{% endif %}
+      - traefik.http.services.grafana.loadbalancer.server.port=3000
+{% endif %}
+    restart: unless-stopped
+    networks:
+      - metrics
+{% if observability_enable_traefik %}
+      - proxy
+{% endif %}
+
+networks:
+  metrics:
+    driver: bridge
+    internal: true
+{% if observability_enable_traefik %}
+  proxy:
+    name: {{ observability_traefik_network }}
+    external: true
+{% endif %}
+
+volumes:
+  prometheus_data:
+  grafana_data:
