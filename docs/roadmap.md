@@ -12,7 +12,7 @@
 ## Fase 1 — Confiabilidade operacional
 
 - [x] implantar e validar backup local automático do NetBox;
-- [ ] implantar backups automáticos do Zabbix;
+- [x] implantar e validar backups automáticos do Zabbix;
 - [ ] replicar backups para armazenamento externo criptografado;
 - [ ] monitorar idade e resultado dos backups;
 - [x] realizar teste isolado de restauração do NetBox;

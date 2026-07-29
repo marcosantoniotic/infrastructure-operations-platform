@@ -169,6 +169,9 @@ ansible-playbook -i inventories/validation/hosts.yml playbooks/netbox.yml
 # Somente Zabbix Server, frontend e MySQL
 ansible-playbook -i inventories/validation/hosts.yml playbooks/zabbix.yml
 
+# Backup consistente e restauração isolada do Zabbix
+ansible-playbook -i inventories/validation/hosts.yml playbooks/zabbix-backup.yml
+
 # Somente Portainer
 ansible-playbook -i inventories/validation/hosts.yml playbooks/portainer.yml
 

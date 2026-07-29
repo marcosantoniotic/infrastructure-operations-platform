@@ -102,6 +102,18 @@ zabbix_enable_traefik: false
 zabbix_traefik_hostname: "zabbix.<BASE_DOMAIN>"
 zabbix_traefik_network: proxy
 
+# Zabbix backup
+zabbix_backup_project_dir: /opt/zabbix
+zabbix_backup_root: /var/backups/infrastructure-platform/zabbix
+zabbix_backup_retention_days: 14
+zabbix_backup_schedule: "*-*-* 03:15:00"
+zabbix_backup_mysql_service: mysql
+zabbix_backup_server_service: zabbix-server
+zabbix_backup_database_name: zabbix
+zabbix_backup_mysql_image: mysql:8.4.10-oraclelinux9
+zabbix_backup_run_now: false
+zabbix_backup_verify_restore: false
+
 # Portainer container management
 portainer_project_dir: /opt/portainer
 portainer_image: portainer/portainer-ce:2.39.5-alpine

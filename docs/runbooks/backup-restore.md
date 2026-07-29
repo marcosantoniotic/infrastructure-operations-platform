@@ -7,8 +7,9 @@ O controle inclui dump consistente do PostgreSQL, mídia, configuração Compose
 não secreta, metadados e manifesto SHA-256. A restauração foi comprovada em um
 PostgreSQL temporário e isolado, sem alterar o banco ativo.
 
-Essa evidência não substitui uma cópia externa. Zabbix e os demais componentes
-permanecem no roadmap até terem automação e restauração igualmente comprovadas.
+Essa evidência não substitui uma cópia externa. O Zabbix possui automação
+equivalente, com backup e restauração isolada comprovados. Os demais componentes
+permanecem no roadmap até receberem controles equivalentes.
 
 ## NetBox
 
@@ -36,6 +37,33 @@ sudo /usr/local/sbin/netbox-backup verify
 O modo `verify` valida checksums e mídia, sobe um PostgreSQL descartável,
 restaura o dump com `--exit-on-error`, confirma a tabela de migrações do NetBox
 e remove o container de teste.
+
+## Zabbix
+
+O timer `zabbix-backup.timer` executa diariamente e grava os conjuntos em:
+
+```text
+/var/backups/infrastructure-platform/zabbix/<UTC_TIMESTAMP>/
+|-- database.sql
+|-- server-data.tar.gz
+|-- compose.yaml
+|-- metadata.txt
+`-- SHA256SUMS
+```
+
+Comandos operacionais:
+
+```bash
+sudo systemctl status zabbix-backup.timer
+sudo systemctl list-timers zabbix-backup.timer
+sudo systemctl start zabbix-backup.service
+sudo journalctl -u zabbix-backup.service
+sudo /usr/local/sbin/zabbix-backup verify
+```
+
+O modo `verify` confirma os checksums e o arquivo operacional, restaura o dump
+em um MySQL temporário e valida as tabelas essenciais `dbversion` e `hosts`.
+O banco ativo não é interrompido ou alterado.
 
 ## Escopo da plataforma
 

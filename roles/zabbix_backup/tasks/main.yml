@@ -1,0 +1,94 @@
+---
+- name: Validate Zabbix backup variables
+  ansible.builtin.assert:
+    that:
+      - zabbix_backup_root.startswith("/")
+      - zabbix_backup_project_dir.startswith("/")
+      - zabbix_backup_retention_days | int >= 1
+      - zabbix_backup_database_name | length > 0
+      - zabbix_backup_mysql_service | length > 0
+      - zabbix_backup_server_service | length > 0
+      - zabbix_backup_mysql_image | length > 0
+
+- name: Check the Zabbix Compose project
+  ansible.builtin.stat:
+    path: "{{ zabbix_backup_project_dir }}/compose.yaml"
+  register: zabbix_backup_compose
+
+- name: Require an existing Zabbix deployment
+  ansible.builtin.assert:
+    that:
+      - zabbix_backup_compose.stat.exists
+      - zabbix_backup_compose.stat.isreg
+    fail_msg: >-
+      Zabbix must be deployed before configuring its backup module.
+      Expected {{ zabbix_backup_project_dir }}/compose.yaml.
+
+- name: Create protected Zabbix backup directory
+  ansible.builtin.file:
+    path: "{{ zabbix_backup_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install Zabbix backup utility
+  ansible.builtin.template:
+    src: zabbix-backup.sh.j2
+    dest: /usr/local/sbin/zabbix-backup
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install Zabbix backup service
+  ansible.builtin.template:
+    src: zabbix-backup.service.j2
+    dest: /etc/systemd/system/zabbix-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install Zabbix backup timer
+  ansible.builtin.template:
+    src: zabbix-backup.timer.j2
+    dest: /etc/systemd/system/zabbix-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Apply systemd unit changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start Zabbix backup timer
+  ansible.builtin.systemd:
+    name: zabbix-backup.timer
+    enabled: true
+    state: started
+
+- name: Create an immediate Zabbix backup
+  ansible.builtin.command:
+    cmd: /usr/local/sbin/zabbix-backup backup
+  register: zabbix_backup_result
+  changed_when: true
+  when:
+    - zabbix_backup_run_now | bool
+    - not ansible_check_mode
+
+- name: Verify latest backup through an isolated restore
+  ansible.builtin.command:
+    cmd: /usr/local/sbin/zabbix-backup verify
+  register: zabbix_restore_verification
+  changed_when: false
+  when:
+    - zabbix_backup_verify_restore | bool
+    - not ansible_check_mode
+
+- name: Report Zabbix backup state
+  ansible.builtin.debug:
+    msg:
+      backup_root: "{{ zabbix_backup_root }}"
+      timer: zabbix-backup.timer
+      immediate_backup: "{{ zabbix_backup_run_now | bool }}"
+      isolated_restore_verified: "{{ zabbix_backup_verify_restore | bool }}"

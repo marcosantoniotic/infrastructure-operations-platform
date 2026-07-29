@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Zabbix backup schedule
+
+[Timer]
+OnCalendar={{ zabbix_backup_schedule }}
+Persistent=true
+RandomizedDelaySec=15m
+Unit=zabbix-backup.service
+
+[Install]
+WantedBy=timers.target
