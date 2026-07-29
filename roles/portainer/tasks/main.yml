@@ -1,0 +1,173 @@
+---
+- name: Validate Portainer variables
+  ansible.builtin.assert:
+    that:
+      - portainer_project_dir.startswith("/")
+      - portainer_admin_user == "admin"
+      - portainer_admin_password | length >= 16
+      - not portainer_admin_password.startswith("<")
+      - >-
+        not (portainer_enable_traefik | bool) or
+        portainer_traefik_hostname | length > 0
+    fail_msg: >-
+      Replace the Portainer password placeholder with a strong Ansible Vault
+      value and configure a hostname before enabling Traefik.
+  no_log: true
+
+- name: Validate Docker service
+  ansible.builtin.service_facts: {}
+
+- name: Assert Docker is running
+  ansible.builtin.assert:
+    that:
+      - "'docker.service' in ansible_facts.services"
+      - ansible_facts.services.get('docker.service', {}).get('state', '') == 'running'
+    fail_msg: "Docker must be installed and running before Portainer deployment."
+
+- name: Verify the external Traefik network exists
+  ansible.builtin.command:
+    argv:
+      - docker
+      - network
+      - inspect
+      - "{{ portainer_traefik_network }}"
+  changed_when: false
+  when:
+    - portainer_enable_traefik | bool
+    - not ansible_check_mode
+
+- name: Create Portainer project directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ portainer_project_dir }}"
+      mode: "0750"
+    - path: "{{ portainer_project_dir }}/secrets"
+      mode: "0700"
+
+- name: Install Portainer administrator secret
+  ansible.builtin.copy:
+    content: "{{ portainer_admin_password }}"
+    dest: "{{ portainer_project_dir }}/secrets/portainer_admin_password"
+    owner: root
+    group: root
+    mode: "0644"
+  no_log: true
+
+- name: Render Portainer Compose project
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ portainer_project_dir }}/compose.yaml"
+    owner: root
+    group: root
+    mode: "0640"
+
+- name: Validate rendered Portainer Compose configuration
+  ansible.builtin.command:
+    cmd: docker compose --project-directory {{ portainer_project_dir }} config --quiet
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Deploy Portainer project
+  community.docker.docker_compose_v2:
+    project_src: "{{ portainer_project_dir }}"
+    files:
+      - compose.yaml
+    state: present
+    pull: missing
+    wait: true
+    wait_timeout: 300
+  when: not ansible_check_mode
+
+- name: Wait for Portainer API
+  ansible.builtin.uri:
+    url: >-
+      http://{{ portainer_validation_host }}:{{ portainer_http_port }}/api/system/status
+    method: GET
+    status_code: 200
+    return_content: true
+  register: portainer_status
+  retries: 30
+  delay: 5
+  until: portainer_status.status == 200
+  when: not ansible_check_mode
+
+- name: Authenticate with the managed Portainer administrator
+  ansible.builtin.uri:
+    url: "http://{{ portainer_validation_host }}:{{ portainer_http_port }}/api/auth"
+    method: POST
+    body_format: json
+    body:
+      Username: "{{ portainer_admin_user }}"
+      Password: "{{ portainer_admin_password }}"
+    return_content: true
+    status_code: 200
+  register: portainer_auth
+  failed_when: portainer_auth.json.jwt is not defined
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Validate the local Docker environment through Portainer
+  ansible.builtin.uri:
+    url: "http://{{ portainer_validation_host }}:{{ portainer_http_port }}/api/endpoints"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ portainer_auth.json.jwt }}"
+    return_content: true
+    status_code: 200
+  register: portainer_endpoints
+  failed_when: >-
+    portainer_endpoints.json | length == 0 or
+    (
+      portainer_endpoints.json |
+      selectattr('URL', 'equalto', 'unix:///var/run/docker.sock') |
+      list |
+      length
+    ) == 0
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Validate Portainer through Traefik HTTPS
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --silent
+      - --insecure
+      - --include
+      - --resolve
+      - "{{ portainer_traefik_hostname }}:{{ portainer_traefik_https_port }}:{{ portainer_traefik_validation_address }}"
+      - "https://{{ portainer_traefik_hostname }}:{{ portainer_traefik_https_port }}/"
+  register: portainer_traefik_response
+  changed_when: false
+  retries: 20
+  delay: 3
+  until: >-
+    'http/1.1 200' in portainer_traefik_response.stdout | lower or
+    'http/2 200' in portainer_traefik_response.stdout | lower
+  failed_when: >-
+    (
+      'http/1.1 200' not in portainer_traefik_response.stdout | lower and
+      'http/2 200' not in portainer_traefik_response.stdout | lower
+    ) or
+    'x-content-type-options: nosniff' not in
+    portainer_traefik_response.stdout | lower or
+    'strict-transport-security: max-age=31536000' not in
+    portainer_traefik_response.stdout | lower
+  when:
+    - portainer_enable_traefik | bool
+    - not ansible_check_mode
+
+- name: Report Portainer deployment
+  ansible.builtin.debug:
+    msg:
+      project_directory: "{{ portainer_project_dir }}"
+      fallback_url: >-
+        http://{{ portainer_bind_address }}:{{ portainer_http_port }}
+      docker_endpoint: unix:///var/run/docker.sock
+      traefik_enabled: "{{ portainer_enable_traefik | bool }}"
+      traefik_hostname: >-
+        {{ portainer_traefik_hostname if portainer_enable_traefik else 'disabled' }}

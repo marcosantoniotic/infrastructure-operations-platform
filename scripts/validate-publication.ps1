@@ -67,6 +67,10 @@ foreach ($file in $files) {
             $contentToInspect = $contentToInspect -replace (
                 '(?i)(?:\./)?(?:run/)?secrets/[A-Za-z0-9_.-]+'
             ), '<SECRET_FILE_PATH>'
+            # Portainer's documented CLI flag points to a secret file.
+            $contentToInspect = $contentToInspect -replace (
+                '(?i)--admin-password-file'
+            ), '--credential-file'
         }
         if ($contentToInspect -match $pattern) {
             $errors.Add("Conteúdo potencialmente sensível em: $($file.FullName) (padrão: $pattern)")

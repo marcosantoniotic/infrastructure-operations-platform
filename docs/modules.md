@@ -10,7 +10,7 @@
 | Traefik | `playbooks/traefik.yml` | implementado e validado | Docker |
 | Zabbix | `playbooks/zabbix.yml` | implementado e validado | Docker; Traefik opcional |
 | Observabilidade | `playbooks/observability.yml` | planejado | Docker |
-| Portainer | `playbooks/portainer.yml` | planejado | Docker |
+| Portainer | `playbooks/portainer.yml` | implementado e integrado ao Traefik | Docker; Traefik opcional |
 | Integrações | `playbooks/integrations.yml` | planejado | módulos correspondentes |
 | GLPI | `playbooks/glpi.yml` | fase futura | Docker e proxy opcional |
 

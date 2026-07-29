@@ -392,6 +392,32 @@ This private CA exists only for the isolated validation environment. Production
 promotion still requires the certificate, DNS and renewal strategy for the
 real application domain.
 
+### 14. Deploy and publish Portainer
+
+Deploy Portainer CE LTS, initialize its administrator from Ansible Vault,
+connect the local Docker Engine and publish the interface through Traefik:
+
+```powershell
+.\automation\scripts\Run-ValidationPortainer.ps1 `
+  -EnableTraefik `
+  -VerifyPersistence `
+  -VerifyIdempotence
+```
+
+Open `https://portainer.localhost:8443/` and use the credential stored in
+`.validation/portainer-initial-credentials.txt`. The optional fallback remains
+limited to `127.0.0.1:9000`; add that port to the SSH tunnel only for recovery
+testing. Edge Agent port `8000` is intentionally not published.
+
+Certification requires a healthy Portainer container, successful API
+authentication, discovery of the local Docker socket endpoint, HTTP 200
+through Traefik, reusable security headers, persisted data after reload and a
+final Ansible pass with `changed=0`, `unreachable=0` and `failed=0`.
+
+Portainer is an operational interface. Changes intended to persist as platform
+configuration must be implemented in Ansible and Compose and promoted through
+the repository workflow.
+
 ## Lifecycle commands
 
 From `automation\vagrant`:

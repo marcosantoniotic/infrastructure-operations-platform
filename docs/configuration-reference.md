@@ -55,6 +55,17 @@ Consulte [exemplo sanitizado](../config/examples/traefik-static.yml).
 - plugins de topologia, QR code e cálculo IP;
 - frontend publicado somente pelo Traefik.
 
+## Portainer
+
+- Community Edition em versão LTS fixada;
+- volume nomeado dedicado para o banco interno;
+- credencial administrativa fornecida por Ansible Vault;
+- endpoint Docker local pelo socket Unix;
+- porta HTTP de fallback limitada ao loopback;
+- frontend publicado pelo Traefik com TLS e headers padronizados;
+- porta Edge não publicada enquanto o recurso não estiver em uso;
+- Ansible e Compose permanecem como fonte oficial da configuração.
+
 ## Observabilidade
 
 Prometheus:
@@ -92,5 +103,6 @@ Consulte os exemplos de [Prometheus](../config/examples/prometheus.yml) e [Black
 | token Zabbix API | arquivo `.env` restrito |
 | credencial UniFi | arquivo `.env` restrito |
 | senha administrativa Grafana | arquivo/variável externa |
+| senha administrativa Portainer | Ansible Vault + arquivo read-only |
 
 O valor nunca é documentado ou versionado.
