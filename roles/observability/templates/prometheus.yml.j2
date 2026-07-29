@@ -29,17 +29,18 @@ scrape_configs:
 
   - job_name: blackbox-http
     metrics_path: /probe
-    params:
-      module:
-        - http_2xx
     static_configs:
 {% for target in observability_blackbox_targets %}
       - targets:
           - {{ target.url }}
         labels:
           service: {{ target.name }}
+          module: http_{{ target.name | regex_replace('[^A-Za-z0-9_]', '_') }}
 {% endfor %}
     relabel_configs:
+      - source_labels:
+          - module
+        target_label: __param_module
       - source_labels:
           - __address__
         target_label: __param_target
@@ -48,6 +49,8 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
+      - regex: module
+        action: labeldrop
 {% if observability_enable_traefik %}
 
   - job_name: traefik

@@ -70,6 +70,21 @@ Cada elemento possui trigger real. Os vínculos mudam de estado conforme a trigg
 | Certificado | dias até expiração |
 | Rede | perda, latência, interfaces e tráfego |
 
+## Inventário de probes HTTP
+
+O ambiente de validação comprova probes para:
+
+- Prometheus e Grafana na rede interna de métricas;
+- NetBox com cabeçalho `Host` específico;
+- Zabbix frontend;
+- Portainer;
+- endpoint interno de métricas do Traefik.
+
+Cada alvo gera um módulo Blackbox próprio e pode declarar URL, cabeçalho
+`Host`, códigos HTTP aceitos e política TLS. O Cockpit será incluído quando seu
+módulo estiver implantado na VM; não é criado um alvo fictício para um serviço
+ausente.
+
 ## Alertas recomendados
 
 - host indisponível;

@@ -136,6 +136,15 @@ observability_blackbox_targets:
     url: http://prometheus:9090/-/ready
   - name: grafana
     url: http://grafana:3000/api/health
+  - name: netbox
+    url: http://netbox:8080/login/
+    host_header: netbox.localhost
+  - name: zabbix
+    url: http://zabbix-web:8080/
+  - name: portainer
+    url: http://portainer:9000/
+  - name: traefik
+    url: http://traefik:8082/metrics
 $traefikVariablesYaml
 # END VALIDATION OBSERVABILITY
 "@
