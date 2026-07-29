@@ -169,6 +169,9 @@ ansible-playbook -i inventories/validation/hosts.yml playbooks/netbox.yml
 # Somente Zabbix Server, frontend e MySQL
 ansible-playbook -i inventories/validation/hosts.yml playbooks/zabbix.yml
 
+# Somente Portainer
+ansible-playbook -i inventories/validation/hosts.yml playbooks/portainer.yml
+
 # Baseline inicial completa
 ansible-playbook -i inventories/validation/hosts.yml playbooks/platform.yml
 ```

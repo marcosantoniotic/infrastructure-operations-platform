@@ -27,6 +27,7 @@ $requiredPaths = @(
     'automation/scripts/Run-ValidationNetBoxBackup.ps1',
     'automation/scripts/Run-ValidationTraefik.ps1',
     'automation/scripts/Run-ValidationZabbix.ps1',
+    'automation/scripts/Run-ValidationPortainer.ps1',
     'automation/scripts/Initialize-Validation.ps1',
     'automation/scripts/Build-RhelBox.ps1',
     'automation/scripts/Register-RhelBox.ps1',
@@ -38,6 +39,7 @@ $requiredPaths = @(
     'playbooks/netbox-backup.yml',
     'playbooks/traefik.yml',
     'playbooks/zabbix.yml',
+    'playbooks/portainer.yml',
     'playbooks/platform.yml',
     'roles/rhel_baseline/defaults/main.yml',
     'roles/rhel_baseline/tasks/main.yml',
@@ -58,7 +60,11 @@ $requiredPaths = @(
     'roles/zabbix/defaults/main.yml',
     'roles/zabbix/tasks/main.yml',
     'roles/zabbix/templates/compose.yaml.j2',
-    'roles/zabbix/README.md'
+    'roles/zabbix/README.md',
+    'roles/portainer/defaults/main.yml',
+    'roles/portainer/tasks/main.yml',
+    'roles/portainer/templates/compose.yaml.j2',
+    'roles/portainer/README.md'
 )
 
 foreach ($relativePath in $requiredPaths) {
@@ -117,7 +123,8 @@ $requiredPlaceholders = @(
     '<TRAEFIK_DASHBOARD_BASIC_AUTH>',
     '<ZABBIX_DATABASE_PASSWORD>',
     '<ZABBIX_DATABASE_ROOT_PASSWORD>',
-    '<ZABBIX_ADMIN_PASSWORD>'
+    '<ZABBIX_ADMIN_PASSWORD>',
+    '<PORTAINER_ADMIN_PASSWORD>'
 )
 
 foreach ($placeholder in $requiredPlaceholders) {

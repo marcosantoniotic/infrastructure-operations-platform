@@ -101,3 +101,14 @@ zabbix_server_port: 10051
 zabbix_enable_traefik: false
 zabbix_traefik_hostname: "zabbix.<BASE_DOMAIN>"
 zabbix_traefik_network: proxy
+
+# Portainer container management
+portainer_project_dir: /opt/portainer
+portainer_image: portainer/portainer-ce:2.39.5-alpine
+portainer_admin_user: admin
+portainer_admin_password: "{{ vault_portainer_admin_password }}"
+portainer_bind_address: 127.0.0.1
+portainer_http_port: 9000
+portainer_enable_traefik: false
+portainer_traefik_hostname: "portainer.<BASE_DOMAIN>"
+portainer_traefik_network: proxy

@@ -1,0 +1,63 @@
+name: portainer
+
+services:
+  portainer:
+    image: {{ portainer_image }}
+    command:
+      - -H
+      - unix:///var/run/docker.sock
+      - --admin-password-file
+      - /run/secrets/portainer_admin_password
+      - --http-enabled
+      - --bind-https
+      - ""
+    ports:
+      - "{{ portainer_bind_address }}:{{ portainer_http_port }}:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./secrets/portainer_admin_password:/run/secrets/portainer_admin_password:ro,Z
+      - portainer_data:/data
+    security_opt:
+      - no-new-privileges:true
+      - label=disable
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --spider
+        - http://127.0.0.1:9000/api/system/status
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    labels:
+      - traefik.enable={{ portainer_enable_traefik | bool | lower }}
+{% if portainer_enable_traefik %}
+      - traefik.docker.network={{ portainer_traefik_network }}
+      - traefik.http.routers.portainer.rule=Host(`{{ portainer_traefik_hostname }}`)
+      - traefik.http.routers.portainer.entrypoints=websecure
+      - traefik.http.routers.portainer.tls=true
+{% if portainer_traefik_middlewares | length > 0 %}
+      - traefik.http.routers.portainer.middlewares={{ portainer_traefik_middlewares | join(',') }}
+{% endif %}
+      - traefik.http.services.portainer.loadbalancer.server.port=9000
+{% endif %}
+    restart: unless-stopped
+    networks:
+      - management
+{% if portainer_enable_traefik %}
+      - proxy
+{% endif %}
+
+networks:
+  management:
+    driver: bridge
+{% if portainer_enable_traefik %}
+  proxy:
+    name: {{ portainer_traefik_network }}
+    external: true
+{% endif %}
+
+volumes:
+  portainer_data:

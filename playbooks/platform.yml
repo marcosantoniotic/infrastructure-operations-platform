@@ -16,3 +16,4 @@
     - role: netbox
     - role: netbox_backup
     - role: zabbix
+    - role: portainer
