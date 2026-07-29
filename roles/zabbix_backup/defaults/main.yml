@@ -9,3 +9,4 @@ zabbix_backup_database_name: zabbix
 zabbix_backup_mysql_image: mysql:8.4.10-oraclelinux9
 zabbix_backup_run_now: false
 zabbix_backup_verify_restore: false
+zabbix_backup_metrics_dir: /var/lib/node_exporter/textfile_collector

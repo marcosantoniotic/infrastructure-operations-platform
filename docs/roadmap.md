@@ -14,7 +14,7 @@
 - [x] implantar e validar backup local automático do NetBox;
 - [x] implantar e validar backups automáticos do Zabbix;
 - [ ] replicar backups para armazenamento externo criptografado;
-- [ ] monitorar idade e resultado dos backups;
+- [x] monitorar idade e resultado dos backups;
 - [x] realizar teste isolado de restauração do NetBox;
 - [ ] definir RPO e RTO;
 - [ ] documentar retenção do Zabbix e Prometheus;

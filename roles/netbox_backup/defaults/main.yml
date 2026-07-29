@@ -10,3 +10,4 @@ netbox_backup_database_user: netbox
 netbox_backup_postgres_image: postgres:18-alpine
 netbox_backup_run_now: false
 netbox_backup_verify_restore: false
+netbox_backup_metrics_dir: /var/lib/node_exporter/textfile_collector

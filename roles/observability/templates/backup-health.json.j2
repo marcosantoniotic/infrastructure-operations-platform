@@ -1,0 +1,62 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [{"options": {"0": {"color": "red", "text": "FALHA"}, "1": {"color": "green", "text": "OK"}}, "type": "value"}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "infrastructure_backup_last_run_success", "legendFormat": "{{ '{{' }}service{{ '}}' }}", "refId": "A"}],
+      "title": "Resultado da última execução",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 20}, {"color": "red", "value": 26}]},
+          "unit": "h"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "(time() - infrastructure_backup_last_success_timestamp_seconds) / 3600", "legendFormat": "{{ '{{' }}service{{ '}}' }}", "refId": "A"}],
+      "title": "Idade do último backup válido",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never"}, "unit": "h"}, "overrides": []},
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 6},
+      "id": 3,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+      "targets": [{"expr": "(time() - infrastructure_backup_last_success_timestamp_seconds) / 3600", "legendFormat": "{{ '{{' }}service{{ '}}' }}", "refId": "A"}],
+      "title": "Evolução da idade dos backups",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["infrastructure", "backup", "recovery"],
+  "templating": {"list": []},
+  "time": {"from": "now-24h", "to": "now"},
+  "timezone": "browser",
+  "title": "Infrastructure Operations — Backup Health",
+  "uid": "backup-health",
+  "version": 1
+}

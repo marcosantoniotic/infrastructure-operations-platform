@@ -3,6 +3,7 @@
   ansible.builtin.assert:
     that:
       - observability_project_dir.startswith("/")
+      - observability_textfile_collector_dir.startswith("/")
       - observability_grafana_admin_password | length >= 16
       - not observability_grafana_admin_password.startswith("<")
       - observability_prometheus_retention_time | length > 0
@@ -64,6 +65,14 @@
     - path: "{{ observability_project_dir }}/grafana/dashboards"
       mode: "0750"
 
+- name: Create Node Exporter textfile collector directory
+  ansible.builtin.file:
+    path: "{{ observability_textfile_collector_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Install Grafana administrator secret
   ansible.builtin.copy:
     content: "{{ observability_grafana_admin_password }}"
@@ -95,6 +104,8 @@
       dest: grafana/dashboards/infrastructure-host-containers.json
     - src: application-tls-health.json.j2
       dest: grafana/dashboards/application-tls-health.json
+    - src: backup-health.json.j2
+      dest: grafana/dashboards/backup-health.json
   register: observability_rendered_configuration
 
 - name: Render observability Compose project
@@ -303,6 +314,21 @@
   failed_when: >-
     observability_application_dashboard.json.dashboard.uid !=
     'application-tls-health'
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Validate provisioned backup health dashboard
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_grafana_validation_host }}:{{ observability_grafana_port }}/api/dashboards/uid/backup-health
+    method: GET
+    user: "{{ observability_grafana_admin_user }}"
+    password: "{{ observability_grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    return_content: true
+  register: observability_backup_dashboard
+  failed_when: observability_backup_dashboard.json.dashboard.uid != 'backup-health'
   no_log: true
   when: not ansible_check_mode
 
