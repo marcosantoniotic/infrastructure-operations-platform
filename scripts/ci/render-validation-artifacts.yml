@@ -61,9 +61,9 @@
         content: |
           POSTGRES_DB=netbox
           POSTGRES_USER=netbox
-          POSTGRES_PASSWORD=ci-placeholder
-          REDIS_PASSWORD=ci-placeholder
-          REDIS_CACHE_PASSWORD=ci-placeholder
+          POSTGRES_PASSWORD=ci
+          REDIS_PASSWORD=ci
+          REDIS_CACHE_PASSWORD=ci
 
     - name: Load Portainer defaults
       ansible.builtin.include_vars:
