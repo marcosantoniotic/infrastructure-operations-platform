@@ -16,8 +16,8 @@
 - [ ] replicar backups para armazenamento externo criptografado;
 - [x] monitorar idade e resultado dos backups;
 - [x] realizar teste isolado de restauração do NetBox;
-- [ ] definir RPO e RTO;
-- [ ] documentar retenção do Zabbix e Prometheus;
+- [x] definir RPO e RTO;
+- [x] documentar retenção do Zabbix e Prometheus;
 - [ ] criar janela mensal de manutenção.
 
 ## Fase 2 — Segurança e governança
