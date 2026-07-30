@@ -110,4 +110,3 @@ imediatamente reconciliadas no código e no estado.
 - plano pós-importação sem mudanças;
 - acesso externo e acesso local validados;
 - procedimento de rollback testado em recurso não crítico.
-

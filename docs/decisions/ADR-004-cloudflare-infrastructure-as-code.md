@@ -60,4 +60,3 @@ dependências e planejamento que o Terraform já resolve.
 
 Foi rejeitado porque produziria risco desnecessário de indisponibilidade e
 alteração de identificadores em uma configuração que já está operacional.
-
