@@ -24,8 +24,8 @@
 ## Fase 2 — Segurança e governança
 
 - [x] limitar a porta do Zabbix Server por origem;
-- [ ] revisar permissões dos tokens;
-- [ ] formalizar rotação de credenciais;
+- [x] revisar permissões dos tokens;
+- [x] formalizar rotação de credenciais;
 - [x] validar headers de segurança no gateway Traefik;
 - [x] restringir descoberta Docker por Socket Proxy somente leitura;
 - [x] proteger o dashboard do Traefik sem modo inseguro;

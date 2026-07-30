@@ -52,3 +52,14 @@ segredos da plataforma de CI. Ele nunca deve ser versionado.
 - nunca colocar tokens em issues, screenshots, logs ou commits;
 - executar `scripts/validate-publication.ps1` antes de publicar;
 - revisar o diff e o histórico do Git antes de cada push.
+
+## Governança e rotação
+
+O catálogo público `config/credential-catalog.json` mantém somente metadados
+operacionais: finalidade, privilégio, papel responsável e política de revisão
+ou rotação. A cobertura entre esse catálogo e `vault.example.yml` é verificada
+por `scripts/validate-credential-governance.ps1`.
+
+O procedimento completo, incluindo rotação planejada, revogação emergencial e
+particularidades por classe de credencial, está em
+`docs/runbooks/credential-rotation.md`.
