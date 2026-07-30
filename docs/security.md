@@ -7,6 +7,23 @@ vulnerabilidades altas ou críticas, segredos expostos e configurações
 inseguras. A action utiliza um commit imutável, e um achado bloqueia o workflow
 até ser corrigido ou registrado formalmente como exceção aceita.
 
+Um segundo workflow monta automaticamente a matriz de imagens fixadas nos
+defaults Ansible e executa uma análise Trivy de cada imagem:
+
+- semanalmente;
+- sob demanda;
+- em pull requests que alteram imagens ou templates Compose.
+
+O Dependabot revisa semanalmente as GitHub Actions. As actions utilizadas pelos
+workflows permanecem fixadas por SHA imutável; os comentários de versão mantêm
+a referência legível durante as atualizações automatizadas.
+
+Os achados das imagens são publicados no **GitHub Code Scanning** por imagem.
+Durante a formação do baseline eles são auditáveis e não bloqueiam a PR; o
+workflow de repositório continua bloqueando vulnerabilidades, segredos e
+configurações HIGH/CRITICAL. Depois da correção do baseline, a política das
+imagens deve evoluir para bloquear novos achados corrigíveis.
+
 ## Controles implementados
 
 ### Borda

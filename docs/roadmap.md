@@ -30,7 +30,7 @@
 - [x] restringir descoberta Docker por Socket Proxy somente leitura;
 - [x] proteger o dashboard do Traefik sem modo inseguro;
 - [x] revisar imagens privilegiadas;
-- [ ] implantar análise de dependências e imagens.
+- [x] implantar análise de dependências e imagens.
 
 ## Fase 3 — Automação
 
