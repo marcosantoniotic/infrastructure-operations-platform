@@ -7,8 +7,14 @@ O inventário público deve registrar versões, responsabilidades e capacidade s
 Execute no host:
 
 ```bash
-sudo ./scripts/inventory-host.sh
+sudo ./scripts/inventory-host.sh \
+  --logical-name platform-production \
+  --output .validation/inventory/current-state.md
 ```
+
+O resultado é um documento Markdown pronto para revisão. O caminho
+`.validation/` é ignorado pelo Git; copie o conteúdo aprovado para
+`docs/inventory/current-state.md` somente depois das validações.
 
 O script não lê:
 
@@ -18,6 +24,23 @@ O script não lê:
 - endereços e portas publicadas;
 - dados de volumes;
 - logs.
+
+Além disso, o gerador usa uma lista positiva de campos e interrompe a execução
+se o documento de origem contiver chaves relacionadas a endereços, redes,
+portas, variáveis de ambiente, labels, mounts ou segredos.
+
+## Teste reproduzível
+
+A CI executa o mesmo gerador com dados sintéticos:
+
+```bash
+./scripts/inventory-host.sh \
+  --source-json scripts/fixtures/sanitized-inventory-source.json \
+  --output /tmp/sanitized-current-state.md
+```
+
+Isso valida a renderização e a ausência de indicadores sensíveis sem acessar o
+host de produção.
 
 ## Revisão
 
