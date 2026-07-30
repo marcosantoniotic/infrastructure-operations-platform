@@ -35,6 +35,10 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-publication.ps1
 
+      - name: Validate credential governance
+        shell: pwsh
+        run: ./scripts/validate-credential-governance.ps1
+
       - name: Validate pinned container images
         shell: pwsh
         run: ./scripts/validate-container-images.ps1
