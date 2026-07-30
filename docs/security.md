@@ -42,6 +42,35 @@ até ser corrigido ou registrado formalmente como exceção aceita.
 - `no-new-privileges` quando compatível;
 - serviços administrativos protegidos por identidade.
 
+### Política de privilégios de containers
+
+O arquivo `config/container-privilege-policy.json` registra toda exceção que
+acessa namespaces, dispositivos, caminhos ou APIs sensíveis do host. Cada
+registro declara o responsável, a justificativa, os controles compensatórios e
+o intervalo máximo de revisão.
+
+O princípio adotado é **negação por padrão**. O script
+`scripts/validate-container-privileges.ps1` examina os templates Compose e
+bloqueia a CI quando:
+
+- surge um privilégio que não está no catálogo;
+- uma exceção permanece cadastrada depois de removida do template;
+- o intervalo de revisão excede a política;
+- não existem pelo menos dois controles compensatórios.
+
+As exceções de maior impacto são:
+
+| Serviço | Necessidade | Controles principais |
+|---|---|---|
+| cAdvisor | telemetria completa de containers e cgroups | sem portas publicadas, rede interna de métricas, binds somente leitura e imagem fixada |
+| Portainer | administração do ciclo de vida pelo Docker API | autenticação administrativa, rota protegida, rede de gestão e `no-new-privileges` |
+| node-exporter | métricas do host | filesystem somente leitura, capabilities removidas e rede exclusiva de métricas |
+| Traefik Socket Proxy | descoberta dinâmica de serviços | socket somente leitura, `POST=0`, rede interna e capabilities removidas |
+
+O acesso do Portainer ao Docker Socket continua sendo equivalente a controle
+administrativo do host. Ele é uma decisão de arquitetura consciente, não um
+isolamento de segurança, e deve ser revisto a cada 90 dias.
+
 ## Modelo de confiança
 
 ```mermaid

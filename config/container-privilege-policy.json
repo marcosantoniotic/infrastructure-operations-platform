@@ -1,0 +1,191 @@
+{
+  "schema": "container-privilege-policy-v1",
+  "policy": {
+    "default_decision": "deny",
+    "maximum_review_days": 180
+  },
+  "accepted_findings": [
+    {
+      "id": "traefik-socket-proxy-docker-api-read",
+      "template": "roles/traefik/templates/compose.yaml.j2",
+      "service": "docker-socket-proxy",
+      "control": "docker-socket-read",
+      "owner_role": "container-platform-administrator",
+      "rationale": "Expose the minimum read-only Docker API surface required for Traefik discovery.",
+      "compensating_controls": [
+        "socket mounted read-only",
+        "POST requests disabled",
+        "internal isolated network",
+        "all Linux capabilities dropped",
+        "read-only root filesystem"
+      ],
+      "review_days": 90
+    },
+    {
+      "id": "traefik-low-port-bind",
+      "template": "roles/traefik/templates/compose.yaml.j2",
+      "service": "traefik",
+      "control": "capability-net-bind-service",
+      "owner_role": "edge-administrator",
+      "rationale": "Bind HTTP and HTTPS on privileged container ports without granting broader capabilities.",
+      "compensating_controls": [
+        "only NET_BIND_SERVICE added",
+        "all other Linux capabilities dropped",
+        "no-new-privileges enabled",
+        "read-only root filesystem"
+      ],
+      "review_days": 180
+    },
+    {
+      "id": "portainer-docker-api-administration",
+      "template": "roles/portainer/templates/compose.yaml.j2",
+      "service": "portainer",
+      "control": "docker-socket-write",
+      "owner_role": "container-platform-administrator",
+      "rationale": "Portainer requires Docker API write access to perform authorized lifecycle administration.",
+      "compensating_controls": [
+        "administrative authentication required",
+        "published through protected Traefik route",
+        "no-new-privileges enabled",
+        "management network separated"
+      ],
+      "review_days": 90
+    },
+    {
+      "id": "node-exporter-host-process-namespace",
+      "template": "roles/observability/templates/compose.yaml.j2",
+      "service": "node-exporter",
+      "control": "host-pid",
+      "owner_role": "observability-administrator",
+      "rationale": "Collect host-level process and operating-system telemetry.",
+      "compensating_controls": [
+        "all Linux capabilities dropped",
+        "no-new-privileges enabled",
+        "read-only root filesystem",
+        "metrics-only network"
+      ],
+      "review_days": 180
+    },
+    {
+      "id": "node-exporter-host-filesystem-read",
+      "template": "roles/observability/templates/compose.yaml.j2",
+      "service": "node-exporter",
+      "control": "host-bind-read",
+      "source": "/",
+      "owner_role": "observability-administrator",
+      "rationale": "Read host filesystem metrics through the dedicated rootfs path.",
+      "compensating_controls": [
+        "bind mounted read-only",
+        "all Linux capabilities dropped",
+        "no-new-privileges enabled",
+        "read-only root filesystem"
+      ],
+      "review_days": 180
+    },
+    {
+      "id": "cadvisor-privileged-telemetry",
+      "template": "roles/observability/templates/compose.yaml.j2",
+      "service": "cadvisor",
+      "control": "privileged",
+      "owner_role": "observability-administrator",
+      "rationale": "Collect complete container and cgroup telemetry from the Docker host.",
+      "compensating_controls": [
+        "no published ports",
+        "metrics-only internal network",
+        "host paths mounted read-only",
+        "image version pinned"
+      ],
+      "review_days": 90
+    },
+    {
+      "id": "cadvisor-kmsg-device",
+      "template": "roles/observability/templates/compose.yaml.j2",
+      "service": "cadvisor",
+      "control": "host-device",
+      "source": "/dev/kmsg",
+      "owner_role": "observability-administrator",
+      "rationale": "Provide kernel event visibility required by the cAdvisor runtime.",
+      "compensating_controls": [
+        "no published ports",
+        "metrics-only internal network",
+        "image version pinned"
+      ],
+      "review_days": 90
+    },
+    {
+      "id": "cadvisor-rootfs-read",
+      "template": "roles/observability/templates/compose.yaml.j2",
+      "service": "cadvisor",
+      "control": "host-bind-read",
+      "source": "/",
+      "owner_role": "observability-administrator",
+      "rationale": "Read host filesystem and mount metadata for container telemetry.",
+      "compensating_controls": [
+        "bind mounted read-only",
+        "no published ports",
+        "metrics-only internal network"
+      ],
+      "review_days": 90
+    },
+    {
+      "id": "cadvisor-runtime-read",
+      "template": "roles/observability/templates/compose.yaml.j2",
+      "service": "cadvisor",
+      "control": "host-bind-read",
+      "source": "/var/run",
+      "owner_role": "observability-administrator",
+      "rationale": "Discover running container runtime state.",
+      "compensating_controls": [
+        "bind mounted read-only",
+        "no published ports",
+        "metrics-only internal network"
+      ],
+      "review_days": 90
+    },
+    {
+      "id": "cadvisor-sysfs-read",
+      "template": "roles/observability/templates/compose.yaml.j2",
+      "service": "cadvisor",
+      "control": "host-bind-read",
+      "source": "/sys",
+      "owner_role": "observability-administrator",
+      "rationale": "Read cgroup and kernel device telemetry.",
+      "compensating_controls": [
+        "bind mounted read-only",
+        "no published ports",
+        "metrics-only internal network"
+      ],
+      "review_days": 90
+    },
+    {
+      "id": "cadvisor-docker-state-read",
+      "template": "roles/observability/templates/compose.yaml.j2",
+      "service": "cadvisor",
+      "control": "host-bind-read",
+      "source": "/var/lib/docker",
+      "owner_role": "observability-administrator",
+      "rationale": "Map Docker storage objects to container telemetry.",
+      "compensating_controls": [
+        "bind mounted read-only",
+        "no published ports",
+        "metrics-only internal network"
+      ],
+      "review_days": 90
+    },
+    {
+      "id": "cadvisor-disk-metadata-read",
+      "template": "roles/observability/templates/compose.yaml.j2",
+      "service": "cadvisor",
+      "control": "host-bind-read",
+      "source": "/dev/disk",
+      "owner_role": "observability-administrator",
+      "rationale": "Resolve disk metadata used by filesystem telemetry.",
+      "compensating_controls": [
+        "bind mounted read-only",
+        "no published ports",
+        "metrics-only internal network"
+      ],
+      "review_days": 90
+    }
+  ]
+}
