@@ -117,6 +117,7 @@ $requiredPaths = @(
     'scripts/fixtures/http-contract-server.py',
     'config/examples/http-contract.json',
     'docs/runbooks/http-contract-validation.md',
+    'docs/change-management.md',
     'scripts/validate-container-privileges.ps1',
     'scripts/validate-github-actions.ps1',
     'scripts/validate-credential-governance.ps1',

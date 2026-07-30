@@ -38,7 +38,7 @@
 - [x] validar Compose e Prometheus em CI;
 - [x] detectar tags não fixadas;
 - [x] automatizar teste HTTP 200/302;
-- [ ] registrar mudanças por pull request;
+- [x] registrar mudanças por pull request;
 - [ ] avaliar Infrastructure as Code para DNS e Access.
 
 ## Fase 4 — GLPI
