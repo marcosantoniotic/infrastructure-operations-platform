@@ -39,7 +39,7 @@
 - [x] detectar tags não fixadas;
 - [x] automatizar teste HTTP 200/302;
 - [x] registrar mudanças por pull request;
-- [ ] avaliar Infrastructure as Code para DNS e Access.
+- [x] avaliar Infrastructure as Code para DNS, Tunnel e Access.
 
 ## Fase 4 — GLPI
 

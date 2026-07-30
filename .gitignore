@@ -28,6 +28,16 @@ Thumbs.db
 reports/
 tmp/
 
+# Terraform local state and environment data
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+
 # Environment-specific Ansible data
 inventories/validation/*
 !inventories/validation/.gitkeep
