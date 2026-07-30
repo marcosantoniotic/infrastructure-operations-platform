@@ -1,0 +1,69 @@
+---
+name: Container Image Security
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "37 5 * * 2"
+  pull_request:
+    paths:
+      - "roles/**/defaults/main.yml"
+      - "roles/**/templates/compose.yaml.j2"
+      - "scripts/get-container-images.ps1"
+      - ".github/workflows/image-security.yml"
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: image-security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inventory:
+    name: Build image inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      images: ${{ steps.inventory.outputs.images }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Resolve unique pinned images
+        id: inventory
+        shell: pwsh
+        run: ./scripts/get-container-images.ps1 -WriteGitHubOutput
+
+  scan:
+    name: Scan ${{ matrix.image }}
+    needs: inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        image: ${{ fromJSON(needs.inventory.outputs.images) }}
+
+    steps:
+      - name: Scan image vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ matrix.image }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: "0"
+          hide-progress: true
+
+      - name: Publish findings to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-image-${{ strategy.job-index }}
