@@ -1,0 +1,9 @@
+---
+- name: Execute an authorized platform maintenance window
+  hosts: platform
+  gather_facts: true
+  become: true
+  serial: 1
+  any_errors_fatal: true
+  roles:
+    - role: maintenance_window

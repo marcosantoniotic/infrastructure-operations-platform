@@ -40,11 +40,20 @@ services:
       docker-socket-proxy:
         condition: service_healthy
     ports:
-      - "{{ traefik_bind_address }}:{{ traefik_http_port }}:80"
+      - target: 80
+        published: "{{ traefik_http_port }}"
+        host_ip: "{{ traefik_bind_address }}"
+        protocol: tcp
 {% if traefik_enable_https %}
-      - "{{ traefik_bind_address }}:{{ traefik_https_port }}:443"
+      - target: 443
+        published: "{{ traefik_https_port }}"
+        host_ip: "{{ traefik_bind_address }}"
+        protocol: tcp
 {% endif %}
-      - "{{ traefik_bind_address }}:{{ traefik_metrics_port }}:8082"
+      - target: 8082
+        published: "{{ traefik_metrics_port }}"
+        host_ip: "{{ traefik_bind_address }}"
+        protocol: tcp
     volumes:
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
       - ./dynamic:/etc/traefik/dynamic:ro

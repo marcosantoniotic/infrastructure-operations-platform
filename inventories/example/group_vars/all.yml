@@ -26,6 +26,7 @@ rhel_ssh_allow_users: []
 # Docker
 docker_users:
   - "<ADMIN_USER>"
+docker_compose_package: docker-compose-plugin-2.40.3-1.el9
 docker_daemon_config:
   log-driver: json-file
   log-opts:
@@ -140,6 +141,15 @@ external_backup_sources:
   - /var/backups/infrastructure-platform/netbox
   - /var/backups/infrastructure-platform/zabbix
   - /var/backups/infrastructure-platform/observability
+
+# Authorized maintenance window
+maintenance_authorized: false
+maintenance_change_reference: "not-authorized"
+maintenance_apply_os_updates: true
+maintenance_refresh_container_images: false
+maintenance_reboot_if_required: true
+maintenance_minimum_free_mb: 4096
+maintenance_run_external_backup: false
 
 # Portainer container management
 portainer_project_dir: /opt/portainer

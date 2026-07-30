@@ -1,0 +1,25 @@
+{
+  "schema": "infrastructure-maintenance-evidence-v1",
+  "change_reference": {{ maintenance_change_reference | to_json }},
+  "host": {{ ansible_facts.hostname | to_json }},
+  "started_utc": {{ maintenance_started_utc | to_json }},
+  "completed_utc": {{ maintenance_completed_utc | to_json }},
+  "duration_seconds": {{ maintenance_completed_epoch | int - maintenance_started_epoch | int }},
+  "recovery_points": [
+{% for result in maintenance_backup_results.results %}
+    {"component": {{ result.item.name | to_json }}, "success": {{ (result.rc == 0) | to_json }}}{% if not loop.last %},{% endif %}
+{% endfor %}
+  ],
+  "external_replication": {{ (maintenance_run_external_backup | bool) | to_json }},
+  "os_updates_enabled": {{ (maintenance_apply_os_updates | bool) | to_json }},
+  "os_updates_changed": {{ (maintenance_update_result is changed) | to_json }},
+  "container_refresh_enabled": {{ (maintenance_refresh_container_images | bool) | to_json }},
+  "reboot_required": {{ (maintenance_reboot_probe.rc == 1) | to_json }},
+  "reboot_performed": {{ (maintenance_reboot_probe.rc == 1 and maintenance_reboot_if_required | bool) | to_json }},
+  "health_checks": [
+{% for result in maintenance_health_results.results %}
+    {"component": {{ result.item.name | to_json }}, "status": {{ result.status | int }}, "success": true}{% if not loop.last %},{% endif %}
+{% endfor %}
+  ],
+  "result": "success"
+}

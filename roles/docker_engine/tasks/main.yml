@@ -29,6 +29,12 @@
     name: "{{ docker_packages }}"
     state: present
 
+- name: Install validated Docker Compose plugin version
+  ansible.builtin.dnf:
+    name: "{{ docker_compose_package }}"
+    state: present
+    allow_downgrade: true
+
 - name: Ensure Docker configuration directory exists
   ansible.builtin.file:
     path: /etc/docker

@@ -12,6 +12,7 @@
 | Backup do Zabbix | `playbooks/zabbix-backup.yml` | implementado e validado | systemd + Docker + Zabbix |
 | Observabilidade | `playbooks/observability.yml` | implementado com host e containers | Docker; Traefik opcional |
 | Backup da observabilidade | `playbooks/observability-backup.yml` | implementado para Grafana e Prometheus | systemd + Docker + Observabilidade |
+| Janela de manutenção | `playbooks/maintenance-window.yml` | implementada com backup obrigatório e evidência | RHEL 9 + módulos da plataforma |
 | Cockpit | `playbooks/cockpit.yml` | implementado e validado | RHEL 9; Traefik opcional |
 | Portainer | `playbooks/portainer.yml` | implementado e integrado ao Traefik | Docker; Traefik opcional |
 | Integrações | `playbooks/integrations.yml` | planejado | módulos correspondentes |

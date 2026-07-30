@@ -1,0 +1,9 @@
+# HELP infrastructure_maintenance_last_run_success Whether the latest maintenance completed successfully.
+# TYPE infrastructure_maintenance_last_run_success gauge
+infrastructure_maintenance_last_run_success 1
+# HELP infrastructure_maintenance_last_success_timestamp_seconds Unix timestamp of the latest successful maintenance.
+# TYPE infrastructure_maintenance_last_success_timestamp_seconds gauge
+infrastructure_maintenance_last_success_timestamp_seconds {{ maintenance_completed_epoch }}
+# HELP infrastructure_maintenance_last_run_duration_seconds Duration of the latest successful maintenance.
+# TYPE infrastructure_maintenance_last_run_duration_seconds gauge
+infrastructure_maintenance_last_run_duration_seconds {{ maintenance_completed_epoch | int - maintenance_started_epoch | int }}

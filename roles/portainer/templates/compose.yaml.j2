@@ -12,7 +12,10 @@ services:
       - --bind-https
       - ""
     ports:
-      - "{{ portainer_bind_address }}:{{ portainer_http_port }}:9000"
+      - target: 9000
+        published: "{{ portainer_http_port }}"
+        host_ip: "{{ portainer_bind_address }}"
+        protocol: tcp
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./secrets/portainer_admin_password:/run/secrets/portainer_admin_password:ro,Z
