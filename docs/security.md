@@ -1,5 +1,12 @@
 # Arquitetura de segurança
 
+## Verificação contínua
+
+O GitHub Actions executa o Trivy em pull requests e semanalmente para detectar
+vulnerabilidades altas ou críticas, segredos expostos e configurações
+inseguras. A action utiliza um commit imutável, e um achado bloqueia o workflow
+até ser corrigido ou registrado formalmente como exceção aceita.
+
 ## Controles implementados
 
 ### Borda
