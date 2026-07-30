@@ -88,6 +88,7 @@ external_backup_randomized_delay: 15m
 external_backup_sources:
   - /var/backups/infrastructure-platform/netbox
   - /var/backups/infrastructure-platform/zabbix
+  - /var/backups/infrastructure-platform/observability
 external_backup_keep_daily: 14
 external_backup_keep_weekly: 8
 external_backup_keep_monthly: 3
@@ -182,7 +183,7 @@ ssh -o BatchMode=yes -o StrictHostKeyChecking=no automation@$($configuration.pla
         $remoteCommand = @"
 set -eu
 ssh -o BatchMode=yes -o StrictHostKeyChecking=no automation@$($configuration.platform_ip) \
-  'sudo rm -rf /var/tmp/infrastructure-external-backup-restore-validation && sudo install -d -m 0700 /var/tmp/infrastructure-external-backup-restore-validation && sudo env PATH=/usr/local/bin:/usr/bin:/bin RESTIC_REPOSITORY=rclone:onedrive:infrastructure-operations-platform/restic RESTIC_PASSWORD_FILE=/etc/infrastructure-backup/restic-password RCLONE_CONFIG=/etc/infrastructure-backup/rclone.conf /usr/local/bin/restic restore latest --verify --target /var/tmp/infrastructure-external-backup-restore-validation && sudo find /var/tmp/infrastructure-external-backup-restore-validation -type f -print -quit | grep -q . && sudo rm -rf /var/tmp/infrastructure-external-backup-restore-validation'
+  'sudo rm -rf /var/tmp/infrastructure-external-backup-restore-validation && sudo install -d -m 0700 /var/tmp/infrastructure-external-backup-restore-validation && sudo env PATH=/usr/local/bin:/usr/bin:/bin RESTIC_REPOSITORY=rclone:onedrive:infrastructure-operations-platform/restic RESTIC_PASSWORD_FILE=/etc/infrastructure-backup/restic-password RCLONE_CONFIG=/etc/infrastructure-backup/rclone.conf /usr/local/bin/restic restore latest --verify --target /var/tmp/infrastructure-external-backup-restore-validation && test "$(sudo find /var/tmp/infrastructure-external-backup-restore-validation/var/backups/infrastructure-platform -mindepth 3 -maxdepth 3 -name SHA256SUMS | wc -l)" -ge 3 && sudo env PATH=/usr/bin:/bin find /var/tmp/infrastructure-external-backup-restore-validation/var/backups/infrastructure-platform -mindepth 3 -maxdepth 3 -name SHA256SUMS -execdir sha256sum --check SHA256SUMS \; && sudo rm -rf /var/tmp/infrastructure-external-backup-restore-validation'
 "@ -replace "`r`n", "`n"
         & ssh.exe @sshOptions $controller $remoteCommand
         if ($LASTEXITCODE -ne 0) {

@@ -1,0 +1,81 @@
+---
+- name: Validate observability backup variables
+  ansible.builtin.assert:
+    that:
+      - observability_backup_project_dir.startswith("/")
+      - observability_backup_root.startswith("/")
+      - observability_backup_retention_days | int >= 1
+      - observability_backup_prometheus_service | length > 0
+      - observability_backup_grafana_service | length > 0
+      - observability_backup_metrics_dir.startswith("/")
+
+- name: Create protected observability backup directory
+  ansible.builtin.file:
+    path: "{{ observability_backup_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Create Node Exporter textfile collector directory
+  ansible.builtin.file:
+    path: "{{ observability_backup_metrics_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install observability backup utility
+  ansible.builtin.template:
+    src: observability-backup.sh.j2
+    dest: /usr/local/sbin/observability-backup
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install observability backup systemd units
+  ansible.builtin.template:
+    src: "{{ item.source }}"
+    dest: "/etc/systemd/system/{{ item.destination }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - source: observability-backup.service.j2
+      destination: observability-backup.service
+    - source: observability-backup.timer.j2
+      destination: observability-backup.timer
+  notify: Reload systemd for observability backup
+
+- name: Apply observability backup unit changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start observability backup timer
+  ansible.builtin.systemd:
+    name: observability-backup.timer
+    enabled: true
+    state: started
+
+- name: Create an immediate observability backup
+  ansible.builtin.command:
+    cmd: /usr/local/sbin/observability-backup backup
+  changed_when: true
+  when:
+    - observability_backup_run_now | bool
+    - not ansible_check_mode
+
+- name: Verify latest observability backup through isolated containers
+  ansible.builtin.command:
+    cmd: /usr/local/sbin/observability-backup verify
+  changed_when: false
+  when:
+    - observability_backup_verify_restore | bool
+    - not ansible_check_mode
+
+- name: Report observability backup state
+  ansible.builtin.debug:
+    msg:
+      backup_root: "{{ observability_backup_root }}"
+      timer: observability-backup.timer
+      immediate_backup: "{{ observability_backup_run_now | bool }}"
+      isolated_restore_verified: "{{ observability_backup_verify_restore | bool }}"

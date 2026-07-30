@@ -21,6 +21,7 @@
     - "{{ recovery_drill_rclone_config }}"
     - "{{ recovery_drill_netbox_project_dir }}/compose.yaml"
     - "{{ recovery_drill_zabbix_project_dir }}/compose.yaml"
+    - "{{ recovery_drill_observability_project_dir }}/compose.yaml"
   register: recovery_drill_requirements
 
 - name: Require every recovery dependency

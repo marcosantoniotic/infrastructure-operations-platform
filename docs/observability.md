@@ -96,9 +96,17 @@ Cada alvo gera um módulo Blackbox próprio e pode declarar URL, cabeçalho
 
 ## Saúde dos backups
 
-As rotinas de backup do NetBox e Zabbix publicam métricas no textfile collector
+As rotinas de backup do NetBox, Zabbix e da própria camada de observabilidade
+publicam métricas no textfile collector
 do Node Exporter. O dashboard `Infrastructure Operations — Backup Health`
 apresenta o resultado da última execução e a idade do último backup válido.
+
+O backup da observabilidade interrompe Grafana e Prometheus de forma limpa pelo
+menor intervalo possível, arquiva os volumes persistentes e reinicia os
+serviços antes de finalizar o conjunto. A verificação restaura os arquivos em
+volumes descartáveis, inicia containers isolados com as mesmas imagens e exige
+saúde do banco do Grafana e da TSDB do Prometheus. Nenhum volume ativo é usado
+como destino de teste.
 
 Os alertas `PlatformBackupFailed` e `PlatformBackupStale` sinalizam,
 respectivamente, uma execução malsucedida e a ausência de backup válido nas

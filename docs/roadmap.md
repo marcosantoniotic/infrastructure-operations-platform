@@ -16,6 +16,7 @@
 - [x] replicar backups para armazenamento externo criptografado;
 - [x] monitorar idade e resultado dos backups;
 - [x] realizar teste isolado de restauração do NetBox;
+- [x] proteger e restaurar isoladamente o estado do Grafana e a TSDB do Prometheus;
 - [x] definir RPO e RTO;
 - [x] documentar retenção do Zabbix e Prometheus;
 - [ ] criar janela mensal de manutenção.

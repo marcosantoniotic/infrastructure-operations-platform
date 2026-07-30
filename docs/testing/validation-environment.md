@@ -460,6 +460,22 @@ MySQL container, validates essential Zabbix tables, reloads the platform VM,
 checks the persistent timer, verifies the backup again, and completes with an
 idempotent Ansible pass.
 
+### 16.1 Validate observability backup and isolated restore
+
+After Grafana and Prometheus have been deployed:
+
+```powershell
+.\automation\scripts\Run-ValidationObservabilityBackup.ps1 `
+  -VerifyRestore `
+  -VerifyPersistence `
+  -VerifyIdempotence
+```
+
+Certification requires SHA-256 validation, successful restoration of both
+archives into disposable Docker volumes, Prometheus readiness, Grafana database
+health, removal of temporary resources, timer persistence after VM reload and
+an idempotent Ansible pass. The workflow never restores into active volumes.
+
 ### 17. Validate Cockpit
 
 ```powershell
@@ -497,7 +513,9 @@ restore the latest encrypted external NetBox and Zabbix recovery point:
 The workflow is intentionally restricted to `srv01-recovery`. It verifies the
 Restic snapshot and backup manifests, replaces both isolated databases,
 restores persistent application data and requires HTTP 200 from NetBox and
-Zabbix through Traefik HTTPS. The external backup timer is disabled on the
+Zabbix through Traefik HTTPS. It also replaces the isolated Grafana and
+Prometheus volumes, validates Grafana database health, Prometheus readiness and
+the recovered TSDB. The external backup timer is disabled on the
 recovery VM. Sanitized evidence is written below `.validation/recovery/` and
 must not include credentials, private topology or recovered records.
 
@@ -545,6 +563,8 @@ The environment is not considered validated until:
 - Zabbix backup restores in an isolated database and its timer survives reload;
 - NetBox and Zabbix restore from encrypted external storage in the isolated
   recovery VM and return HTTP 200 through Traefik;
+- Grafana runtime state and Prometheus TSDB restore from encrypted external
+  storage and pass application-level health checks;
 - Cockpit remains enabled, healthy and reachable through Traefik after reload;
 - Traefik discovery, authentication and Socket Proxy restrictions pass;
 - NetBox responds through Traefik with TLS and reusable security headers;

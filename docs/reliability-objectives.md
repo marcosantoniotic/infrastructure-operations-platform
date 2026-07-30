@@ -19,8 +19,8 @@ one requires periodic recovery evidence.
 | NetBox database and media | 24 hours | 4 hours | encrypted external PostgreSQL dump and media archive | full application recovery validated |
 | Zabbix database and operational data | 24 hours | 4 hours | encrypted external MySQL dump and server data archive | full application recovery validated |
 | Grafana provisioned dashboards | per merged change | 2 hours | Git and Ansible | reproducible deployment validated |
-| Grafana runtime state | 24 hours | 4 hours | persistent volume backup | external backup pending |
-| Prometheus TSDB | 24 hours | 8 hours | TSDB snapshot or volume backup | recovery procedure pending |
+| Grafana runtime state | 24 hours | 4 hours | consistent persistent volume archive | isolated external recovery validated |
+| Prometheus TSDB | 24 hours | 8 hours | consistent persistent volume archive | isolated external recovery validated |
 | Traefik, Portainer and Cockpit configuration | per merged change | 2 hours | Git, Ansible and encrypted secrets | reproducible deployment validated |
 | RHEL host baseline | per merged change | 4 hours | Packer, Vagrant and Ansible | clean build validated |
 
@@ -34,6 +34,7 @@ depends on host capacity, operator availability and access to required secrets.
 |---|---:|---:|---|
 | NetBox backup sets | 14 days | 14 daily, 8 weekly and 3 monthly externally | local and encrypted external backup roles |
 | Zabbix backup sets | 14 days | 14 daily, 8 weekly and 3 monthly externally | local and encrypted external backup roles |
+| Observability backup sets | 14 days | 14 daily, 8 weekly and 3 monthly externally | local and encrypted external backup roles |
 | Prometheus metrics | 30 days or 8 GB, whichever is reached first | none by default | Prometheus startup flags |
 | Zabbix history | 30 days | not applicable | item/template retention and housekeeping review |
 | Zabbix trends | 365 days | not applicable | item/template retention and housekeeping review |
@@ -67,8 +68,6 @@ encrypted external storage and exercised from an isolated recovery VM.
 
 ## Known gaps
 
-- Grafana runtime state and Prometheus TSDB do not yet have proven restore
-  procedures;
 - the clean-host drill includes a manual external RHEL registration dependency;
   unattended reconstruction requires an approved registration mechanism;
 - external DNS and identity dependencies require separate continuity controls.
@@ -103,3 +102,12 @@ NetBox cold-start health grace period and a transient Zabbix bootstrap API
 condition. This result is therefore recorded as a successful engineering drill
 with corrective deviations, not as a clean first-pass execution. Credentials,
 private addressing and recovered records are excluded from this evidence.
+
+On the same date, snapshot `ce35e743` extended the encrypted recovery point to
+the Grafana runtime volume and Prometheus TSDB. Restic restored and verified 84
+files and directories (288.223 MiB). All component SHA-256 manifests passed.
+The isolated recovery VM restored NetBox, Zabbix, Grafana and Prometheus,
+validated both relational databases, Grafana database health, Prometheus
+readiness and historical TSDB loading, and completed the application recovery
+in 107 seconds. The external backup timer remained disabled on the recovery
+target.
