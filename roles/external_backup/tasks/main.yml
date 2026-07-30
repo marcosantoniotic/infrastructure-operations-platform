@@ -1,0 +1,175 @@
+---
+- name: Validate external backup variables
+  ansible.builtin.assert:
+    that:
+      - external_backup_repository | length > 0
+      - external_backup_restic_password | length >= 20
+      - not external_backup_restic_password.startswith("<")
+      - external_backup_sources | length > 0
+      - external_backup_keep_daily | int >= 1
+      - external_backup_keep_weekly | int >= 1
+      - external_backup_keep_monthly | int >= 1
+      - >-
+        not (external_backup_require_rclone | bool) or
+        (
+          external_backup_rclone_config | length > 20 and
+          not external_backup_rclone_config.startswith("<")
+        )
+    fail_msg: >-
+      Configure the encrypted repository password and, for an rclone backend,
+      the complete rclone configuration through Ansible Vault.
+  no_log: true
+
+- name: Install archive utilities
+  ansible.builtin.dnf:
+    name:
+      - bzip2
+      - unzip
+    state: present
+
+- name: Download verified Restic binary archive
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/restic/restic/releases/download/v{{ external_backup_restic_version }}/restic_{{ external_backup_restic_version }}_linux_amd64.bz2
+    dest: "/var/tmp/restic-{{ external_backup_restic_version }}.bz2"
+    checksum: "{{ external_backup_restic_checksum }}"
+    mode: "0600"
+
+- name: Install Restic binary
+  ansible.builtin.shell:
+    cmd: >-
+      bzip2 --decompress --stdout
+      /var/tmp/restic-{{ external_backup_restic_version }}.bz2
+      > /usr/local/bin/restic &&
+      chmod 0755 /usr/local/bin/restic
+  args:
+    creates: /usr/local/bin/restic
+
+- name: Download verified rclone archive
+  ansible.builtin.get_url:
+    url: >-
+      https://downloads.rclone.org/v{{ external_backup_rclone_version }}/rclone-v{{ external_backup_rclone_version }}-linux-amd64.zip
+    dest: "/var/tmp/rclone-{{ external_backup_rclone_version }}.zip"
+    checksum: "{{ external_backup_rclone_checksum }}"
+    mode: "0600"
+  when: external_backup_require_rclone | bool
+
+- name: Extract rclone archive
+  ansible.builtin.unarchive:
+    src: "/var/tmp/rclone-{{ external_backup_rclone_version }}.zip"
+    dest: /var/tmp
+    remote_src: true
+    creates: "/var/tmp/rclone-v{{ external_backup_rclone_version }}-linux-amd64/rclone"
+  when: external_backup_require_rclone | bool
+
+- name: Install rclone binary
+  ansible.builtin.copy:
+    src: "/var/tmp/rclone-v{{ external_backup_rclone_version }}-linux-amd64/rclone"
+    dest: /usr/local/bin/rclone
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  when: external_backup_require_rclone | bool
+
+- name: Create protected external backup configuration directory
+  ansible.builtin.file:
+    path: /etc/infrastructure-backup
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install Restic repository password
+  ansible.builtin.copy:
+    content: "{{ external_backup_restic_password | trim }}\n"
+    dest: /etc/infrastructure-backup/restic-password
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Install rclone configuration
+  ansible.builtin.copy:
+    content: "{{ external_backup_rclone_config | trim }}\n"
+    dest: /etc/infrastructure-backup/rclone.conf
+    owner: root
+    group: root
+    mode: "0600"
+    force: "{{ external_backup_rclone_config_force | bool }}"
+  no_log: true
+  when: external_backup_require_rclone | bool
+
+- name: Create metrics directory
+  ansible.builtin.file:
+    path: "{{ external_backup_metrics_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install external backup utility
+  ansible.builtin.template:
+    src: external-backup.sh.j2
+    dest: /usr/local/sbin/infrastructure-external-backup
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install external backup systemd units
+  ansible.builtin.template:
+    src: "{{ item.source }}"
+    dest: "/etc/systemd/system/{{ item.destination }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - source: external-backup.service.j2
+      destination: infrastructure-external-backup.service
+    - source: external-backup.timer.j2
+      destination: infrastructure-external-backup.timer
+  notify: Reload systemd for external backup
+
+- name: Apply external backup unit changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Check external Restic repository
+  ansible.builtin.command: /usr/local/bin/restic snapshots --json
+  environment:
+    PATH: /usr/local/bin:/usr/bin:/bin
+    RESTIC_REPOSITORY: "{{ external_backup_repository }}"
+    RESTIC_PASSWORD_FILE: /etc/infrastructure-backup/restic-password
+    RCLONE_CONFIG: /etc/infrastructure-backup/rclone.conf
+  register: external_backup_repository_check
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Initialize external Restic repository
+  ansible.builtin.command: /usr/local/bin/restic init
+  environment:
+    PATH: /usr/local/bin:/usr/bin:/bin
+    RESTIC_REPOSITORY: "{{ external_backup_repository }}"
+    RESTIC_PASSWORD_FILE: /etc/infrastructure-backup/restic-password
+    RCLONE_CONFIG: /etc/infrastructure-backup/rclone.conf
+  when: external_backup_repository_check.rc == 10
+  no_log: true
+
+- name: Require an accessible Restic repository
+  ansible.builtin.assert:
+    that:
+      - external_backup_repository_check.rc in [0, 10]
+    fail_msg: >-
+      The Restic repository could not be opened. Verify the repository
+      password, rclone token, remote name and network connectivity.
+
+- name: Enable external backup timer
+  ansible.builtin.systemd:
+    name: infrastructure-external-backup.timer
+    enabled: true
+    state: started
+
+- name: Run external backup now
+  ansible.builtin.command: /usr/local/sbin/infrastructure-external-backup
+  when: external_backup_run_now | bool
+  changed_when: true

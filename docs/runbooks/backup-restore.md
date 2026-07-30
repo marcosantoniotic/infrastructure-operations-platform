@@ -94,6 +94,35 @@ as duas rotinas de forma centralizada.
 Os objetivos formais e períodos de retenção estão definidos em
 [Reliability objectives](../reliability-objectives.md).
 
+## Réplica externa criptografada
+
+Os conjuntos locais validados do NetBox e do Zabbix são replicados para um
+repositório Restic criptografado, transportado pelo rclone para o OneDrive.
+A senha do repositório e a configuração OAuth são fornecidas exclusivamente
+por Ansible Vault.
+
+Controles aplicados:
+
+- execução diária pelo timer `infrastructure-external-backup.timer`;
+- retenção de 14 cópias diárias, 8 semanais e 3 mensais;
+- deduplicação e criptografia do lado do cliente pelo Restic;
+- verificação de integridade de uma amostra de dados após cada execução;
+- métricas sanitizadas no Node Exporter;
+- alertas de falha e ausência de cópia recente;
+- restauração com `restic restore --verify` comprovada no ambiente de validação.
+
+Comandos operacionais:
+
+```bash
+sudo systemctl status infrastructure-external-backup.timer
+sudo systemctl list-timers infrastructure-external-backup.timer
+sudo systemctl start infrastructure-external-backup.service
+sudo journalctl -u infrastructure-external-backup.service
+```
+
+Não exponha a senha Restic, o arquivo `rclone.conf`, tokens OAuth ou conteúdo
+de snapshots em logs, capturas de tela ou commits.
+
 ## Ordem de restauração
 
 1. recriar host, armazenamento e Docker;

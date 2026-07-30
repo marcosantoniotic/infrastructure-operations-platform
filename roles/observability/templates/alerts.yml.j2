@@ -54,3 +54,23 @@ groups:
         annotations:
           summary: "Backup is older than 26 hours: {{ '{{' }} $labels.service {{ '}}' }}"
           description: "No recent successful backup was recorded for this service."
+
+      - alert: ExternalBackupFailed
+        expr: infrastructure_external_backup_last_run_success == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "External backup to {{ '{{' }} $labels.destination {{ '}}' }} failed"
+          description: "The latest encrypted external backup did not complete successfully."
+
+      - alert: ExternalBackupStale
+        expr: >-
+          time() - infrastructure_external_backup_last_success_timestamp_seconds
+          > 26 * 60 * 60
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "External backup is older than 26 hours"
+          description: "No recent successful encrypted external backup was recorded."

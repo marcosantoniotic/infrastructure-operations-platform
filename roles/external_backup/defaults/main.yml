@@ -1,0 +1,21 @@
+---
+external_backup_restic_version: "0.19.1"
+external_backup_restic_checksum: "sha256:f415415624dcc452f2a02b8c33641791a8c6d6d3b65bbb3543fcf9a25151585c"
+external_backup_rclone_version: "1.74.4"
+external_backup_rclone_checksum: "sha256:fe435e0c36228e7c2f116a8701f01127bb1f694005fc11d1f27186c8bca4115d"
+
+external_backup_repository: "rclone:onedrive:infrastructure-operations-platform/restic"
+external_backup_restic_password: "<RESTIC_REPOSITORY_PASSWORD>"
+external_backup_rclone_config: "<RCLONE_CONFIG>"
+external_backup_rclone_config_force: false
+external_backup_require_rclone: true
+external_backup_schedule: "*-*-* 04:30:00"
+external_backup_randomized_delay: 15m
+external_backup_sources:
+  - /var/backups/infrastructure-platform/netbox
+  - /var/backups/infrastructure-platform/zabbix
+external_backup_keep_daily: 14
+external_backup_keep_weekly: 8
+external_backup_keep_monthly: 3
+external_backup_metrics_dir: /var/lib/node_exporter/textfile_collector
+external_backup_run_now: false

@@ -18,5 +18,7 @@
     - role: netbox_backup
     - role: zabbix
     - role: zabbix_backup
+    - role: external_backup
+      when: external_backup_enabled | default(false) | bool
     - role: portainer
     - role: observability
