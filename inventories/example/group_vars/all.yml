@@ -114,6 +114,18 @@ zabbix_backup_mysql_image: mysql:8.4.10-oraclelinux9
 zabbix_backup_run_now: false
 zabbix_backup_verify_restore: false
 
+# Encrypted external backup (OneDrive through rclone)
+external_backup_enabled: false
+external_backup_repository: "rclone:onedrive:infrastructure-operations-platform/restic"
+external_backup_restic_password: "{{ vault_external_backup_restic_password }}"
+external_backup_rclone_config: "{{ vault_external_backup_rclone_config }}"
+external_backup_require_rclone: true
+external_backup_schedule: "*-*-* 04:30:00"
+external_backup_keep_daily: 14
+external_backup_keep_weekly: 8
+external_backup_keep_monthly: 3
+external_backup_run_now: false
+
 # Portainer container management
 portainer_project_dir: /opt/portainer
 portainer_image: portainer/portainer-ce:2.39.5-alpine

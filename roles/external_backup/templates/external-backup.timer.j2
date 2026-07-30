@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily encrypted external platform backup schedule
+
+[Timer]
+OnCalendar={{ external_backup_schedule }}
+RandomizedDelaySec={{ external_backup_randomized_delay }}
+Persistent=true
+Unit=infrastructure-external-backup.service
+
+[Install]
+WantedBy=timers.target

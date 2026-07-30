@@ -1,0 +1,16 @@
+[Unit]
+Description=Encrypted external platform backup
+After=network-online.target netbox-backup.service zabbix-backup.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/infrastructure-external-backup
+User=root
+Group=root
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ external_backup_metrics_dir }}
+TimeoutStartSec=6h

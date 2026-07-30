@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 0077
+
+export PATH=/usr/local/bin:/usr/bin:/bin
+export RESTIC_REPOSITORY="{{ external_backup_repository }}"
+export RESTIC_PASSWORD_FILE=/etc/infrastructure-backup/restic-password
+export RCLONE_CONFIG=/etc/infrastructure-backup/rclone.conf
+
+readonly METRICS_DIR="{{ external_backup_metrics_dir }}"
+readonly METRICS_FILE="${METRICS_DIR}/external_backup.prom"
+readonly STARTED_AT="$(date +%s)"
+readonly RESTIC=/usr/local/bin/restic
+
+write_metrics() {
+  local success="$1" completed_at duration temporary
+  completed_at="$(date +%s)"
+  duration="$((completed_at - STARTED_AT))"
+  temporary="${METRICS_FILE}.$$"
+  install -d -m 0755 "$METRICS_DIR"
+  {
+    printf '# HELP infrastructure_external_backup_last_run_success Whether the latest external backup succeeded.\n'
+    printf '# TYPE infrastructure_external_backup_last_run_success gauge\n'
+    printf 'infrastructure_external_backup_last_run_success{destination="onedrive"} %s\n' "$success"
+    printf '# HELP infrastructure_external_backup_last_run_duration_seconds Duration of the latest external backup.\n'
+    printf '# TYPE infrastructure_external_backup_last_run_duration_seconds gauge\n'
+    printf 'infrastructure_external_backup_last_run_duration_seconds{destination="onedrive"} %s\n' "$duration"
+    if [[ "$success" == "1" ]]; then
+      printf '# HELP infrastructure_external_backup_last_success_timestamp_seconds Unix timestamp of the latest successful external backup.\n'
+      printf '# TYPE infrastructure_external_backup_last_success_timestamp_seconds gauge\n'
+      printf 'infrastructure_external_backup_last_success_timestamp_seconds{destination="onedrive"} %s\n' "$completed_at"
+    elif [[ -f "$METRICS_FILE" ]]; then
+      grep '^infrastructure_external_backup_last_success_timestamp_seconds' "$METRICS_FILE" || true
+    fi
+  } > "$temporary"
+  chmod 0644 "$temporary"
+  mv -f -- "$temporary" "$METRICS_FILE"
+}
+
+on_error() {
+  write_metrics 0
+}
+trap on_error ERR INT TERM
+
+"$RESTIC" backup \
+{% for source in external_backup_sources %}
+  "{{ source }}" \
+{% endfor %}
+  --tag infrastructure-operations-platform \
+  --tag external-replication
+
+"$RESTIC" forget \
+  --keep-daily {{ external_backup_keep_daily }} \
+  --keep-weekly {{ external_backup_keep_weekly }} \
+  --keep-monthly {{ external_backup_keep_monthly }} \
+  --prune
+
+"$RESTIC" check --read-data-subset=5%
+trap - ERR INT TERM
+write_metrics 1

@@ -107,6 +107,13 @@ arquivos, conteúdo e credenciais de backup não são expostos.
 - Prometheus target down;
 - sincronização NetBox-Zabbix sem execução recente.
 
+O mesmo dashboard apresenta a réplica externa criptografada no OneDrive por
+meio das métricas `infrastructure_external_backup_last_run_success`,
+`infrastructure_external_backup_last_run_duration_seconds` e
+`infrastructure_external_backup_last_success_timestamp_seconds`. Os painéis
+consolidam estado, idade do ponto de recuperação, duração, RPO observado e
+alertas ativos sem expor nomes de arquivos ou credenciais.
+
 ## Retenção atual
 
 Prometheus está configurado para retenção limitada por tempo e tamanho. A retenção do Zabbix deve ser documentada junto ao housekeeping após a primeira revisão de capacidade.

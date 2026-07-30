@@ -1,0 +1,6 @@
+---
+- name: Configure encrypted external platform backup
+  hosts: platform
+  become: true
+  roles:
+    - role: external_backup

@@ -11,15 +11,16 @@
         "defaults": {
           "color": {"mode": "thresholds"},
           "mappings": [{"options": {"0": {"color": "red", "text": "FALHA"}, "1": {"color": "green", "text": "OK"}}, "type": "value"}],
+          "noValue": "SEM DADOS",
           "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
         },
         "overrides": []
       },
-      "gridPos": {"h": 6, "w": 12, "x": 0, "y": 0},
+      "gridPos": {"h": 5, "w": 12, "x": 0, "y": 0},
       "id": 1,
       "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
       "targets": [{"expr": "infrastructure_backup_last_run_success", "legendFormat": "{{ '{{' }}service{{ '}}' }}", "refId": "A"}],
-      "title": "Resultado da última execução",
+      "title": "Backups locais — última execução",
       "type": "stat"
     },
     {
@@ -27,36 +28,119 @@
       "fieldConfig": {
         "defaults": {
           "color": {"mode": "thresholds"},
+          "mappings": [{"options": {"0": {"color": "red", "text": "FALHA"}, "1": {"color": "green", "text": "PROTEGIDO"}}, "type": "value"}],
+          "noValue": "SEM DADOS",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "infrastructure_external_backup_last_run_success", "legendFormat": "{{ '{{' }}destination{{ '}}' }}", "refId": "A"}],
+      "title": "Réplica externa criptografada",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "noValue": "SEM DADOS",
           "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 20}, {"color": "red", "value": 26}]},
           "unit": "h"
         },
         "overrides": []
       },
-      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 0},
-      "id": 2,
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 5},
+      "id": 3,
       "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
       "targets": [{"expr": "(time() - infrastructure_backup_last_success_timestamp_seconds) / 3600", "legendFormat": "{{ '{{' }}service{{ '}}' }}", "refId": "A"}],
-      "title": "Idade do último backup válido",
+      "title": "Idade — backups locais",
       "type": "stat"
     },
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never"}, "unit": "h"}, "overrides": []},
-      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 6},
-      "id": 3,
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "noValue": "SEM DADOS",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 20}, {"color": "red", "value": 26}]},
+          "unit": "h"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 5},
+      "id": 4,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "(time() - infrastructure_external_backup_last_success_timestamp_seconds) / 3600", "legendFormat": "{{ '{{' }}destination{{ '}}' }}", "refId": "A"}],
+      "title": "Idade — réplica externa",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "decimals": 0,
+          "noValue": "SEM DADOS",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 900}, {"color": "red", "value": 1800}]},
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 5},
+      "id": 5,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "infrastructure_external_backup_last_run_duration_seconds", "legendFormat": "{{ '{{' }}destination{{ '}}' }}", "refId": "A"}],
+      "title": "Duração — réplica externa",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"drawStyle": "line", "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never"},
+          "unit": "h"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 9, "w": 16, "x": 0, "y": 11},
+      "id": 6,
       "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
-      "targets": [{"expr": "(time() - infrastructure_backup_last_success_timestamp_seconds) / 3600", "legendFormat": "{{ '{{' }}service{{ '}}' }}", "refId": "A"}],
-      "title": "Evolução da idade dos backups",
+      "targets": [
+        {"expr": "(time() - infrastructure_backup_last_success_timestamp_seconds) / 3600", "legendFormat": "local / {{ '{{' }}service{{ '}}' }}", "refId": "A"},
+        {"expr": "(time() - infrastructure_external_backup_last_success_timestamp_seconds) / 3600", "legendFormat": "externo / {{ '{{' }}destination{{ '}}' }}", "refId": "B"}
+      ],
+      "title": "RPO observado — idade dos pontos de recuperação",
       "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [{"options": {"0": {"color": "green", "text": "NENHUM"}, "1": {"color": "red", "text": "ATIVO"}}, "type": "value"}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 9, "w": 8, "x": 16, "y": 11},
+      "id": 7,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "sum(ALERTS{alertname=~\"PlatformBackupFailed|PlatformBackupStale|ExternalBackupFailed|ExternalBackupStale\",alertstate=\"firing\"}) or vector(0)", "legendFormat": "alertas", "refId": "A"}],
+      "title": "Alertas de proteção de dados",
+      "type": "stat"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 41,
-  "tags": ["infrastructure", "backup", "recovery"],
+  "tags": ["infrastructure", "backup", "recovery", "onedrive", "restic"],
   "templating": {"list": []},
   "time": {"from": "now-24h", "to": "now"},
   "timezone": "browser",
   "title": "Infrastructure Operations — Backup Health",
   "uid": "backup-health",
-  "version": 1
+  "version": 2
 }
