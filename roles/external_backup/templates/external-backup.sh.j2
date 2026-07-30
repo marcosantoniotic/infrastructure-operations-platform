@@ -4,8 +4,9 @@ umask 0077
 
 export PATH=/usr/local/bin:/usr/bin:/bin
 export RESTIC_REPOSITORY="{{ external_backup_repository }}"
-export RESTIC_PASSWORD_FILE=/etc/infrastructure-backup/restic-password
-export RCLONE_CONFIG=/etc/infrastructure-backup/rclone.conf
+export RESTIC_PASSWORD_FILE="{{ external_backup_config_dir }}/restic-password"
+export RCLONE_CONFIG="{{ external_backup_config_dir }}/rclone.conf"
+export RESTIC_CACHE_DIR="{{ external_backup_cache_dir }}"
 
 readonly METRICS_DIR="{{ external_backup_metrics_dir }}"
 readonly METRICS_FILE="${METRICS_DIR}/external_backup.prom"

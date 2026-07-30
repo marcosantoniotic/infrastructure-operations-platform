@@ -472,6 +472,35 @@ The workflow installs Cockpit natively, keeps SELinux enforcing, checks the
 dedicated `9091/tcp` socket, publishes `cockpit.localhost` through Traefik and
 confirms that the service remains enabled and healthy after a VM reload.
 
+### 18. Execute an isolated disaster recovery drill
+
+Configure a distinct recovery address and create the third VM:
+
+```powershell
+.\automation\scripts\Initialize-Validation.ps1 `
+  -ControllerAddress "<CONTROLLER_IP>" `
+  -PlatformAddress "<PLATFORM_IP>" `
+  -RecoveryAddress "<RECOVERY_IP>"
+
+Set-Location .\automation\vagrant
+vagrant up srv01-recovery --no-provision
+Set-Location ..\..
+```
+
+After completing the required RHEL registration, reconstruct the platform and
+restore the latest encrypted external NetBox and Zabbix recovery point:
+
+```powershell
+.\automation\scripts\Run-DisasterRecoveryDrill.ps1
+```
+
+The workflow is intentionally restricted to `srv01-recovery`. It verifies the
+Restic snapshot and backup manifests, replaces both isolated databases,
+restores persistent application data and requires HTTP 200 from NetBox and
+Zabbix through Traefik HTTPS. The external backup timer is disabled on the
+recovery VM. Sanitized evidence is written below `.validation/recovery/` and
+must not include credentials, private topology or recovered records.
+
 ## Lifecycle commands
 
 From `automation\vagrant`:
@@ -501,6 +530,8 @@ The environment is not considered validated until:
 - NetBox survives restart and container recreation;
 - NetBox backup restores in an isolated database;
 - Zabbix backup restores in an isolated database and its timer survives reload;
+- NetBox and Zabbix restore from encrypted external storage in the isolated
+  recovery VM and return HTTP 200 through Traefik;
 - Cockpit remains enabled, healthy and reachable through Traefik after reload;
 - Traefik discovery, authentication and Socket Proxy restrictions pass;
 - NetBox responds through Traefik with TLS and reusable security headers;

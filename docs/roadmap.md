@@ -13,7 +13,7 @@
 
 - [x] implantar e validar backup local automático do NetBox;
 - [x] implantar e validar backups automáticos do Zabbix;
-- [ ] replicar backups para armazenamento externo criptografado;
+- [x] replicar backups para armazenamento externo criptografado;
 - [x] monitorar idade e resultado dos backups;
 - [x] realizar teste isolado de restauração do NetBox;
 - [x] definir RPO e RTO;
@@ -54,7 +54,8 @@ Consulte [Fase futura: GLPI](glpi-phase.md).
 ## Fase 5 — Resiliência
 
 - [ ] avaliar segundo nó;
-- [ ] separar backups do host principal;
-- [ ] testar recuperação total;
+- [x] separar backups do host principal;
+- [x] testar recuperação dos dados e aplicações em VM isolada;
+- [ ] medir reconstrução integral a partir de uma VM limpa, incluindo dependências externas;
 - [ ] avaliar proxy e DNS de contingência;
 - [ ] definir estratégia de alta disponibilidade orientada por requisitos de RTO, RPO e criticidade.

@@ -7,9 +7,10 @@ O controle inclui dump consistente do PostgreSQL, mídia, configuração Compose
 não secreta, metadados e manifesto SHA-256. A restauração foi comprovada em um
 PostgreSQL temporário e isolado, sem alterar o banco ativo.
 
-Essa evidência não substitui uma cópia externa. O Zabbix possui automação
-equivalente, com backup e restauração isolada comprovados. Os demais componentes
-permanecem no roadmap até receberem controles equivalentes.
+O Zabbix possui automação equivalente. Os conjuntos dos dois sistemas são
+replicados para um repositório Restic criptografado no OneDrive. Uma recuperação
+completa dos dados das aplicações foi comprovada em uma terceira VM isolada,
+reconstruída por Ansible, sem alterar o ambiente principal.
 
 ## NetBox
 
@@ -134,6 +135,45 @@ de snapshots em logs, capturas de tela ou commits.
 7. restaurar observabilidade e proxy;
 8. validar login, dados essenciais e integrações.
 
+## Teste completo em VM isolada
+
+O teste exige uma terceira VM chamada exatamente `srv01-recovery`, endereço
+distinto do ambiente principal, credenciais locais ignoradas pelo Git e
+registro RHEL válido. Inicialize a configuração e a VM:
+
+```powershell
+.\automation\scripts\Initialize-Validation.ps1 `
+  -ControllerAddress "<CONTROLLER_IP>" `
+  -PlatformAddress "<PLATFORM_IP>" `
+  -RecoveryAddress "<RECOVERY_IP>"
+
+Set-Location .\automation\vagrant
+vagrant up srv01-recovery --no-provision
+Set-Location ..\..
+```
+
+Depois do registro RHEL, execute:
+
+```powershell
+.\automation\scripts\Run-DisasterRecoveryDrill.ps1
+```
+
+Para repetir somente a importação e os testes em uma VM já provisionada:
+
+```powershell
+.\automation\scripts\Run-DisasterRecoveryDrill.ps1 -SkipPlatformRebuild
+```
+
+O workflow recusa execução sem autorização explícita, em hostname diferente de
+`srv01-recovery`, no mesmo endereço do ambiente principal ou fora de
+`/var/tmp`. O timer externo permanece desativado nessa VM para impedir que o
+teste publique novos snapshots. A evidência sanitizada local é gravada em
+`.validation/recovery/evidence.json`, que é ignorado pelo Git.
+
+Para testar as interfaces sem publicar o Traefik na rede, crie um túnel SSH
+temporário da estação para `127.0.0.1:8443` da VM. O teste automatizado interno
+usa SNI TLS real para `netbox.localhost` e `zabbix.localhost`.
+
 ## Critério de sucesso
 
 Um backup só é válido quando:
@@ -144,6 +184,12 @@ Um backup só é válido quando:
 - a aplicação inicia;
 - login e dados essenciais são validados;
 - evidência sanitizada é registrada.
+
+Em 2026-07-30, a restauração de dados das duas aplicações foi concluída em 65
+segundos, incluindo download e verificação do snapshot, validação SHA-256,
+importação dos bancos, restauração dos dados persistentes e testes HTTP 200
+através do Traefik. O workflow repetido completo, incluindo preparação e
+verificação do repositório, terminou em 114 segundos.
 
 ## Proibição
 
