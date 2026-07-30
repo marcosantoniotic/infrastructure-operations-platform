@@ -93,6 +93,7 @@ $requiredPaths = @(
     'scripts/ci/validate-service-artifacts.sh',
     'scripts/validate-container-images.ps1',
     'docs/reliability-objectives.md',
+    '.github/workflows/security.yml',
     'roles/observability/README.md',
     'roles/cockpit/defaults/main.yml',
     'roles/cockpit/handlers/main.yml',
