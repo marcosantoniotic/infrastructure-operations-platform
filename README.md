@@ -126,6 +126,7 @@ flowchart LR
 - [Objetivos de confiabilidade, RPO, RTO e retenção](docs/reliability-objectives.md)
 - [Resposta a incidentes](docs/runbooks/incident-response.md)
 - [Gestão de mudanças](docs/runbooks/change-management.md)
+- [Adoção segura de IaC para Cloudflare](docs/runbooks/cloudflare-iac-adoption.md)
 - [Publicação segura](docs/publishing-checklist.md)
 - [Roadmap](docs/roadmap.md)
 - [Fase futura: GLPI](docs/glpi-phase.md)

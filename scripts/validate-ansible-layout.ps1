@@ -124,6 +124,8 @@ $requiredPaths = @(
     'config/container-privilege-policy.json',
     'config/credential-catalog.json',
     'docs/runbooks/credential-rotation.md',
+    'docs/runbooks/cloudflare-iac-adoption.md',
+    'docs/decisions/ADR-004-cloudflare-infrastructure-as-code.md',
     'docs/reliability-objectives.md',
     '.github/workflows/security.yml',
     '.github/workflows/image-security.yml',
