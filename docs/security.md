@@ -29,6 +29,7 @@ até ser corrigido ou registrado formalmente como exceção aceita.
 - firewalld ativo;
 - SSH como serviço administrativo;
 - Cockpit roteado pelo proxy;
+- listener do Zabbix Server restrito a loopback e testado a partir de outro host;
 - segredos em arquivos com acesso restrito;
 - atualizações e janelas de manutenção documentadas.
 
@@ -69,17 +70,14 @@ Permissões mínimas esperadas:
 ## Riscos conhecidos
 
 - nó único sem alta disponibilidade;
-- porta do Zabbix Server publicada no host;
+- agentes passivos remotos exigem desenho futuro com Zabbix Proxy ou política
+  explícita para tráfego encaminhado pelo Docker;
 - cAdvisor exige acesso privilegiado para visibilidade completa;
 - participação do Zabbix Server em várias redes aumenta seu alcance lateral;
-- backups ainda não comprovados por timer e teste de restauração;
 - Portainer e Cockpit são superfícies administrativas de alto impacto.
 
 ## Mitigações prioritárias
 
-1. automatizar e monitorar backups;
-2. testar restauração isolada;
-3. limitar origens da porta do Zabbix Server;
-4. revisar permissões de tokens a cada fase;
-5. adicionar alertas de segurança e auditoria;
-6. registrar dependências e versões em cada mudança.
+1. revisar permissões de tokens a cada fase;
+2. adicionar alertas de segurança e auditoria;
+3. registrar dependências e versões em cada mudança.

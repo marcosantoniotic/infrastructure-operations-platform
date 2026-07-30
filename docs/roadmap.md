@@ -23,7 +23,7 @@
 
 ## Fase 2 — Segurança e governança
 
-- [ ] limitar a porta do Zabbix Server por origem;
+- [x] limitar a porta do Zabbix Server por origem;
 - [ ] revisar permissões dos tokens;
 - [ ] formalizar rotação de credenciais;
 - [x] validar headers de segurança no gateway Traefik;
