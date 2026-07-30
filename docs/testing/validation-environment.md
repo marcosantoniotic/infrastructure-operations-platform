@@ -501,6 +501,19 @@ Zabbix through Traefik HTTPS. The external backup timer is disabled on the
 recovery VM. Sanitized evidence is written below `.validation/recovery/` and
 must not include credentials, private topology or recovered records.
 
+Remote shell blocks are normalized to LF before SSH execution because this
+runner is normally invoked from Windows. Cold NetBox migrations receive an
+extended health-check start period, and the Zabbix bootstrap password rotation
+uses bounded retries to tolerate API readiness without masking a persistent
+failure.
+
+The clean-host exercise on 2026-07-30 completed the final automated
+reconstruction and restore pass in 441 seconds. The application data phase
+took 88 seconds. The end-to-end elapsed time from initial authorization,
+including manual RHEL registration and corrective reruns, was 2,128 seconds.
+All critical containers, database structures and HTTPS routes passed an
+independent post-recovery check; the external backup timer remained disabled.
+
 ## Lifecycle commands
 
 From `automation\vagrant`:

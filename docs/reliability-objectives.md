@@ -69,9 +69,8 @@ encrypted external storage and exercised from an isolated recovery VM.
 
 - Grafana runtime state and Prometheus TSDB do not yet have proven restore
   procedures;
-- the NetBox and Zabbix application-data recovery was measured at 65 seconds,
-  but a clean host reconstruction RTO still requires a timed run that includes
-  image creation and the external RHEL registration dependency;
+- the clean-host drill includes a manual external RHEL registration dependency;
+  unattended reconstruction requires an approved registration mechanism;
 - external DNS and identity dependencies require separate continuity controls.
 
 ## Latest recovery evidence
@@ -85,3 +84,22 @@ recovery completed in 65 seconds; the complete repeat workflow, including
 preparation and repository checks, completed in 114 seconds. Snapshot contents,
 credentials, OAuth data, private addressing and database records are
 intentionally excluded from this public evidence.
+
+Later on 2026-07-30, a second exercise started from a newly created,
+unprovisioned `srv01-recovery` VM. The workflow installed the RHEL baseline,
+Docker, Traefik, Cockpit, NetBox, Zabbix, Portainer, Prometheus, Grafana and the
+external recovery tooling, then restored snapshot `ceac638d`. Restic restored
+and verified 65 files and directories (106.612 MiB). NetBox and Zabbix database
+structures, application data and HTTPS routes were independently validated.
+The final successful automated pass took 441 seconds, including platform
+reconstruction and application recovery; the data restoration phase took 88
+seconds.
+
+Measured from the original recovery authorization through the external RHEL
+registration and corrective reruns, usable service was recovered in 2,128
+seconds (35 minutes 28 seconds), within the four-hour RTO. The first pass
+identified and corrected Windows CRLF handling in staged remote commands, the
+NetBox cold-start health grace period and a transient Zabbix bootstrap API
+condition. This result is therefore recorded as a successful engineering drill
+with corrective deviations, not as a clean first-pass execution. Credentials,
+private addressing and recovered records are excluded from this evidence.

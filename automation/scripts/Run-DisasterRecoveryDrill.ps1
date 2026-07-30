@@ -93,7 +93,7 @@ $startedAt = [DateTimeOffset]::UtcNow
 $result = 'failed'
 
 try {
-    & ssh.exe @sshOptions $controller @"
+    $remoteCommand = @"
 set -eu
 case '$remoteRoot' in
   /home/automation/infrastructure-operations-platform-recovery) ;;
@@ -104,7 +104,8 @@ install -d -m 0755 \
   '$remoteRoot' \
   '$remoteRoot/inventories/recovery/group_vars/all'
 sudo chown -R automation:automation '$remoteRoot'
-"@
+"@ -replace "`r`n", "`n"
+    & ssh.exe @sshOptions $controller $remoteCommand
     if ($LASTEXITCODE -ne 0) {
         throw 'Failed to prepare the controller recovery workspace.'
     }
@@ -146,33 +147,35 @@ sudo chown -R automation:automation '$remoteRoot'
         }
     }
 
-    & ssh.exe @sshOptions $controller @"
+    $remoteCommand = @"
 set -eu
 chmod 0600 \
   '$remoteRoot/inventories/recovery/group_vars/all/vault.yml' \
   '$remoteRoot/inventories/recovery/group_vars/all/external-backup-vault.yml'
 cd '$remoteRoot'
 ansible-galaxy collection install -r requirements.yml
-"@
+"@ -replace "`r`n", "`n"
+    & ssh.exe @sshOptions $controller $remoteCommand
     if ($LASTEXITCODE -ne 0) {
         throw 'Failed to prepare Ansible requirements.'
     }
 
     if (-not $SkipPlatformRebuild) {
-        & ssh.exe @sshOptions $controller @"
+        $remoteCommand = @"
 set -eu
 cd '$remoteRoot'
 ANSIBLE_ROLES_PATH='$remoteRoot/roles' ansible-playbook \
   --vault-password-file /home/automation/.ansible/vault-password \
   -i inventories/recovery/hosts.yml \
   playbooks/platform.yml
-"@
+"@ -replace "`r`n", "`n"
+        & ssh.exe @sshOptions $controller $remoteCommand
         if ($LASTEXITCODE -ne 0) {
             throw 'Recovery platform reconstruction failed.'
         }
     }
 
-    & ssh.exe @sshOptions $controller @"
+    $remoteCommand = @"
 set -eu
 cd '$remoteRoot'
 ANSIBLE_ROLES_PATH='$remoteRoot/roles' ansible-playbook \
@@ -185,7 +188,8 @@ ANSIBLE_ROLES_PATH='$remoteRoot/roles' ansible-playbook \
   --vault-password-file /home/automation/.ansible/vault-password \
   -i inventories/recovery/hosts.yml \
   playbooks/recovery-drill.yml
-"@
+"@ -replace "`r`n", "`n"
+    & ssh.exe @sshOptions $controller $remoteCommand
     if ($LASTEXITCODE -ne 0) {
         throw 'Encrypted recovery or application validation failed.'
     }
@@ -194,10 +198,17 @@ ANSIBLE_ROLES_PATH='$remoteRoot/roles' ansible-playbook \
 }
 finally {
     $completedAt = [DateTimeOffset]::UtcNow
+    $drillType = if ($SkipPlatformRebuild) {
+        'isolated-full-application-recovery'
+    }
+    else {
+        'isolated-platform-reconstruction-and-application-recovery'
+    }
     $evidence = [ordered]@{
-        schema_version = 1
-        drill_type = 'isolated-full-application-recovery'
+        schema_version = 2
+        drill_type = $drillType
         target = 'srv01-recovery'
+        platform_rebuild_included = -not $SkipPlatformRebuild
         started_utc = $startedAt.ToString('o')
         completed_utc = $completedAt.ToString('o')
         duration_seconds = [math]::Round(

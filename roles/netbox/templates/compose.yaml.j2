@@ -93,7 +93,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 10
-      start_period: 120s
+      start_period: "{{ netbox_healthcheck_start_period }}"
 
   netbox-worker:
     <<: *netbox-common

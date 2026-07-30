@@ -56,6 +56,6 @@ Consulte [Fase futura: GLPI](glpi-phase.md).
 - [ ] avaliar segundo nó;
 - [x] separar backups do host principal;
 - [x] testar recuperação dos dados e aplicações em VM isolada;
-- [ ] medir reconstrução integral a partir de uma VM limpa, incluindo dependências externas;
+- [x] medir reconstrução integral a partir de uma VM limpa, incluindo dependências externas;
 - [ ] avaliar proxy e DNS de contingência;
 - [ ] definir estratégia de alta disponibilidade orientada por requisitos de RTO, RPO e criticidade.

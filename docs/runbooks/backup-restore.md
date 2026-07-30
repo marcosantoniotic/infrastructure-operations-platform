@@ -191,6 +191,21 @@ importação dos bancos, restauração dos dados persistentes e testes HTTP 200
 através do Traefik. O workflow repetido completo, incluindo preparação e
 verificação do repositório, terminou em 114 segundos.
 
+No mesmo dia, a reconstrução integral foi exercitada a partir de uma VM RHEL
+nova e não provisionada. Após o registro externo do sistema, a automação
+reconstruiu todos os serviços e restaurou 106,612 MiB do snapshot criptografado.
+A execução automatizada final levou 441 segundos, dos quais 88 segundos
+corresponderam à restauração e validação dos dados. Medido desde a autorização
+original, incluindo registro e reruns corretivos, o serviço utilizável foi
+recuperado em 35 minutos e 28 segundos, dentro do RTO de quatro horas.
+
+O exercício revelou e corrigiu três condições: normalização CRLF dos comandos
+remotos enviados a partir do Windows, período de tolerância para as migrações
+do NetBox em inicialização fria e retentativa da troca de senha administrativa
+do Zabbix durante o bootstrap. Por isso, o registro representa um exercício de
+engenharia bem-sucedido com desvios corretivos, e não uma execução limpa na
+primeira tentativa.
+
 ## Proibição
 
 Nunca armazene dumps reais, chaves, arquivos `.env`, Vault passwords ou estado
