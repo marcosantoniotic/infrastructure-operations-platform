@@ -1,0 +1,27 @@
+{
+  "schema": "http-contract-v1",
+  "defaults": {
+    "timeout_seconds": 5,
+    "follow_redirects": false,
+    "tls_insecure": false
+  },
+  "endpoints": [
+    {
+      "name": "fixture-ok",
+      "url": "http://localhost:18080/ok",
+      "expected_status_codes": [200],
+      "required_headers": [
+        {"name": "x-content-type-options", "pattern": "^nosniff$"}
+      ]
+    },
+    {
+      "name": "fixture-redirect",
+      "url": "http://localhost:18080/redirect",
+      "expected_status_codes": [302],
+      "expected_location_pattern": "^https://example[.]invalid/",
+      "required_headers": [
+        {"name": "x-content-type-options", "pattern": "^nosniff$"}
+      ]
+    }
+  ]
+}

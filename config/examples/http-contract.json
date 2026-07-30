@@ -1,0 +1,46 @@
+{
+  "schema": "http-contract-v1",
+  "defaults": {
+    "timeout_seconds": 15,
+    "follow_redirects": false,
+    "tls_insecure": true
+  },
+  "endpoints": [
+    {
+      "name": "netbox-login",
+      "url": "https://netbox.localhost:8443/login/",
+      "expected_status_codes": [200, 302],
+      "required_headers": [
+        {"name": "strict-transport-security", "pattern": ".+"},
+        {"name": "x-content-type-options", "pattern": "^nosniff$"}
+      ]
+    },
+    {
+      "name": "zabbix-web",
+      "url": "https://zabbix.localhost:8443/",
+      "expected_status_codes": [200, 302],
+      "required_headers": [
+        {"name": "strict-transport-security", "pattern": ".+"},
+        {"name": "x-content-type-options", "pattern": "^nosniff$"}
+      ]
+    },
+    {
+      "name": "grafana-login",
+      "url": "https://grafana.localhost:8443/login",
+      "expected_status_codes": [200, 302],
+      "required_headers": [
+        {"name": "strict-transport-security", "pattern": ".+"},
+        {"name": "x-content-type-options", "pattern": "^nosniff$"}
+      ]
+    },
+    {
+      "name": "portainer",
+      "url": "https://portainer.localhost:8443/",
+      "expected_status_codes": [200, 302],
+      "required_headers": [
+        {"name": "strict-transport-security", "pattern": ".+"},
+        {"name": "x-content-type-options", "pattern": "^nosniff$"}
+      ]
+    }
+  ]
+}

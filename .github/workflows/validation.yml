@@ -93,6 +93,23 @@ jobs:
             exit 1
           fi
 
+      - name: Validate HTTP 200 and 302 contracts
+        shell: bash
+        run: |
+          python scripts/fixtures/http-contract-server.py &
+          fixture_pid=$!
+          trap 'kill "$fixture_pid"' EXIT
+          for attempt in {1..10}; do
+            curl --silent --fail http://localhost:18080/ok && break
+            sleep 1
+          done
+          pwsh ./scripts/Test-HttpContract.ps1 \
+            -ContractPath scripts/fixtures/http-contract.json \
+            -EvidencePath /tmp/http-contract-evidence.json
+          jq -e \
+            '.passed == true and (.endpoints | length) == 2' \
+            /tmp/http-contract-evidence.json
+
   service-artifacts:
     name: Ansible, Compose and Prometheus validation
     runs-on: ubuntu-latest
