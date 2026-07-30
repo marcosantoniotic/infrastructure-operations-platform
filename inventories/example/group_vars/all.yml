@@ -114,6 +114,17 @@ zabbix_backup_mysql_image: mysql:8.4.10-oraclelinux9
 zabbix_backup_run_now: false
 zabbix_backup_verify_restore: false
 
+# Observability backup
+observability_backup_project_dir: /opt/observability
+observability_backup_root: /var/backups/infrastructure-platform/observability
+observability_backup_retention_days: 14
+observability_backup_schedule: "*-*-* 03:45:00"
+observability_backup_prometheus_image: prom/prometheus:v3.13.1
+observability_backup_grafana_image: grafana/grafana:13.1.1
+observability_backup_helper_image: alpine:3.23.3
+observability_backup_run_now: false
+observability_backup_verify_restore: false
+
 # Encrypted external backup (OneDrive through rclone)
 external_backup_enabled: false
 external_backup_repository: "rclone:onedrive:infrastructure-operations-platform/restic"
@@ -125,6 +136,10 @@ external_backup_keep_daily: 14
 external_backup_keep_weekly: 8
 external_backup_keep_monthly: 3
 external_backup_run_now: false
+external_backup_sources:
+  - /var/backups/infrastructure-platform/netbox
+  - /var/backups/infrastructure-platform/zabbix
+  - /var/backups/infrastructure-platform/observability
 
 # Portainer container management
 portainer_project_dir: /opt/portainer

@@ -1,0 +1,7 @@
+---
+- name: Configure and validate observability backups
+  hosts: platform
+  gather_facts: true
+  become: true
+  roles:
+    - role: observability_backup

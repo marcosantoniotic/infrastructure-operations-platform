@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Grafana and Prometheus backup schedule
+
+[Timer]
+OnCalendar={{ observability_backup_schedule }}
+Persistent=true
+RandomizedDelaySec=15m
+Unit=observability-backup.service
+
+[Install]
+WantedBy=timers.target

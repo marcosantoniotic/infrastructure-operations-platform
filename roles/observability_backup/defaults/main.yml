@@ -1,0 +1,13 @@
+---
+observability_backup_project_dir: /opt/observability
+observability_backup_root: /var/backups/infrastructure-platform/observability
+observability_backup_retention_days: 14
+observability_backup_schedule: "*-*-* 03:45:00"
+observability_backup_prometheus_service: prometheus
+observability_backup_grafana_service: grafana
+observability_backup_prometheus_image: prom/prometheus:v3.13.1
+observability_backup_grafana_image: grafana/grafana:13.1.1
+observability_backup_helper_image: alpine:3.23.3
+observability_backup_run_now: false
+observability_backup_verify_restore: false
+observability_backup_metrics_dir: /var/lib/node_exporter/textfile_collector

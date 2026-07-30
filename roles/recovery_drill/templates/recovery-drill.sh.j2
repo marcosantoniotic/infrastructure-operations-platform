@@ -11,6 +11,8 @@ readonly EXPECTED_HOSTNAME="{{ recovery_drill_expected_hostname }}"
 readonly RESTORE_ROOT="{{ recovery_drill_restore_root }}"
 readonly NETBOX_PROJECT="{{ recovery_drill_netbox_project_dir }}"
 readonly ZABBIX_PROJECT="{{ recovery_drill_zabbix_project_dir }}"
+readonly OBSERVABILITY_PROJECT="{{ recovery_drill_observability_project_dir }}"
+readonly HELPER_IMAGE="{{ recovery_drill_helper_image }}"
 readonly STARTED_AT="$(date +%s)"
 
 [[ "$(hostname -s)" == "$EXPECTED_HOSTNAME" ]] || {
@@ -29,17 +31,21 @@ restic restore latest --verify --target "$RESTORE_ROOT"
 
 readonly NETBOX_ROOT="${RESTORE_ROOT}/var/backups/infrastructure-platform/netbox"
 readonly ZABBIX_ROOT="${RESTORE_ROOT}/var/backups/infrastructure-platform/zabbix"
+readonly OBSERVABILITY_ROOT="${RESTORE_ROOT}/var/backups/infrastructure-platform/observability"
 NETBOX_SET="$(find "$NETBOX_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' -printf '%f\n' | sort | tail -n 1)"
 ZABBIX_SET="$(find "$ZABBIX_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' -printf '%f\n' | sort | tail -n 1)"
-[[ -n "$NETBOX_SET" && -n "$ZABBIX_SET" ]] || {
-  printf 'Recovery snapshot does not contain both required backup sets.\n' >&2
+OBSERVABILITY_SET="$(find "$OBSERVABILITY_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' -printf '%f\n' | sort | tail -n 1)"
+[[ -n "$NETBOX_SET" && -n "$ZABBIX_SET" && -n "$OBSERVABILITY_SET" ]] || {
+  printf 'Recovery snapshot does not contain every required backup set.\n' >&2
   exit 12
 }
 readonly NETBOX_BACKUP="${NETBOX_ROOT}/${NETBOX_SET}"
 readonly ZABBIX_BACKUP="${ZABBIX_ROOT}/${ZABBIX_SET}"
+readonly OBSERVABILITY_BACKUP="${OBSERVABILITY_ROOT}/${OBSERVABILITY_SET}"
 
 (cd "$NETBOX_BACKUP" && sha256sum --check SHA256SUMS)
 (cd "$ZABBIX_BACKUP" && sha256sum --check SHA256SUMS)
+(cd "$OBSERVABILITY_BACKUP" && sha256sum --check SHA256SUMS)
 
 cd "$NETBOX_PROJECT"
 docker compose stop netbox netbox-worker netbox-housekeeping
@@ -54,6 +60,32 @@ docker compose exec -T postgres \
 docker compose run --rm --no-deps -T netbox \
   tar -C /opt/netbox/netbox/media -xzf - \
   < "${NETBOX_BACKUP}/media.tar.gz"
+docker compose up -d
+
+cd "$OBSERVABILITY_PROJECT"
+PROMETHEUS_CONTAINER="$(docker compose ps --all -q prometheus)"
+GRAFANA_CONTAINER="$(docker compose ps --all -q grafana)"
+[[ -n "$PROMETHEUS_CONTAINER" && -n "$GRAFANA_CONTAINER" ]]
+PROMETHEUS_VOLUME="$(docker inspect --format \
+  '{% raw %}{{range .Mounts}}{{if eq .Destination "/prometheus"}}{{.Name}}{{end}}{{end}}{% endraw %}' \
+  "$PROMETHEUS_CONTAINER")"
+GRAFANA_VOLUME="$(docker inspect --format \
+  '{% raw %}{{range .Mounts}}{{if eq .Destination "/var/lib/grafana"}}{{.Name}}{{end}}{{end}}{% endraw %}' \
+  "$GRAFANA_CONTAINER")"
+[[ -n "$PROMETHEUS_VOLUME" && -n "$GRAFANA_VOLUME" ]]
+docker compose stop grafana prometheus
+docker run --rm --user 0 \
+  --volume "${PROMETHEUS_VOLUME}:/prometheus" \
+  --volume "${OBSERVABILITY_BACKUP}:/backup:ro,Z" \
+  "$HELPER_IMAGE" sh -c \
+  'find /prometheus -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + &&
+   tar -xzf /backup/prometheus-data.tar.gz -C /prometheus'
+docker run --rm --user 0 \
+  --volume "${GRAFANA_VOLUME}:/var/lib/grafana" \
+  --volume "${OBSERVABILITY_BACKUP}:/backup:ro,Z" \
+  "$HELPER_IMAGE" sh -c \
+  'find /var/lib/grafana -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + &&
+   tar -xzf /backup/grafana-data.tar.gz -C /var/lib/grafana'
 docker compose up -d
 
 cd "$ZABBIX_PROJECT"
@@ -78,7 +110,12 @@ for _ in {1..60}; do
       https://netbox.localhost:8443/login/ >/dev/null 2>&1 &&
      curl -kfsS \
       --resolve 'zabbix.localhost:8443:127.0.0.1' \
-      https://zabbix.localhost:8443/ >/dev/null 2>&1; then
+      https://zabbix.localhost:8443/ >/dev/null 2>&1 &&
+     curl -kfsS \
+      --resolve 'grafana.localhost:8443:127.0.0.1' \
+      https://grafana.localhost:8443/api/health |
+      grep -q '"database"[[:space:]]*:[[:space:]]*"ok"' &&
+     curl -fsS http://127.0.0.1:9090/-/ready >/dev/null 2>&1; then
     break
   fi
   sleep 5
@@ -90,6 +127,13 @@ curl -kfsS \
 curl -kfsS \
   --resolve 'zabbix.localhost:8443:127.0.0.1' \
   https://zabbix.localhost:8443/ >/dev/null
+curl -kfsS \
+  --resolve 'grafana.localhost:8443:127.0.0.1' \
+  https://grafana.localhost:8443/api/health |
+  grep -q '"database"[[:space:]]*:[[:space:]]*"ok"'
+curl -fsS http://127.0.0.1:9090/-/ready >/dev/null
+curl -fsS http://127.0.0.1:9090/api/v1/label/__name__/values |
+  grep -q '"status":"success"'
 
 cd "$NETBOX_PROJECT"
 docker compose exec -T postgres \
@@ -113,3 +157,4 @@ printf 'recovery_status=success\n'
 printf 'recovery_duration_seconds=%s\n' "$((COMPLETED_AT - STARTED_AT))"
 printf 'netbox_backup_set=%s\n' "$NETBOX_SET"
 printf 'zabbix_backup_set=%s\n' "$ZABBIX_SET"
+printf 'observability_backup_set=%s\n' "$OBSERVABILITY_SET"

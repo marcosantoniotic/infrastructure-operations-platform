@@ -215,7 +215,7 @@ finally {
             ($completedAt - $startedAt).TotalSeconds
         )
         result = $result
-        recovered_components = @('netbox', 'zabbix')
+        recovered_components = @('netbox', 'zabbix', 'grafana', 'prometheus')
         secret_material_recorded = $false
     }
     [IO.File]::WriteAllText(

@@ -1,0 +1,229 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 0077
+
+readonly PROJECT_DIR="{{ observability_backup_project_dir }}"
+readonly BACKUP_ROOT="{{ observability_backup_root }}"
+readonly RETENTION_DAYS="{{ observability_backup_retention_days }}"
+readonly PROMETHEUS_SERVICE="{{ observability_backup_prometheus_service }}"
+readonly GRAFANA_SERVICE="{{ observability_backup_grafana_service }}"
+readonly PROMETHEUS_IMAGE="{{ observability_backup_prometheus_image }}"
+readonly GRAFANA_IMAGE="{{ observability_backup_grafana_image }}"
+readonly HELPER_IMAGE="{{ observability_backup_helper_image }}"
+readonly METRICS_DIR="{{ observability_backup_metrics_dir }}"
+readonly METRICS_FILE="${METRICS_DIR}/observability_backup.prom"
+
+write_metrics() {
+  local run_success="$1" success_timestamp="${2:-}"
+  local temporary="${METRICS_FILE}.$$"
+  install -d -m 0755 "$METRICS_DIR"
+  {
+    printf '# HELP infrastructure_backup_last_run_success Whether the last backup execution succeeded.\n'
+    printf '# TYPE infrastructure_backup_last_run_success gauge\n'
+    printf 'infrastructure_backup_last_run_success{service="observability"} %s\n' "$run_success"
+    if [[ -n "$success_timestamp" ]]; then
+      printf '# HELP infrastructure_backup_last_success_timestamp_seconds Unix timestamp of the last successful backup.\n'
+      printf '# TYPE infrastructure_backup_last_success_timestamp_seconds gauge\n'
+      printf 'infrastructure_backup_last_success_timestamp_seconds{service="observability"} %s\n' "$success_timestamp"
+    elif [[ -f "$METRICS_FILE" ]]; then
+      grep '^infrastructure_backup_last_success_timestamp_seconds' \
+        "$METRICS_FILE" || true
+    fi
+  } > "$temporary"
+  chmod 0644 "$temporary"
+  mv -f -- "$temporary" "$METRICS_FILE"
+}
+
+log() {
+  logger -t observability-backup -- "$*"
+  printf '%s\n' "$*"
+}
+
+latest_backup() {
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' \
+    -printf '%f\n' | sort | tail -n 1
+}
+
+wait_for_service() {
+  local service="$1" url="$2"
+  for _ in {1..60}; do
+    if docker compose exec -T "$service" \
+      wget --quiet --spider "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+create_backup() {
+  local timestamp staging final prometheus_container grafana_container
+  local prometheus_volume grafana_volume
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  staging="${BACKUP_ROOT}/.${timestamp}.partial"
+  final="${BACKUP_ROOT}/${timestamp}"
+  install -d -m 0700 "$staging"
+  cd "$PROJECT_DIR"
+
+  prometheus_container="$(docker compose ps --all -q "$PROMETHEUS_SERVICE")"
+  grafana_container="$(docker compose ps --all -q "$GRAFANA_SERVICE")"
+  [[ -n "$prometheus_container" && -n "$grafana_container" ]]
+  prometheus_volume="$(docker inspect --format \
+    '{% raw %}{{range .Mounts}}{{if eq .Destination "/prometheus"}}{{.Name}}{{end}}{{end}}{% endraw %}' \
+    "$prometheus_container")"
+  grafana_volume="$(docker inspect --format \
+    '{% raw %}{{range .Mounts}}{{if eq .Destination "/var/lib/grafana"}}{{.Name}}{{end}}{{end}}{% endraw %}' \
+    "$grafana_container")"
+  [[ -n "$prometheus_volume" && -n "$grafana_volume" ]]
+
+  recover_services() {
+    cd "$PROJECT_DIR"
+    docker compose up --detach "$PROMETHEUS_SERVICE" "$GRAFANA_SERVICE" \
+      >/dev/null 2>&1 || true
+  }
+  cleanup_partial() {
+    recover_services
+    rm -rf -- "$staging"
+    write_metrics 0
+  }
+  trap cleanup_partial ERR INT TERM
+
+  docker compose stop "$GRAFANA_SERVICE" "$PROMETHEUS_SERVICE" >/dev/null
+  docker run --rm --user 0 --volume "${prometheus_volume}:/prometheus" \
+    --entrypoint tar "$HELPER_IMAGE" \
+    -C /prometheus -czf - . > "${staging}/prometheus-data.tar.gz"
+  docker run --rm --user 0 --volume "${grafana_volume}:/var/lib/grafana" \
+    --entrypoint tar "$HELPER_IMAGE" \
+    -C /var/lib/grafana -czf - . > "${staging}/grafana-data.tar.gz"
+
+  recover_services
+  wait_for_service "$PROMETHEUS_SERVICE" http://127.0.0.1:9090/-/ready
+  wait_for_service "$GRAFANA_SERVICE" http://127.0.0.1:3000/api/health
+
+  install -m 0600 "${PROJECT_DIR}/compose.yaml" "${staging}/compose.yaml"
+  {
+    printf 'created_utc=%s\n' "$timestamp"
+    printf 'format=observability-platform-backup-v1\n'
+    printf 'prometheus_image=%s\n' "$PROMETHEUS_IMAGE"
+    printf 'grafana_image=%s\n' "$GRAFANA_IMAGE"
+  } > "${staging}/metadata.txt"
+
+  (
+    cd "$staging"
+    sha256sum prometheus-data.tar.gz grafana-data.tar.gz \
+      compose.yaml metadata.txt > SHA256SUMS
+  )
+  mv -- "$staging" "$final"
+  trap - ERR INT TERM
+  write_metrics 1 "$(date +%s)"
+
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' \
+    -mtime "+${RETENTION_DAYS}" -exec rm -rf -- {} +
+  log "Observability backup completed: ${final}"
+}
+
+verify_backup() {
+  local selected directory suffix prometheus_container grafana_container
+  local prometheus_volume grafana_volume prometheus_config
+  selected="${1:-$(latest_backup)}"
+  if [[ -z "$selected" ]]; then
+    log "No observability backup is available for verification."
+    exit 1
+  fi
+  directory="${BACKUP_ROOT}/${selected}"
+  [[ -d "$directory" ]] || {
+    log "Backup directory does not exist: ${directory}"
+    exit 1
+  }
+
+  (
+    cd "$directory"
+    sha256sum --check SHA256SUMS
+  )
+  tar -tzf "${directory}/prometheus-data.tar.gz" >/dev/null
+  tar -tzf "${directory}/grafana-data.tar.gz" >/dev/null
+
+  suffix="${RANDOM}-$$"
+  prometheus_container="prometheus-restore-check-${suffix}"
+  grafana_container="grafana-restore-check-${suffix}"
+  prometheus_volume="prometheus-restore-check-${suffix}"
+  grafana_volume="grafana-restore-check-${suffix}"
+  prometheus_config="/var/tmp/prometheus-restore-check-${suffix}.yml"
+
+  cleanup_verification() {
+    docker rm -f "$prometheus_container" "$grafana_container" \
+      >/dev/null 2>&1 || true
+    docker volume rm "$prometheus_volume" "$grafana_volume" \
+      >/dev/null 2>&1 || true
+    rm -f -- "$prometheus_config"
+  }
+  trap cleanup_verification EXIT INT TERM
+
+  docker volume create "$prometheus_volume" >/dev/null
+  docker volume create "$grafana_volume" >/dev/null
+  docker run --rm --user 0 \
+    --volume "${prometheus_volume}:/restore" \
+    --volume "${directory}:/backup:ro,Z" \
+    "$HELPER_IMAGE" \
+    tar -xzf /backup/prometheus-data.tar.gz -C /restore
+  docker run --rm --user 0 \
+    --volume "${grafana_volume}:/restore" \
+    --volume "${directory}:/backup:ro,Z" \
+    "$HELPER_IMAGE" \
+    tar -xzf /backup/grafana-data.tar.gz -C /restore
+
+  printf '%s\n' \
+    'global:' \
+    '  scrape_interval: 1m' \
+    > "$prometheus_config"
+  chmod 0644 "$prometheus_config"
+  docker run --detach --name "$prometheus_container" \
+    --volume "${prometheus_volume}:/prometheus" \
+    --volume "${prometheus_config}:/etc/prometheus/restore.yml:ro,Z" \
+    "$PROMETHEUS_IMAGE" \
+    --config.file=/etc/prometheus/restore.yml \
+    --storage.tsdb.path=/prometheus >/dev/null
+  docker run --detach --name "$grafana_container" \
+    --volume "${grafana_volume}:/var/lib/grafana" \
+    --env GF_ANALYTICS_REPORTING_ENABLED=false \
+    --env GF_ANALYTICS_CHECK_FOR_UPDATES=false \
+    "$GRAFANA_IMAGE" >/dev/null
+
+  for _ in {1..60}; do
+    if docker exec "$prometheus_container" \
+      wget --quiet --spider http://127.0.0.1:9090/-/ready \
+      >/dev/null 2>&1 &&
+      docker exec "$grafana_container" \
+        wget --quiet --spider http://127.0.0.1:3000/api/health \
+        >/dev/null 2>&1; then
+      break
+    fi
+    sleep 2
+  done
+  docker exec "$prometheus_container" \
+    wget --quiet --spider http://127.0.0.1:9090/-/ready
+  docker exec "$prometheus_container" \
+    wget --quiet --output-document=- \
+      http://127.0.0.1:9090/api/v1/label/__name__/values \
+    | grep -q '"status":"success"'
+  docker exec "$grafana_container" \
+    wget --quiet --output-document=- http://127.0.0.1:3000/api/health \
+    | grep -q '"database"[[:space:]]*:[[:space:]]*"ok"'
+
+  cleanup_verification
+  trap - EXIT INT TERM
+  log "Observability isolated restore verified: ${directory}"
+}
+
+case "${1:-backup}" in
+  backup)
+    create_backup
+    ;;
+  verify)
+    verify_backup "${2:-}"
+    ;;
+  *)
+    printf 'Usage: %s {backup|verify [TIMESTAMP]}\n' "$0" >&2
+    exit 2
+    ;;
+esac

@@ -78,6 +78,34 @@ O banco ativo não é interrompido ou alterado.
 | Portainer | volume de dados |
 | Host | arquivos de serviço, timers, firewall e documentação |
 
+## Grafana e Prometheus
+
+O timer `observability-backup.timer` produz diariamente:
+
+```text
+/var/backups/infrastructure-platform/observability/<UTC_TIMESTAMP>/
+|-- grafana-data.tar.gz
+|-- prometheus-data.tar.gz
+|-- compose.yaml
+|-- metadata.txt
+`-- SHA256SUMS
+```
+
+Comandos operacionais:
+
+```bash
+sudo systemctl status observability-backup.timer
+sudo systemctl start observability-backup.service
+sudo journalctl -u observability-backup.service
+sudo /usr/local/sbin/observability-backup verify
+```
+
+Grafana e Prometheus são encerrados de forma limpa somente durante a cópia
+consistente de seus volumes e são reiniciados imediatamente. A validação cria
+volumes e containers descartáveis, restaura os dois arquivos e verifica as APIs
+de saúde e o banco do Grafana. O conjunto é então incluído na réplica Restic
+criptografada.
+
 ## Política
 
 - backup local diário;
@@ -205,6 +233,13 @@ do NetBox em inicialização fria e retentativa da troca de senha administrativa
 do Zabbix durante o bootstrap. Por isso, o registro representa um exercício de
 engenharia bem-sucedido com desvios corretivos, e não uma execução limpa na
 primeira tentativa.
+
+Em uma extensão do exercício, o snapshot criptografado `ce35e743` incluiu o
+estado do Grafana e a TSDB do Prometheus. O Restic restaurou e verificou 84
+arquivos e diretórios (288,223 MiB), e 13 manifestos históricos SHA-256 foram
+validados. A VM isolada substituiu os quatro conjuntos de dados, confirmou os
+bancos do NetBox, Zabbix e Grafana, carregou checkpoint e WAL do Prometheus e
+concluiu a recuperação das aplicações em 107 segundos.
 
 ## Proibição
 
