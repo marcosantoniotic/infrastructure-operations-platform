@@ -70,7 +70,10 @@ services:
   netbox:
     <<: *netbox-common
     ports:
-      - "{{ netbox_bind_address }}:{{ netbox_http_port }}:8080"
+      - target: 8080
+        published: "{{ netbox_http_port }}"
+        host_ip: "{{ netbox_bind_address }}"
+        protocol: tcp
     volumes:
       - media_data:/opt/netbox/netbox/media
 {% if netbox_enable_traefik %}

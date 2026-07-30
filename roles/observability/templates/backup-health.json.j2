@@ -132,15 +132,70 @@
       "targets": [{"expr": "sum(ALERTS{alertname=~\"PlatformBackupFailed|PlatformBackupStale|ExternalBackupFailed|ExternalBackupStale\",alertstate=\"firing\"}) or vector(0)", "legendFormat": "alertas", "refId": "A"}],
       "title": "Alertas de proteção de dados",
       "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [{"options": {"0": {"color": "red", "text": "FALHA"}, "1": {"color": "green", "text": "CONCLUÍDA"}}, "type": "value"}],
+          "noValue": "SEM EXECUÇÃO",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 20},
+      "id": 8,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "infrastructure_maintenance_last_run_success", "legendFormat": "manutenção", "refId": "A"}],
+      "title": "Janela mensal — resultado",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "noValue": "SEM EXECUÇÃO",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 31}, {"color": "red", "value": 45}]},
+          "unit": "d"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 20},
+      "id": 9,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "(time() - infrastructure_maintenance_last_success_timestamp_seconds) / 86400", "legendFormat": "dias", "refId": "A"}],
+      "title": "Janela mensal — idade",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "decimals": 0,
+          "noValue": "SEM EXECUÇÃO",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1800}, {"color": "red", "value": 3600}]},
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 6, "w": 8, "x": 16, "y": 20},
+      "id": 10,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}},
+      "targets": [{"expr": "infrastructure_maintenance_last_run_duration_seconds", "legendFormat": "duração", "refId": "A"}],
+      "title": "Janela mensal — duração",
+      "type": "stat"
     }
   ],
   "refresh": "30s",
   "schemaVersion": 41,
-  "tags": ["infrastructure", "backup", "recovery", "onedrive", "restic"],
+  "tags": ["infrastructure", "backup", "recovery", "maintenance", "onedrive", "restic"],
   "templating": {"list": []},
   "time": {"from": "now-24h", "to": "now"},
   "timezone": "browser",
-  "title": "Infrastructure Operations — Backup Health",
+  "title": "Infrastructure Operations — Backup & Maintenance Health",
   "uid": "backup-health",
-  "version": 2
+  "version": 3
 }

@@ -5,7 +5,7 @@ docker_packages:
   - docker-ce-cli
   - containerd.io
   - docker-buildx-plugin
-  - docker-compose-plugin
+docker_compose_package: docker-compose-plugin-2.40.3-1.el9
 docker_users: []
 docker_daemon_config:
   log-driver: json-file

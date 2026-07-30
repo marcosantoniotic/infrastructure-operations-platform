@@ -166,15 +166,42 @@
     wait_timeout: 420
   when: not ansible_check_mode
 
-- name: Recreate configuration consumers after atomic file replacement
+- name: Inspect Prometheus local port publication
   ansible.builtin.command:
     cmd: >-
       docker compose --project-directory {{ observability_project_dir }}
-      up --detach --force-recreate prometheus blackbox-exporter
+      port prometheus 9090
+  register: observability_prometheus_published_port
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Inspect Grafana local port publication
+  ansible.builtin.command:
+    cmd: >-
+      docker compose --project-directory {{ observability_project_dir }}
+      port grafana 3000
+  register: observability_grafana_published_port
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Recreate configuration consumers after atomic file replacement
+  ansible.builtin.shell:
+    cmd: |
+      set -o errexit -o nounset -o pipefail
+      docker compose --project-directory {{ observability_project_dir }} \
+        rm --stop --force grafana prometheus blackbox-exporter
+      docker compose --project-directory {{ observability_project_dir }} \
+        up --detach prometheus blackbox-exporter grafana
+    executable: /bin/bash
   changed_when: true
   when:
     - not ansible_check_mode
-    - observability_rendered_configuration.changed
+    - >-
+      observability_rendered_configuration.changed or
+      observability_prometheus_published_port.stdout | trim | length == 0 or
+      observability_grafana_published_port.stdout | trim | length == 0
 
 - name: Reload Blackbox Exporter configuration
   ansible.builtin.command:
@@ -184,24 +211,24 @@
   changed_when: false
   when: not ansible_check_mode
 
+- name: Wait for Prometheus readiness before reload
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/-/ready
+    method: GET
+    status_code: 200
+  register: observability_prometheus_pre_reload_ready
+  retries: 30
+  delay: 5
+  until: observability_prometheus_pre_reload_ready.status == 200
+  when: not ansible_check_mode
+
 - name: Reload Prometheus configuration
   ansible.builtin.uri:
     url: >-
       http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/-/reload
     method: POST
     status_code: 200
-  when: not ansible_check_mode
-
-- name: Wait for Prometheus readiness
-  ansible.builtin.uri:
-    url: >-
-      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/-/ready
-    method: GET
-    status_code: 200
-  register: observability_prometheus_ready
-  retries: 30
-  delay: 5
-  until: observability_prometheus_ready.status == 200
   when: not ansible_check_mode
 
 - name: Validate all Prometheus scrape targets

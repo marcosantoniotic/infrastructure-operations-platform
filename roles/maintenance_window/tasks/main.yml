@@ -1,0 +1,224 @@
+---
+- name: Require explicit maintenance authorization
+  ansible.builtin.assert:
+    that:
+      - maintenance_authorized | bool
+      - maintenance_change_reference | string | length > 0
+      - maintenance_minimum_free_mb | int >= 1024
+      - maintenance_evidence_dir.startswith("/")
+      - maintenance_metrics_dir.startswith("/")
+    fail_msg: >-
+      Set maintenance_authorized=true and provide a change reference before
+      running the maintenance workflow.
+
+- name: Record maintenance start
+  ansible.builtin.set_fact:
+    maintenance_started_epoch: "{{ ansible_facts.date_time.epoch | int }}"
+    maintenance_started_utc: "{{ ansible_facts.date_time.iso8601 }}"
+
+- name: Create Node Exporter textfile collector directory before maintenance
+  ansible.builtin.file:
+    path: "{{ maintenance_metrics_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Mark maintenance execution as incomplete
+  ansible.builtin.shell:
+    cmd: |
+      set -o errexit -o nounset -o pipefail
+      target="{{ maintenance_metrics_dir }}/maintenance.prom"
+      temporary="${target}.$$"
+      {
+        printf '%s\n' \
+          '# HELP infrastructure_maintenance_last_run_success Whether the latest maintenance completed successfully.' \
+          '# TYPE infrastructure_maintenance_last_run_success gauge' \
+          'infrastructure_maintenance_last_run_success 0'
+        if [[ -f "$target" ]]; then
+          grep '^# HELP infrastructure_maintenance_last_success_timestamp_seconds' \
+            "$target" || true
+          grep '^# TYPE infrastructure_maintenance_last_success_timestamp_seconds' \
+            "$target" || true
+          grep '^infrastructure_maintenance_last_success_timestamp_seconds' \
+            "$target" || true
+        fi
+      } > "$temporary"
+      chmod 0644 "$temporary"
+      mv -f -- "$temporary" "$target"
+    executable: /bin/bash
+  changed_when: true
+
+- name: Validate required backup utilities
+  ansible.builtin.stat:
+    path: "{{ item.command.split(' ')[0] }}"
+  loop: "{{ maintenance_backup_commands }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: maintenance_backup_utilities
+
+- name: Require every local backup utility
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.executable
+    fail_msg: "Required backup utility is unavailable: {{ item.item.name }}"
+  loop: "{{ maintenance_backup_utilities.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+
+- name: Read root filesystem capacity
+  ansible.builtin.set_fact:
+    maintenance_root_mount: >-
+      {{ ansible_facts.mounts
+         | selectattr('mount', 'equalto', '/')
+         | list
+         | first }}
+
+- name: Require minimum free capacity
+  ansible.builtin.assert:
+    that:
+      - (maintenance_root_mount.size_available | int / 1024 / 1024) >=
+        maintenance_minimum_free_mb | int
+    fail_msg: >-
+      Insufficient free capacity for maintenance. At least
+      {{ maintenance_minimum_free_mb }} MiB is required.
+
+- name: Capture pre-maintenance container state
+  ansible.builtin.command:
+    cmd: docker ps --format {% raw %}'{{.Names}}|{{.Status}}|{{.Image}}'{% endraw %}
+  register: maintenance_containers_before
+  changed_when: false
+
+- name: Create mandatory recovery points
+  ansible.builtin.command:
+    cmd: "{{ item.command }}"
+  loop: "{{ maintenance_backup_commands }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: maintenance_backup_results
+  changed_when: true
+
+- name: Replicate recovery points externally when requested
+  ansible.builtin.command:
+    cmd: /usr/local/sbin/external-backup
+  register: maintenance_external_backup_result
+  changed_when: true
+  when: maintenance_run_external_backup | bool
+
+- name: Refresh pinned container images
+  ansible.builtin.command:
+    cmd: docker compose pull
+    chdir: "{{ item }}"
+  loop: "{{ maintenance_container_projects }}"
+  register: maintenance_image_pull_results
+  changed_when: false
+  when: maintenance_refresh_container_images | bool
+
+- name: Reconcile container projects with the declared state
+  ansible.builtin.command:
+    cmd: docker compose up --detach --remove-orphans
+    chdir: "{{ item }}"
+  loop: "{{ maintenance_container_projects }}"
+  register: maintenance_compose_results
+  changed_when: false
+
+- name: Apply RHEL package updates
+  ansible.builtin.dnf:
+    name: "*"
+    state: latest
+    update_only: true
+    exclude: "{{ maintenance_update_exclude }}"
+  register: maintenance_update_result
+  when: maintenance_apply_os_updates | bool
+
+- name: Detect whether a reboot is required
+  ansible.builtin.command:
+    cmd: dnf needs-restarting -r
+  register: maintenance_reboot_probe
+  changed_when: false
+  failed_when: maintenance_reboot_probe.rc not in [0, 1]
+
+- name: Reboot after updates when required and authorized
+  ansible.builtin.reboot:
+    reboot_timeout: "{{ maintenance_reboot_timeout }}"
+    post_reboot_delay: 15
+  when:
+    - maintenance_reboot_probe.rc == 1
+    - maintenance_reboot_if_required | bool
+
+- name: Refresh facts after maintenance
+  ansible.builtin.setup:
+
+- name: Wait for application health endpoints
+  ansible.builtin.uri:
+    url: "{{ item.url }}"
+    method: GET
+    status_code: "{{ item.status_codes }}"
+    return_content: false
+    validate_certs: false
+  loop: "{{ maintenance_health_checks }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: maintenance_health_results
+  retries: 30
+  delay: 5
+  until: maintenance_health_results is succeeded
+
+- name: Detect unhealthy or stopped platform containers
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      docker ps --all --format {% raw %}'{{.Names}}|{{.Status}}'{% endraw %} |
+        awk '$0 ~ /unhealthy|Exited|Dead/ { print }'
+    executable: /bin/bash
+  register: maintenance_bad_containers
+  changed_when: false
+  failed_when: maintenance_bad_containers.stdout | length > 0
+
+- name: Create protected maintenance evidence directory
+  ansible.builtin.file:
+    path: "{{ maintenance_evidence_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Calculate maintenance completion data
+  ansible.builtin.set_fact:
+    maintenance_completed_epoch: "{{ ansible_facts.date_time.epoch | int }}"
+    maintenance_completed_utc: "{{ ansible_facts.date_time.iso8601 }}"
+
+- name: Write sanitized maintenance evidence
+  ansible.builtin.template:
+    src: maintenance-evidence.json.j2
+    dest: >-
+      {{ maintenance_evidence_dir }}/maintenance-{{
+      maintenance_started_utc | regex_replace('[^0-9]', '') }}.json
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Publish maintenance success metrics
+  ansible.builtin.template:
+    src: maintenance.prom.j2
+    dest: "{{ maintenance_metrics_dir }}/maintenance.prom"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Report maintenance result
+  ansible.builtin.debug:
+    msg:
+      change_reference: "{{ maintenance_change_reference }}"
+      started_utc: "{{ maintenance_started_utc }}"
+      completed_utc: "{{ maintenance_completed_utc }}"
+      duration_seconds: >-
+        {{ maintenance_completed_epoch | int - maintenance_started_epoch | int }}
+      os_updates_applied: "{{ maintenance_update_result is changed }}"
+      container_images_refreshed: "{{ maintenance_refresh_container_images | bool }}"
+      reboot_required: "{{ maintenance_reboot_probe.rc == 1 }}"
+      reboot_performed: >-
+        {{ maintenance_reboot_probe.rc == 1 and
+           maintenance_reboot_if_required | bool }}
+      health_checks: "{{ maintenance_health_results.results | length }}"

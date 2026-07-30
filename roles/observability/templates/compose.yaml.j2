@@ -11,7 +11,10 @@ services:
       - --storage.tsdb.wal-compression
       - --web.enable-lifecycle
     ports:
-      - "{{ observability_prometheus_bind_address }}:{{ observability_prometheus_port }}:9090"
+      - target: 9090
+        published: "{{ observability_prometheus_port }}"
+        host_ip: "{{ observability_prometheus_bind_address }}"
+        protocol: tcp
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
       - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro,Z
@@ -37,6 +40,7 @@ services:
     restart: unless-stopped
     networks:
       - metrics
+      - access
 {% if observability_enable_traefik %}
       - proxy
 {% endif %}
@@ -107,6 +111,7 @@ services:
     restart: unless-stopped
     networks:
       - metrics
+      - access
 {% if observability_enable_traefik %}
       - proxy
 {% endif %}
@@ -133,7 +138,10 @@ services:
       prometheus:
         condition: service_healthy
     ports:
-      - "{{ observability_grafana_bind_address }}:{{ observability_grafana_port }}:3000"
+      - target: 3000
+        published: "{{ observability_grafana_port }}"
+        host_ip: "{{ observability_grafana_bind_address }}"
+        protocol: tcp
     volumes:
       - ./secrets/grafana_admin_password:/run/secrets/grafana_admin_password:ro,Z
       - ./grafana/provisioning:/etc/grafana/provisioning:ro,Z
@@ -166,6 +174,7 @@ services:
     restart: unless-stopped
     networks:
       - metrics
+      - access
 {% if observability_enable_traefik %}
       - proxy
 {% endif %}
@@ -174,6 +183,8 @@ networks:
   metrics:
     driver: bridge
     internal: true
+  access:
+    driver: bridge
 {% if observability_enable_traefik %}
   proxy:
     name: {{ observability_traefik_network }}

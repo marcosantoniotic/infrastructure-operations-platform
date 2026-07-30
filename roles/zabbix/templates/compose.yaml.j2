@@ -43,7 +43,10 @@ services:
       mysql:
         condition: service_healthy
     ports:
-      - "{{ zabbix_server_bind_address }}:{{ zabbix_server_port }}:10051"
+      - target: 10051
+        published: "{{ zabbix_server_port }}"
+        host_ip: "{{ zabbix_server_bind_address }}"
+        protocol: tcp
     volumes:
       - ./secrets/zabbix_database_password:/run/secrets/zabbix_database_password:ro,Z
       - ./secrets/zabbix_database_root_password:/run/secrets/zabbix_database_root_password:ro,Z
@@ -78,7 +81,10 @@ services:
       zabbix-server:
         condition: service_healthy
     ports:
-      - "{{ zabbix_web_bind_address }}:{{ zabbix_web_port }}:8080"
+      - target: 8080
+        published: "{{ zabbix_web_port }}"
+        host_ip: "{{ zabbix_web_bind_address }}"
+        protocol: tcp
     healthcheck:
       test:
         - CMD-SHELL

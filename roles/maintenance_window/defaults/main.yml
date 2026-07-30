@@ -1,0 +1,42 @@
+---
+maintenance_authorized: false
+maintenance_change_reference: "validation"
+maintenance_apply_os_updates: true
+maintenance_update_exclude:
+  - docker-compose-plugin*
+maintenance_refresh_container_images: false
+maintenance_reboot_if_required: true
+maintenance_reboot_timeout: 900
+maintenance_minimum_free_mb: 4096
+maintenance_run_external_backup: false
+maintenance_evidence_dir: /var/log/infrastructure-platform/maintenance
+maintenance_metrics_dir: /var/lib/node_exporter/textfile_collector
+maintenance_backup_commands:
+  - name: netbox
+    command: /usr/local/sbin/netbox-backup backup
+  - name: zabbix
+    command: /usr/local/sbin/zabbix-backup backup
+  - name: observability
+    command: /usr/local/sbin/observability-backup backup
+maintenance_container_projects:
+  - /opt/traefik
+  - /opt/netbox
+  - /opt/zabbix
+  - /opt/portainer
+  - /opt/observability
+maintenance_health_checks:
+  - name: netbox
+    url: http://127.0.0.1:8000/login/
+    status_codes: [200]
+  - name: zabbix
+    url: http://127.0.0.1:8081/
+    status_codes: [200, 302]
+  - name: portainer
+    url: http://127.0.0.1:9000/api/status
+    status_codes: [200]
+  - name: prometheus
+    url: http://127.0.0.1:9090/-/ready
+    status_codes: [200]
+  - name: grafana
+    url: http://127.0.0.1:3000/api/health
+    status_codes: [200]
