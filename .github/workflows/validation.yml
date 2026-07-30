@@ -43,6 +43,10 @@ jobs:
         shell: pwsh
         run: ./scripts/validate-container-images.ps1
 
+      - name: Validate container privilege policy
+        shell: pwsh
+        run: ./scripts/validate-container-privileges.ps1
+
       - name: Parse PowerShell sources
         shell: pwsh
         run: |

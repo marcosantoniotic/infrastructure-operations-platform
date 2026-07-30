@@ -29,7 +29,7 @@
 - [x] validar headers de segurança no gateway Traefik;
 - [x] restringir descoberta Docker por Socket Proxy somente leitura;
 - [x] proteger o dashboard do Traefik sem modo inseguro;
-- [ ] revisar imagens privilegiadas;
+- [x] revisar imagens privilegiadas;
 - [ ] implantar análise de dependências e imagens.
 
 ## Fase 3 — Automação
