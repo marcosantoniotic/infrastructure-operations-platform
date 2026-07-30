@@ -169,7 +169,24 @@
     status_code: 200
   register: zabbix_password_update
   changed_when: zabbix_password_update.json.result is defined
+  failed_when: false
+  retries: 10
+  delay: 3
+  until: zabbix_password_update.json.result is defined
   no_log: true
+  when:
+    - not ansible_check_mode
+    - zabbix_desired_login.json.result is not defined
+
+- name: Require successful Zabbix administrator password replacement
+  ansible.builtin.assert:
+    that:
+      - zabbix_password_update.json.result is defined
+    fail_msg: >-
+      Zabbix API rejected the administrator password replacement:
+      {{ zabbix_password_update.json.error | default(
+        {'message': 'response did not contain a JSON-RPC result'}
+      ) | to_json }}
   when:
     - not ansible_check_mode
     - zabbix_desired_login.json.result is not defined
