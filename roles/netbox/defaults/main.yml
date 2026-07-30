@@ -5,6 +5,7 @@ netbox_postgres_image: postgres:18-alpine
 netbox_valkey_image: valkey/valkey:9.0-alpine
 netbox_bind_address: 127.0.0.1
 netbox_http_port: 8000
+netbox_compose_wait_timeout: 600
 netbox_allowed_hosts:
   - localhost
 netbox_csrf_trusted_origins: []

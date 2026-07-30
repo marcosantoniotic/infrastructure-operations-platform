@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 0077
+
+export PATH=/usr/local/bin:/usr/bin:/bin
+export RESTIC_REPOSITORY="{{ recovery_drill_repository }}"
+export RESTIC_PASSWORD_FILE="{{ recovery_drill_restic_password_file }}"
+export RCLONE_CONFIG="{{ recovery_drill_rclone_config }}"
+
+readonly EXPECTED_HOSTNAME="{{ recovery_drill_expected_hostname }}"
+readonly RESTORE_ROOT="{{ recovery_drill_restore_root }}"
+readonly NETBOX_PROJECT="{{ recovery_drill_netbox_project_dir }}"
+readonly ZABBIX_PROJECT="{{ recovery_drill_zabbix_project_dir }}"
+readonly STARTED_AT="$(date +%s)"
+
+[[ "$(hostname -s)" == "$EXPECTED_HOSTNAME" ]] || {
+  printf 'Recovery refused: unexpected hostname.\n' >&2
+  exit 10
+}
+[[ "$RESTORE_ROOT" == /var/tmp/* ]] || {
+  printf 'Recovery refused: unsafe restore root.\n' >&2
+  exit 11
+}
+
+rm -rf -- "$RESTORE_ROOT"
+install -d -m 0700 "$RESTORE_ROOT"
+
+restic restore latest --verify --target "$RESTORE_ROOT"
+
+readonly NETBOX_ROOT="${RESTORE_ROOT}/var/backups/infrastructure-platform/netbox"
+readonly ZABBIX_ROOT="${RESTORE_ROOT}/var/backups/infrastructure-platform/zabbix"
+NETBOX_SET="$(find "$NETBOX_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' -printf '%f\n' | sort | tail -n 1)"
+ZABBIX_SET="$(find "$ZABBIX_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' -printf '%f\n' | sort | tail -n 1)"
+[[ -n "$NETBOX_SET" && -n "$ZABBIX_SET" ]] || {
+  printf 'Recovery snapshot does not contain both required backup sets.\n' >&2
+  exit 12
+}
+readonly NETBOX_BACKUP="${NETBOX_ROOT}/${NETBOX_SET}"
+readonly ZABBIX_BACKUP="${ZABBIX_ROOT}/${ZABBIX_SET}"
+
+(cd "$NETBOX_BACKUP" && sha256sum --check SHA256SUMS)
+(cd "$ZABBIX_BACKUP" && sha256sum --check SHA256SUMS)
+
+cd "$NETBOX_PROJECT"
+docker compose stop netbox netbox-worker netbox-housekeeping
+docker compose exec -T postgres \
+  dropdb --username netbox --force netbox
+docker compose exec -T postgres \
+  createdb --username netbox --owner netbox netbox
+docker compose exec -T postgres \
+  pg_restore --username netbox --dbname netbox \
+  --no-owner --no-privileges --exit-on-error \
+  < "${NETBOX_BACKUP}/database.dump"
+docker compose run --rm --no-deps -T netbox \
+  tar -C /opt/netbox/netbox/media -xzf - \
+  < "${NETBOX_BACKUP}/media.tar.gz"
+docker compose up -d
+
+cd "$ZABBIX_PROJECT"
+docker compose stop zabbix-web zabbix-server
+ZABBIX_ROOT_PASSWORD="$(< secrets/zabbix_database_root_password)"
+docker compose exec -T \
+  --env "MYSQL_PWD=${ZABBIX_ROOT_PASSWORD}" mysql \
+  mysql --user=root --execute \
+  "DROP DATABASE IF EXISTS zabbix;
+   CREATE DATABASE zabbix CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;"
+docker compose exec -T \
+  --env "MYSQL_PWD=${ZABBIX_ROOT_PASSWORD}" mysql \
+  mysql --user=root zabbix < "${ZABBIX_BACKUP}/database.sql"
+docker compose run --rm --no-deps -T zabbix-server \
+  tar -C / -xzf - < "${ZABBIX_BACKUP}/server-data.tar.gz"
+unset ZABBIX_ROOT_PASSWORD
+docker compose up -d
+
+for _ in {1..60}; do
+  if curl -kfsS \
+      --resolve 'netbox.localhost:8443:127.0.0.1' \
+      https://netbox.localhost:8443/login/ >/dev/null 2>&1 &&
+     curl -kfsS \
+      --resolve 'zabbix.localhost:8443:127.0.0.1' \
+      https://zabbix.localhost:8443/ >/dev/null 2>&1; then
+    break
+  fi
+  sleep 5
+done
+
+curl -kfsS \
+  --resolve 'netbox.localhost:8443:127.0.0.1' \
+  https://netbox.localhost:8443/login/ >/dev/null
+curl -kfsS \
+  --resolve 'zabbix.localhost:8443:127.0.0.1' \
+  https://zabbix.localhost:8443/ >/dev/null
+
+cd "$NETBOX_PROJECT"
+docker compose exec -T postgres \
+  psql --username netbox --dbname netbox --tuples-only \
+  --command 'SELECT COUNT(*) FROM django_migrations;' |
+  grep -Eq '[1-9][0-9]*'
+
+cd "$ZABBIX_PROJECT"
+ZABBIX_ROOT_PASSWORD="$(< secrets/zabbix_database_root_password)"
+docker compose exec -T \
+  --env "MYSQL_PWD=${ZABBIX_ROOT_PASSWORD}" mysql \
+  mysql --batch --skip-column-names --user=root zabbix \
+  --execute \
+  "SELECT COUNT(*) FROM information_schema.tables
+   WHERE table_schema='zabbix' AND table_name IN ('dbversion','hosts');" |
+  grep -qx '2'
+unset ZABBIX_ROOT_PASSWORD
+
+COMPLETED_AT="$(date +%s)"
+printf 'recovery_status=success\n'
+printf 'recovery_duration_seconds=%s\n' "$((COMPLETED_AT - STARTED_AT))"
+printf 'netbox_backup_set=%s\n' "$NETBOX_SET"
+printf 'zabbix_backup_set=%s\n' "$ZABBIX_SET"

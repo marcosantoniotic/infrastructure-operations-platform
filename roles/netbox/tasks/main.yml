@@ -88,7 +88,7 @@
     state: present
     pull: missing
     wait: true
-    wait_timeout: 300
+    wait_timeout: "{{ netbox_compose_wait_timeout }}"
   register: netbox_compose_result
 
 - name: Wait for NetBox HTTP endpoint

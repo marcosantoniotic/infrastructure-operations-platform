@@ -1,0 +1,9 @@
+---
+recovery_drill_authorized: false
+recovery_drill_expected_hostname: srv01-recovery
+recovery_drill_restore_root: /var/tmp/infrastructure-recovery-drill
+recovery_drill_repository: "rclone:onedrive:infrastructure-operations-platform/restic"
+recovery_drill_restic_password_file: /etc/infrastructure-backup/restic-password
+recovery_drill_rclone_config: /etc/infrastructure-backup/rclone.conf
+recovery_drill_netbox_project_dir: /opt/netbox
+recovery_drill_zabbix_project_dir: /opt/zabbix

@@ -1,0 +1,47 @@
+---
+- name: Require explicit recovery drill authorization
+  ansible.builtin.assert:
+    that:
+      - recovery_drill_authorized | bool
+      - inventory_hostname == "srv01-recovery"
+      - ansible_hostname == recovery_drill_expected_hostname
+      - recovery_drill_restore_root.startswith("/var/tmp/")
+      - recovery_drill_restore_root | length > 20
+    fail_msg: >-
+      Recovery is destructive to application data and is permitted only on
+      the explicitly authorized srv01-recovery host.
+
+- name: Verify required recovery tools and configuration
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /usr/local/bin/restic
+    - /usr/local/bin/rclone
+    - "{{ recovery_drill_restic_password_file }}"
+    - "{{ recovery_drill_rclone_config }}"
+    - "{{ recovery_drill_netbox_project_dir }}/compose.yaml"
+    - "{{ recovery_drill_zabbix_project_dir }}/compose.yaml"
+  register: recovery_drill_requirements
+
+- name: Require every recovery dependency
+  ansible.builtin.assert:
+    that:
+      - recovery_drill_requirements.results | map(attribute='stat.exists') | min
+    fail_msg: "The platform baseline or encrypted repository configuration is incomplete."
+
+- name: Install recovery drill utility
+  ansible.builtin.template:
+    src: recovery-drill.sh.j2
+    dest: /usr/local/sbin/infrastructure-recovery-drill
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Execute isolated platform recovery drill
+  ansible.builtin.command: /usr/local/sbin/infrastructure-recovery-drill
+  register: recovery_drill_execution
+  changed_when: true
+
+- name: Report sanitized recovery evidence
+  ansible.builtin.debug:
+    msg: "{{ recovery_drill_execution.stdout_lines }}"

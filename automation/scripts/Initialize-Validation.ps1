@@ -6,6 +6,8 @@ param(
     [Parameter(Mandatory)]
     [string]$PlatformAddress,
 
+    [string]$RecoveryAddress,
+
     [string]$IsoPath = 'D:\ISOs\rhel-9.8-x86_64-dvd.iso',
     [string]$AdminUsername = 'automation'
 )
@@ -26,7 +28,10 @@ function ConvertTo-HclString {
     return $Value.Replace('\', '/').Replace('"', '\"')
 }
 
-foreach ($address in @($ControllerAddress, $PlatformAddress)) {
+foreach ($address in @($ControllerAddress, $PlatformAddress, $RecoveryAddress)) {
+    if ([string]::IsNullOrWhiteSpace($address)) {
+        continue
+    }
     $parsedAddress = $null
     if (-not [System.Net.IPAddress]::TryParse($address, [ref]$parsedAddress)) {
         throw "Invalid validation address: $address"
@@ -92,6 +97,9 @@ $utf8WithoutBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
 $vagrantConfiguration = [ordered]@{
     controller_ip = $ControllerAddress
     platform_ip   = $PlatformAddress
+}
+if (-not [string]::IsNullOrWhiteSpace($RecoveryAddress)) {
+    $vagrantConfiguration.recovery_ip = $RecoveryAddress
 }
 $vagrantJson = $vagrantConfiguration | ConvertTo-Json
 [System.IO.File]::WriteAllText($vagrantConfigPath, $vagrantJson, $utf8WithoutBom)

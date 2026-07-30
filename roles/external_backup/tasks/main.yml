@@ -74,7 +74,15 @@
 
 - name: Create protected external backup configuration directory
   ansible.builtin.file:
-    path: /etc/infrastructure-backup
+    path: "{{ external_backup_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Create protected Restic cache directory
+  ansible.builtin.file:
+    path: "{{ external_backup_cache_dir }}"
     state: directory
     owner: root
     group: root
@@ -83,7 +91,7 @@
 - name: Install Restic repository password
   ansible.builtin.copy:
     content: "{{ external_backup_restic_password | trim }}\n"
-    dest: /etc/infrastructure-backup/restic-password
+    dest: "{{ external_backup_config_dir }}/restic-password"
     owner: root
     group: root
     mode: "0600"
@@ -92,7 +100,7 @@
 - name: Install rclone configuration
   ansible.builtin.copy:
     content: "{{ external_backup_rclone_config | trim }}\n"
-    dest: /etc/infrastructure-backup/rclone.conf
+    dest: "{{ external_backup_config_dir }}/rclone.conf"
     owner: root
     group: root
     mode: "0600"
@@ -138,8 +146,9 @@
   environment:
     PATH: /usr/local/bin:/usr/bin:/bin
     RESTIC_REPOSITORY: "{{ external_backup_repository }}"
-    RESTIC_PASSWORD_FILE: /etc/infrastructure-backup/restic-password
-    RCLONE_CONFIG: /etc/infrastructure-backup/rclone.conf
+    RESTIC_PASSWORD_FILE: "{{ external_backup_config_dir }}/restic-password"
+    RCLONE_CONFIG: "{{ external_backup_config_dir }}/rclone.conf"
+    RESTIC_CACHE_DIR: "{{ external_backup_cache_dir }}"
   register: external_backup_repository_check
   changed_when: false
   failed_when: false
@@ -150,8 +159,9 @@
   environment:
     PATH: /usr/local/bin:/usr/bin:/bin
     RESTIC_REPOSITORY: "{{ external_backup_repository }}"
-    RESTIC_PASSWORD_FILE: /etc/infrastructure-backup/restic-password
-    RCLONE_CONFIG: /etc/infrastructure-backup/rclone.conf
+    RESTIC_PASSWORD_FILE: "{{ external_backup_config_dir }}/restic-password"
+    RCLONE_CONFIG: "{{ external_backup_config_dir }}/rclone.conf"
+    RESTIC_CACHE_DIR: "{{ external_backup_cache_dir }}"
   when: external_backup_repository_check.rc == 10
   no_log: true
 
@@ -166,8 +176,8 @@
 - name: Enable external backup timer
   ansible.builtin.systemd:
     name: infrastructure-external-backup.timer
-    enabled: true
-    state: started
+    enabled: "{{ external_backup_timer_enabled | bool }}"
+    state: "{{ (external_backup_timer_enabled | bool) | ternary('started', 'stopped') }}"
 
 - name: Run external backup now
   ansible.builtin.command: /usr/local/sbin/infrastructure-external-backup

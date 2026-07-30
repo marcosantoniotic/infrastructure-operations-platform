@@ -11,11 +11,14 @@ external_backup_rclone_config_force: false
 external_backup_require_rclone: true
 external_backup_schedule: "*-*-* 04:30:00"
 external_backup_randomized_delay: 15m
+external_backup_timer_enabled: true
 external_backup_sources:
   - /var/backups/infrastructure-platform/netbox
   - /var/backups/infrastructure-platform/zabbix
 external_backup_keep_daily: 14
 external_backup_keep_weekly: 8
 external_backup_keep_monthly: 3
+external_backup_config_dir: /etc/infrastructure-backup
+external_backup_cache_dir: /var/cache/infrastructure-backup/restic
 external_backup_metrics_dir: /var/lib/node_exporter/textfile_collector
 external_backup_run_now: false

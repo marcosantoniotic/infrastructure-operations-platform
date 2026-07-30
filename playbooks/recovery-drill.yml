@@ -1,0 +1,6 @@
+---
+- name: Restore platform data in an isolated recovery environment
+  hosts: platform
+  become: true
+  roles:
+    - role: recovery_drill

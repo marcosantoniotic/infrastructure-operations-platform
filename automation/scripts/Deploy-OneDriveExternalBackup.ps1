@@ -104,7 +104,7 @@ try {
         $utf8
     )
 
-    & ssh.exe @sshOptions $controller @"
+    $remoteCommand = @"
 set -eu
 install -d -m 0755 \
   $remoteRoot/playbooks \
@@ -112,7 +112,8 @@ install -d -m 0755 \
   $remoteRoot/inventories/validation/group_vars/all
 sudo rm -rf $remoteRoot/roles/external_backup
 sudo chown -R automation:automation $remoteRoot
-"@
+"@ -replace "`r`n", "`n"
+    & ssh.exe @sshOptions $controller $remoteCommand
     if ($LASTEXITCODE -ne 0) {
         throw 'Failed to prepare the automation controller.'
     }
@@ -122,7 +123,7 @@ sudo chown -R automation:automation $remoteRoot
         throw 'Failed to transfer the temporary Vault source.'
     }
 
-    & ssh.exe @sshOptions $controller @"
+    $remoteCommand = @"
 set -eu
 chmod 0600 /home/automation/external-backup-vault.tmp.yml
 ansible-vault encrypt \
@@ -131,7 +132,8 @@ ansible-vault encrypt \
   /home/automation/external-backup-vault.tmp.yml
 rm -f /home/automation/external-backup-vault.tmp.yml
 chmod 0600 $remoteRoot/inventories/validation/group_vars/all/external-backup-vault.yml
-"@
+"@ -replace "`r`n", "`n"
+    & ssh.exe @sshOptions $controller $remoteCommand
     if ($LASTEXITCODE -ne 0) {
         throw 'Failed to create the encrypted Ansible Vault file.'
     }
@@ -152,7 +154,7 @@ chmod 0600 $remoteRoot/inventories/validation/group_vars/all/external-backup-vau
         throw 'Failed to stage the external backup role.'
     }
 
-    & ssh.exe @sshOptions $controller @"
+    $remoteCommand = @"
 set -eu
 cd $remoteRoot
 ANSIBLE_ROLES_PATH=$remoteRoot/roles ansible-playbook \
@@ -160,26 +162,29 @@ ANSIBLE_ROLES_PATH=$remoteRoot/roles ansible-playbook \
   -i inventories/validation/hosts.yml \
   playbooks/external-backup.yml \
   -e external_backup_run_now=true
-"@
+"@ -replace "`r`n", "`n"
+    & ssh.exe @sshOptions $controller $remoteCommand
     if ($LASTEXITCODE -ne 0) {
         throw 'The OneDrive external backup deployment failed.'
     }
 
-    & ssh.exe @sshOptions $controller @"
+    $remoteCommand = @"
 set -eu
 ssh -o BatchMode=yes -o StrictHostKeyChecking=no automation@$($configuration.platform_ip) \
   'sudo env PATH=/usr/local/bin:/usr/bin:/bin RESTIC_REPOSITORY=rclone:onedrive:infrastructure-operations-platform/restic RESTIC_PASSWORD_FILE=/etc/infrastructure-backup/restic-password RCLONE_CONFIG=/etc/infrastructure-backup/rclone.conf /usr/local/bin/restic snapshots --compact && sudo grep -Eq infrastructure_external_backup_last_run_success.*[[:space:]]1$ /var/lib/node_exporter/textfile_collector/external_backup.prom && sudo systemctl is-enabled --quiet infrastructure-external-backup.timer && sudo systemctl is-active --quiet infrastructure-external-backup.timer'
-"@
+"@ -replace "`r`n", "`n"
+    & ssh.exe @sshOptions $controller $remoteCommand
     if ($LASTEXITCODE -ne 0) {
         throw 'Snapshot, metric, or timer validation failed.'
     }
 
     if (-not $SkipRestore) {
-        & ssh.exe @sshOptions $controller @"
+        $remoteCommand = @"
 set -eu
 ssh -o BatchMode=yes -o StrictHostKeyChecking=no automation@$($configuration.platform_ip) \
   'sudo rm -rf /var/tmp/infrastructure-external-backup-restore-validation && sudo install -d -m 0700 /var/tmp/infrastructure-external-backup-restore-validation && sudo env PATH=/usr/local/bin:/usr/bin:/bin RESTIC_REPOSITORY=rclone:onedrive:infrastructure-operations-platform/restic RESTIC_PASSWORD_FILE=/etc/infrastructure-backup/restic-password RCLONE_CONFIG=/etc/infrastructure-backup/rclone.conf /usr/local/bin/restic restore latest --verify --target /var/tmp/infrastructure-external-backup-restore-validation && sudo find /var/tmp/infrastructure-external-backup-restore-validation -type f -print -quit | grep -q . && sudo rm -rf /var/tmp/infrastructure-external-backup-restore-validation'
-"@
+"@ -replace "`r`n", "`n"
+        & ssh.exe @sshOptions $controller $remoteCommand
         if ($LASTEXITCODE -ne 0) {
             throw 'The encrypted OneDrive restore validation failed.'
         }
