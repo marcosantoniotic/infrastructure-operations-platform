@@ -9,6 +9,7 @@ database as an independent Compose project.
 - agent traffic uses a separate network attached only to Zabbix Server;
 - database credentials are read-only bind mounts with private SELinux relabeling;
 - the web and server fallback ports bind to loopback by default;
+- the server role rejects non-loopback publication of TCP 10051;
 - Traefik publication is opt-in and uses the shared security middleware;
 - the default Zabbix administrator password is replaced during first deployment;
 - persistent database and operational script data use named volumes.
@@ -43,6 +44,8 @@ ansible-playbook \
   playbooks/zabbix.yml
 ```
 
-The native Zabbix Agent 2 and host firewall policy are separate modules because
-their safe configuration depends on the monitoring direction and permitted
-source networks.
+The native Zabbix Agent 2 on the same host reaches the server through loopback.
+SNMP and agentless checks are initiated outbound by Zabbix Server. A future
+requirement for remote passive agents must use a separately reviewed Zabbix
+Proxy or an explicit Docker forwarding policy; changing the bind address alone
+is intentionally rejected.

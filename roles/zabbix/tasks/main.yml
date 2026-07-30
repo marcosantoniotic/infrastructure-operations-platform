@@ -10,12 +10,15 @@
       - zabbix_admin_password | length >= 16
       - not zabbix_admin_password.startswith("<")
       - zabbix_admin_password != zabbix_default_admin_password
+      - zabbix_server_bind_address in ['127.0.0.1', '::1']
       - >-
         not (zabbix_enable_traefik | bool) or
         zabbix_traefik_hostname | length > 0
     fail_msg: >-
-      Replace all Zabbix placeholders with strong Ansible Vault values and
-      configure a hostname before enabling Traefik.
+      Replace all Zabbix placeholders with strong Ansible Vault values,
+      configure a hostname before enabling Traefik, and keep the server listener
+      bound to loopback. Remote agent ingress requires a separately reviewed
+      proxy or firewall design.
   no_log: true
 
 - name: Validate Docker service
@@ -262,6 +265,26 @@
     port: "{{ zabbix_server_port }}"
     state: started
     timeout: 30
+  when: not ansible_check_mode
+
+- name: Inspect Zabbix Server published listener
+  ansible.builtin.command:
+    cmd: >-
+      docker compose --project-directory {{ zabbix_project_dir }}
+      port zabbix-server 10051
+  register: zabbix_server_published_listener
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Require loopback-only Zabbix Server publication
+  ansible.builtin.assert:
+    that:
+      - >-
+        zabbix_server_published_listener.stdout ==
+        zabbix_server_bind_address ~ ':' ~ (zabbix_server_port | string)
+    fail_msg: >-
+      The Zabbix Server listener is not restricted to the configured loopback
+      address.
   when: not ansible_check_mode
 
 - name: Validate Zabbix through Traefik HTTPS

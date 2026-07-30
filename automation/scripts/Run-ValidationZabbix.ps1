@@ -242,6 +242,19 @@ for ($run = 1; $run -le $runs; $run++) {
         throw "Zabbix automation failed on pass $run."
     }
 
+    $networkIsolationCheck = @"
+set -eu
+if timeout 3 bash -c '</dev/tcp/$($configuration.platform_ip)/10051' \
+  >/dev/null 2>&1; then
+  echo 'Zabbix Server port 10051 is reachable from the controller.' >&2
+  exit 30
+fi
+"@ -replace "`r`n", "`n"
+    & ssh.exe @commonOptions $controller $networkIsolationCheck
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Zabbix Server network-origin restriction validation failed.'
+    }
+
     if ($run -eq 1 -and $VerifyPersistence) {
         Write-Host 'Reloading SRV01-VALIDATION to verify Zabbix persistence.'
         Push-Location $vagrantRoot
