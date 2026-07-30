@@ -110,6 +110,8 @@ $requiredPaths = @(
     'scripts/ci/validate-service-artifacts.sh',
     'scripts/validate-container-images.ps1',
     'scripts/get-container-images.ps1',
+    'scripts/inventory-host.sh',
+    'scripts/fixtures/sanitized-inventory-source.json',
     'scripts/validate-container-privileges.ps1',
     'scripts/validate-github-actions.ps1',
     'scripts/validate-credential-governance.ps1',

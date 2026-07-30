@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "generated_at": "2030-01-01T12:00:00Z",
+  "platform": {
+    "logical_name": "platform-validation",
+    "operating_system": "Enterprise Linux 9",
+    "kernel": "5.14.0-validation",
+    "deployment_model": "single-node"
+  },
+  "resources": {
+    "cpu_vcpu": 8,
+    "memory_gib": 16,
+    "root_disk_gib": 100,
+    "root_used_percent": 35
+  },
+  "runtime": {
+    "docker_engine": "validation-version",
+    "docker_compose": "validation-version"
+  },
+  "projects": [
+    {"name": "edge", "status": "running"},
+    {"name": "monitoring", "status": "running"}
+  ],
+  "containers": [
+    {
+      "name": "reverse-proxy",
+      "image": "example/reverse-proxy:validated",
+      "status": "running"
+    },
+    {
+      "name": "metrics",
+      "image": "example/metrics:validated",
+      "status": "running"
+    }
+  ],
+  "native_services": [
+    {"name": "container-runtime", "enabled": "enabled", "active": "active"},
+    {"name": "host-firewall", "enabled": "enabled", "active": "active"}
+  ]
+}

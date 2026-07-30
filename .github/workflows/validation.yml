@@ -75,6 +75,24 @@ jobs:
         shell: bash
         run: git diff --check HEAD^ HEAD
 
+      - name: Generate sanitized inventory fixture
+        shell: bash
+        run: |
+          ./scripts/inventory-host.sh \
+            --source-json scripts/fixtures/sanitized-inventory-source.json \
+            --output /tmp/sanitized-current-state.md
+          grep -q "Inventário sanitizado" /tmp/sanitized-current-state.md
+          grep -q "platform-validation" /tmp/sanitized-current-state.md
+          jq '.network_address = (["192", "0", "2", "10"] | join("."))' \
+            scripts/fixtures/sanitized-inventory-source.json \
+            > /tmp/unsafe-inventory.json
+          if ./scripts/inventory-host.sh \
+            --source-json /tmp/unsafe-inventory.json \
+            --output /tmp/unsafe-current-state.md; then
+            echo "Unsafe inventory was not rejected." >&2
+            exit 1
+          fi
+
   service-artifacts:
     name: Ansible, Compose and Prometheus validation
     runs-on: ubuntu-latest
