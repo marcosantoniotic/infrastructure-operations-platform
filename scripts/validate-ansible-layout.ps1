@@ -37,6 +37,7 @@ $requiredPaths = @(
     'automation/scripts/Build-RhelBox.ps1',
     'automation/scripts/Register-RhelBox.ps1',
     'automation/scripts/Start-ValidationEnvironment.ps1',
+    'automation/scripts/Start-ValidationStandby.ps1',
     'playbooks/preflight.yml',
     'playbooks/bootstrap-rhel.yml',
     'playbooks/docker.yml',

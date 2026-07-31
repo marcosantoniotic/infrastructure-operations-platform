@@ -18,8 +18,10 @@ flowchart LR
     Box --> Vagrant["Vagrant + VMware Workstation"]
     Vagrant --> Controller["AUTOMATION-CONTROLLER"]
     Vagrant --> Platform["SRV01-VALIDATION"]
+    Vagrant -. optional .-> Standby["SRV02-STANDBY"]
     Controller --> Ansible["Ansible playbooks"]
     Ansible --> Platform
+    Ansible -. contingency modules .-> Standby
 ```
 
 ## Host requirements
@@ -172,6 +174,40 @@ Expected resources:
 
 Both VMs receive NAT connectivity and a dedicated host-only interface. Vagrant
 locks the transient password after the first successful key-based connection.
+
+### Optional resource-constrained standby
+
+The resilience design can be exercised with a third operational VM on the same
+VMware host. This validates host-level recovery, DNS and proxy procedures, but
+does not protect against failure of the physical computer, VMware or its shared
+storage.
+
+Regenerate the local configuration with all addresses that must remain present:
+
+```powershell
+.\automation\scripts\Initialize-Validation.ps1 `
+  -ControllerAddress "<CONTROLLER_ADDRESS>" `
+  -PlatformAddress "<PLATFORM_ADDRESS>" `
+  -RecoveryAddress "<RECOVERY_ADDRESS>" `
+  -StandbyAddress "<STANDBY_ADDRESS>"
+```
+
+If the recovery VM is not part of the local environment, omit only
+`-RecoveryAddress`. Start the standby independently:
+
+```powershell
+.\automation\scripts\Start-ValidationStandby.ps1
+```
+
+| VM | CPU | RAM | Initial role |
+|---|---:|---:|---|
+| `SRV02-STANDBY` | 2 | 4 GiB | isolated target for DNS and proxy contingency |
+
+The VM is created without application provisioning. It must not receive the
+full platform playbook until the promotion and data-consistency controls have
+been implemented and tested. When resources are constrained, stop it with
+`vagrant halt srv02-standby`; this changes the exercise to cold standby and
+increases recovery time.
 
 ### 6. Run the Ansible preflight
 
