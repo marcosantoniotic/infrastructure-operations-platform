@@ -1,0 +1,7 @@
+---
+- name: Deploy standby DNS service
+  hosts: standby
+  gather_facts: true
+  become: true
+  roles:
+    - role: dns_standby

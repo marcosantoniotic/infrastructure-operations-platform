@@ -1,0 +1,17 @@
+name: dns-standby
+
+services:
+  adguard-home:
+    image: {{ dns_standby_image }}
+    container_name: dns-adguard-home
+    network_mode: host
+    volumes:
+      - ./work:/opt/adguardhome/work
+      - ./conf:/opt/adguardhome/conf
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
