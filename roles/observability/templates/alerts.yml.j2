@@ -33,6 +33,26 @@ groups:
           summary: "TLS certificate expires within 15 days"
           description: "Certificate for {{ '{{' }} $labels.service {{ '}}' }} requires immediate renewal."
 
+  - name: dns-health
+    rules:
+      - alert: ManagedDNSProbeFailed
+        expr: probe_success{job="blackbox-dns"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Managed DNS probe failed: {{ '{{' }} $labels.service {{ '}}' }}"
+          description: "DNS resolution through {{ '{{' }} $labels.instance {{ '}}' }} failed."
+
+      - alert: ManagedDNSLatencyHigh
+        expr: probe_duration_seconds{job="blackbox-dns"} > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Managed DNS latency is above one second"
+          description: "DNS probe latency for {{ '{{' }} $labels.service {{ '}}' }} is degraded."
+
   - name: backup-health
     rules:
       - alert: PlatformBackupFailed

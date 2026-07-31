@@ -51,6 +51,33 @@ scrape_configs:
         replacement: blackbox-exporter:9115
       - regex: module
         action: labeldrop
+{% if observability_dns_targets | length > 0 %}
+
+  - job_name: blackbox-dns
+    metrics_path: /probe
+    static_configs:
+{% for target in observability_dns_targets %}
+      - targets:
+          - {{ target.address }}
+        labels:
+          service: {{ target.name }}
+          module: dns_{{ target.name | regex_replace('[^A-Za-z0-9_]', '_') }}
+{% endfor %}
+    relabel_configs:
+      - source_labels:
+          - module
+        target_label: __param_module
+      - source_labels:
+          - __address__
+        target_label: __param_target
+      - source_labels:
+          - __param_target
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+      - regex: module
+        action: labeldrop
+{% endif %}
 {% if observability_enable_traefik %}
 
   - job_name: traefik
