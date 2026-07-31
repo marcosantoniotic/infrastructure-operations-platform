@@ -182,6 +182,9 @@ ansible-playbook -i inventories/validation/hosts.yml playbooks/portainer.yml
 
 # Prometheus, Grafana e exporters do host
 ansible-playbook -i inventories/validation/hosts.yml playbooks/observability.yml
+
+# Identidade técnica e métricas operacionais do AdGuard
+ansible-playbook -i inventories/validation/hosts.yml playbooks/adguard-metrics.yml
 ansible-playbook -i inventories/validation/hosts.yml playbooks/cockpit.yml
 
 # Baseline inicial completa

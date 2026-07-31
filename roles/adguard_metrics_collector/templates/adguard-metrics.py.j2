@@ -1,0 +1,62 @@
+#!/usr/bin/python3
+import base64
+import json
+import os
+import tempfile
+import time
+import urllib.request
+
+BASE_URL = {{ adguard_metrics_endpoint | to_json }}
+CREDENTIAL_DIR = {{ adguard_metrics_collector_dir | to_json }}
+OUTPUT = {{ (adguard_metrics_textfile_dir + '/adguard.prom') | to_json }}
+
+
+def read_secret(name):
+    with open(os.path.join(CREDENTIAL_DIR, name), encoding="utf-8") as stream:
+        return stream.read().strip()
+
+
+def api_get(path, authorization):
+    request = urllib.request.Request(BASE_URL + path)
+    request.add_header("Authorization", authorization)
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.load(response)
+
+
+def metric(lines, name, value, help_text, metric_type="gauge"):
+    lines.extend((f"# HELP {name} {help_text}", f"# TYPE {name} {metric_type}", f"{name} {value}"))
+
+
+lines = []
+exit_code = 0
+try:
+    username = read_secret("username")
+    credential_value = read_secret("password")
+    encoded_identity = base64.b64encode(f"{username}:{credential_value}".encode()).decode()
+    authorization = "Basic " + encoded_identity
+    stats = api_get("/control/stats", authorization)
+    status = api_get("/control/status", authorization)
+    metric(lines, "adguard_api_up", 1, "Whether the AdGuard Home API collection succeeded.")
+    metric(lines, "adguard_metrics_last_success_timestamp_seconds", int(time.time()), "Unix timestamp of the latest successful AdGuard API collection.")
+    metric(lines, "adguard_protection_enabled", int(bool(status.get("protection_enabled"))), "Whether AdGuard Home protection is enabled.")
+    metric(lines, "adguard_dns_queries_total", int(stats.get("num_dns_queries", 0)), "DNS queries reported by AdGuard Home in its statistics interval.")
+    metric(lines, "adguard_blocked_filtering_total", int(stats.get("num_blocked_filtering", 0)), "Queries blocked by filtering rules in the statistics interval.")
+    metric(lines, "adguard_blocked_safebrowsing_total", int(stats.get("num_replaced_safebrowsing", 0)), "Queries blocked by safe browsing in the statistics interval.")
+    metric(lines, "adguard_blocked_safesearch_total", int(stats.get("num_replaced_safesearch", 0)), "Queries rewritten by safe search in the statistics interval.")
+    metric(lines, "adguard_average_processing_time_seconds", float(stats.get("avg_processing_time", 0)), "Average DNS query processing time in seconds.")
+except Exception:
+    metric(lines, "adguard_api_up", 0, "Whether the AdGuard Home API collection succeeded.")
+    exit_code = 1
+
+directory = os.path.dirname(OUTPUT)
+fd, temporary = tempfile.mkstemp(prefix=".adguard.", dir=directory, text=True)
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        stream.write("\n".join(lines) + "\n")
+    os.chmod(temporary, 0o644)
+    os.replace(temporary, OUTPUT)
+finally:
+    if os.path.exists(temporary):
+        os.unlink(temporary)
+
+raise SystemExit(exit_code)

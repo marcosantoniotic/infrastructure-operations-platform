@@ -233,6 +233,22 @@ isolated DNS client pilot:
 .\automation\scripts\Run-ValidationDnsClient.ps1 -VerifyIdempotence
 ```
 
+After the managed DNS pilot is healthy, create the dedicated API identity and
+publish operational AdGuard metrics through the platform Node Exporter:
+
+```powershell
+.\automation\scripts\Run-ValidationAdGuardMetrics.ps1 -VerifyIdempotence
+.\automation\scripts\Run-ValidationObservability.ps1 -EnableTraefik
+```
+
+The first runner generates the technical identity, stores its password and
+bcrypt material only in the encrypted validation Vault, and writes a temporary
+ACL-restricted credential record under `.validation/`. AdGuard Home does not
+provide a read-only user role; the collector is therefore constrained to GET
+requests and runs outside containers as a hardened systemd timer. Store the
+credential record in the infrastructure password vault and delete the local
+copy afterward.
+
 The runner selects the validation-only `ens192` connection, gives the standby
 resolver a negative NetworkManager DNS priority, validates external resolution
 and requires a sinkhole response for a blocked test domain. A guest operating

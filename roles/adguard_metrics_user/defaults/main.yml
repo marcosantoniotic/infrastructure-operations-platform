@@ -1,0 +1,7 @@
+---
+adguard_metrics_project_dir: /opt/dns-standby
+adguard_metrics_container_name: dns-adguard-home
+adguard_metrics_username: metrics
+adguard_metrics_password: "<ADGUARD_METRICS_PASSWORD>"
+adguard_metrics_password_hash: "<ADGUARD_METRICS_PASSWORD_HASH>"
+adguard_metrics_admin_port: 80

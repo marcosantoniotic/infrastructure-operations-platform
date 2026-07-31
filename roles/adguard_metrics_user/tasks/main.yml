@@ -1,0 +1,74 @@
+---
+- name: Validate AdGuard metrics identity variables
+  ansible.builtin.assert:
+    that:
+      - adguard_metrics_project_dir.startswith('/')
+      - adguard_metrics_username | length >= 3
+      - adguard_metrics_password | length >= 24
+      - not adguard_metrics_password.startswith('<')
+      - adguard_metrics_password_hash is match('^\\$2[aby]\\$12\\$')
+    fail_msg: Supply the technical account secret and bcrypt salt through Ansible Vault.
+  no_log: true
+
+- name: Inspect AdGuard Home configuration
+  ansible.builtin.stat:
+    path: "{{ adguard_metrics_project_dir }}/conf/AdGuardHome.yaml"
+  register: adguard_metrics_configuration
+
+- name: Require an initialized AdGuard Home instance
+  ansible.builtin.assert:
+    that:
+      - adguard_metrics_configuration.stat.exists
+    fail_msg: Complete the AdGuard Home first-run wizard before adding metrics identity.
+
+- name: Preserve pre-metrics AdGuard configuration
+  ansible.builtin.copy:
+    src: "{{ adguard_metrics_project_dir }}/conf/AdGuardHome.yaml"
+    dest: "{{ adguard_metrics_project_dir }}/conf/AdGuardHome.yaml.pre-metrics"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0600"
+    force: false
+
+- name: Inspect existing AdGuard metrics technical identity
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -F
+      - "  - name: {{ adguard_metrics_username }}"
+      - "{{ adguard_metrics_project_dir }}/conf/AdGuardHome.yaml"
+  register: adguard_metrics_identity
+  changed_when: false
+  failed_when: adguard_metrics_identity.rc not in [0, 1]
+
+- name: Add AdGuard metrics technical identity
+  ansible.builtin.blockinfile:
+    path: "{{ adguard_metrics_project_dir }}/conf/AdGuardHome.yaml"
+    insertafter: '^users:$'
+    marker: "  # {mark} MANAGED METRICS IDENTITY"
+    block: |2
+        - name: {{ adguard_metrics_username }}
+          password: "{{ adguard_metrics_password_hash }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when: adguard_metrics_identity.rc == 1
+  notify: Restart AdGuard Home after identity change
+
+- name: Apply pending AdGuard identity restart
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for AdGuard administration API
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ adguard_metrics_admin_port }}/control/status"
+    user: "{{ adguard_metrics_username }}"
+    password: "{{ adguard_metrics_password }}"
+    force_basic_auth: true
+    status_code: 200
+  register: adguard_metrics_api
+  retries: 20
+  delay: 3
+  until: adguard_metrics_api.status == 200
+  no_log: true

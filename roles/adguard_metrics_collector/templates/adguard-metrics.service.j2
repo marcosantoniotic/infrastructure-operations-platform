@@ -1,0 +1,16 @@
+[Unit]
+Description=Collect AdGuard Home metrics for Node Exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/bin/python3 {{ adguard_metrics_collector_dir }}/adguard-metrics.py
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths={{ adguard_metrics_collector_dir }}
+ReadWritePaths={{ adguard_metrics_textfile_dir }}

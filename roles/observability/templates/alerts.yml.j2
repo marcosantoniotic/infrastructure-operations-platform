@@ -53,6 +53,24 @@ groups:
           summary: "Managed DNS latency is above one second"
           description: "DNS probe latency for {{ '{{' }} $labels.service {{ '}}' }} is degraded."
 
+      - alert: AdGuardMetricsCollectionFailed
+        expr: adguard_api_up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AdGuard operational metrics collection failed"
+          description: "The protected AdGuard API collector cannot refresh operational metrics."
+
+      - alert: AdGuardMetricsCollectionStale
+        expr: time() - adguard_metrics_last_success_timestamp_seconds > 120
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AdGuard operational metrics are stale"
+          description: "No successful AdGuard API collection was recorded in the last two minutes."
+
   - name: backup-health
     rules:
       - alert: PlatformBackupFailed
