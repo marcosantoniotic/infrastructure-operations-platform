@@ -127,7 +127,7 @@ all:
           ansible_ssh_private_key_file: "/home/$AdminUsername/.ssh/id_ed25519"
 "@
 if (-not [string]::IsNullOrWhiteSpace($StandbyAddress)) {
-    $ansibleInventory += @"
+    $ansibleInventory += "`n" + @"
     standby:
       hosts:
         srv02-standby:

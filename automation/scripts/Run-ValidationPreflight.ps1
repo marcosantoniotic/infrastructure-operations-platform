@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet('platform', 'standby')]
+    [string]$TargetGroup = 'platform'
+)
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -19,7 +22,25 @@ foreach ($path in @($privateKey, $vagrantConfig, $playbook)) {
 $configuration = Get-Content -LiteralPath $vagrantConfig -Raw | ConvertFrom-Json
 $controllerAddress = $configuration.controller_ip
 $platformAddress = $configuration.platform_ip
+$standbyAddress = $configuration.standby_ip
 $adminUsername = 'automation'
+
+if ($TargetGroup -eq 'standby' -and -not $standbyAddress) {
+    throw 'standby_ip is not configured in .validation/vagrant.json.'
+}
+$targetAddress = if ($TargetGroup -eq 'standby') {
+    $standbyAddress
+}
+else {
+    $platformAddress
+}
+$targetHostname = if ($TargetGroup -eq 'standby') {
+    'srv02-standby'
+}
+else {
+    'srv01-validation'
+}
+$minimumMemoryMb = if ($TargetGroup -eq 'standby') { 3500 } else { 4096 }
 
 New-Item -ItemType Directory -Path $ansibleRoot -Force | Out-Null
 $inventoryContent = @"
@@ -34,6 +55,17 @@ all:
           ansible_become: true
           ansible_ssh_private_key_file: "/home/$adminUsername/.ssh/id_ed25519"
 "@
+if ($standbyAddress) {
+    $inventoryContent += "`n" + @"
+    standby:
+      hosts:
+        srv02-standby:
+          ansible_host: "$standbyAddress"
+          ansible_user: "$adminUsername"
+          ansible_become: true
+          ansible_ssh_private_key_file: "/home/$adminUsername/.ssh/id_ed25519"
+"@
+}
 $utf8WithoutBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
 $inventoryContent = $inventoryContent -replace "`r`n", "`n"
 [System.IO.File]::WriteAllText($inventory, $inventoryContent, $utf8WithoutBom)
@@ -80,13 +112,15 @@ set -e
 install -m 0600 /tmp/validation_id_ed25519 /home/$adminUsername/.ssh/id_ed25519
 rm -f /tmp/validation_id_ed25519
 touch /home/$adminUsername/.ssh/known_hosts
-ssh-keygen -F $platformAddress -f /home/$adminUsername/.ssh/known_hosts >/dev/null ||
-  ssh-keyscan -H $platformAddress >> /home/$adminUsername/.ssh/known_hosts
+ssh-keygen -F $targetAddress -f /home/$adminUsername/.ssh/known_hosts >/dev/null ||
+  ssh-keyscan -H $targetAddress >> /home/$adminUsername/.ssh/known_hosts
 cd $remoteRoot
+ansible $TargetGroup -i inventories/validation/hosts.yml --list-hosts |
+  grep -q -- '$targetHostname'
 if [ -f /home/$adminUsername/.ansible/vault-password ]; then
-  ansible-playbook --vault-password-file /home/$adminUsername/.ansible/vault-password -i inventories/validation/hosts.yml playbooks/preflight.yml
+  ansible-playbook --vault-password-file /home/$adminUsername/.ansible/vault-password -i inventories/validation/hosts.yml playbooks/preflight.yml -e target_group=$TargetGroup -e minimum_memory_mb=$minimumMemoryMb
 else
-  ansible-playbook -i inventories/validation/hosts.yml playbooks/preflight.yml
+  ansible-playbook -i inventories/validation/hosts.yml playbooks/preflight.yml -e target_group=$TargetGroup -e minimum_memory_mb=$minimumMemoryMb
 fi
 "@
 $remotePreflight = $remotePreflight -replace "`r`n", "`n"

@@ -203,11 +203,27 @@ If the recovery VM is not part of the local environment, omit only
 |---|---:|---:|---|
 | `SRV02-STANDBY` | 2 | 4 GiB | isolated target for DNS and proxy contingency |
 
+The standby preflight requires 3,500 MiB of memory visible to the guest. This
+allows for VMware and guest overhead while preserving the 4 GiB VM profile. The
+main platform retains its 4,096 MiB guest-visible requirement.
+
 The VM is created without application provisioning. It must not receive the
 full platform playbook until the promotion and data-consistency controls have
 been implemented and tested. When resources are constrained, stop it with
 `vagrant halt srv02-standby`; this changes the exercise to cold standby and
 increases recovery time.
+
+Run preflight and the operating-system baseline against only the standby:
+
+```powershell
+.\automation\scripts\Run-ValidationPreflight.ps1 -TargetGroup standby
+.\automation\scripts\Run-ValidationBaseline.ps1 `
+  -TargetGroup standby `
+  -VerifyIdempotence
+```
+
+The default target remains `platform`. Selecting `standby` does not install
+Docker or application services.
 
 ### 6. Run the Ansible preflight
 
