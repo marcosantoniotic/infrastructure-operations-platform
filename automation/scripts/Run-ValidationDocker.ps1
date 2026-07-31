@@ -1,6 +1,9 @@
 [CmdletBinding()]
 param(
-    [switch]$VerifyIdempotence
+    [switch]$VerifyIdempotence,
+
+    [ValidateSet('platform', 'standby')]
+    [string]$TargetGroup = 'platform'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,7 +34,7 @@ if (-not (Test-Path -LiteralPath $role -PathType Container)) {
     throw "Required role not found: $role"
 }
 
-& $preflightRunner
+& $preflightRunner -TargetGroup $TargetGroup
 if ($LASTEXITCODE -notin @(0, $null)) {
     throw 'Validation preflight failed before Docker execution.'
 }
@@ -91,8 +94,17 @@ if ($LASTEXITCODE -ne 0) {
 $runs = if ($VerifyIdempotence) { 2 } else { 1 }
 for ($run = 1; $run -le $runs; $run++) {
     Write-Host "Executing Docker automation: pass $run of $runs."
-    & ssh.exe @commonOptions $controller `
-        "cd $remoteRoot && ANSIBLE_ROLES_PATH=$remoteRoot/roles ansible-playbook -i inventories/validation/hosts.yml playbooks/docker.yml"
+    $remoteDocker = @"
+set -e
+cd $remoteRoot
+if [ -f /home/$adminUsername/.ansible/vault-password ]; then
+  ANSIBLE_ROLES_PATH=$remoteRoot/roles ansible-playbook --vault-password-file /home/$adminUsername/.ansible/vault-password -i inventories/validation/hosts.yml playbooks/docker.yml -e target_group=$TargetGroup
+else
+  ANSIBLE_ROLES_PATH=$remoteRoot/roles ansible-playbook -i inventories/validation/hosts.yml playbooks/docker.yml -e target_group=$TargetGroup
+fi
+"@
+    $remoteDocker = $remoteDocker -replace "`r`n", "`n"
+    & ssh.exe @commonOptions $controller $remoteDocker
     if ($LASTEXITCODE -ne 0) {
         throw "Docker automation failed on pass $run."
     }
