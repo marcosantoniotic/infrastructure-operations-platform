@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule AdGuard Home metrics collection
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec={{ adguard_metrics_interval }}
+AccuracySec=5s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

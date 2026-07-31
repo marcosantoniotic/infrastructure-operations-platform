@@ -1,0 +1,7 @@
+---
+adguard_metrics_endpoint: "http://<ADGUARD_ADDRESS>"
+adguard_metrics_username: metrics
+adguard_metrics_password: "<ADGUARD_METRICS_PASSWORD>"
+adguard_metrics_collector_dir: /opt/adguard-metrics
+adguard_metrics_textfile_dir: /var/lib/node_exporter/textfile_collector
+adguard_metrics_interval: 30s

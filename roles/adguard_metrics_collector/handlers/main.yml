@@ -1,0 +1,10 @@
+---
+- name: Reload systemd for AdGuard metrics collector
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart AdGuard metrics timer
+  ansible.builtin.systemd:
+    name: adguard-metrics.timer
+    enabled: true
+    state: restarted

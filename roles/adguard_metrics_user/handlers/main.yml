@@ -1,0 +1,8 @@
+---
+- name: Restart AdGuard Home after identity change
+  ansible.builtin.command:
+    argv:
+      - docker
+      - restart
+      - "{{ adguard_metrics_container_name }}"
+  changed_when: true

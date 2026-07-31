@@ -5,6 +5,7 @@
 | Preflight | `playbooks/preflight.yml` | implementado | nenhuma |
 | Baseline RHEL | `playbooks/bootstrap-rhel.yml` | implementado | RHEL 9+ |
 | Docker Engine | `playbooks/docker.yml` | implementado | RHEL 9+ |
+| Métricas operacionais do AdGuard | `playbooks/adguard-metrics.yml` | implementado e validado | AdGuard inicializado; Node Exporter |
 | NetBox | `playbooks/netbox.yml` | implementado, validado e integrado ao Traefik | Docker; Traefik opcional |
 | Backup do NetBox | `playbooks/netbox-backup.yml` | implementado e validado | systemd + Docker |
 | Traefik | `playbooks/traefik.yml` | implementado e validado | Docker |

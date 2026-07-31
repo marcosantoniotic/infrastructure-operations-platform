@@ -1,0 +1,92 @@
+---
+- name: Validate AdGuard metrics collector variables
+  ansible.builtin.assert:
+    that:
+      - adguard_metrics_endpoint is match('^https?://')
+      - not adguard_metrics_endpoint.endswith('/')
+      - adguard_metrics_username | length >= 3
+      - adguard_metrics_password | length >= 24
+      - not adguard_metrics_password.startswith('<')
+      - adguard_metrics_collector_dir.startswith('/')
+      - adguard_metrics_textfile_dir.startswith('/')
+    fail_msg: Supply the AdGuard endpoint and technical identity through Vault.
+  no_log: true
+
+- name: Create AdGuard metrics collector directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ adguard_metrics_collector_dir }}"
+      mode: "0700"
+    - path: "{{ adguard_metrics_textfile_dir }}"
+      mode: "0755"
+
+- name: Install AdGuard metrics API credentials
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: "{{ adguard_metrics_collector_dir }}/{{ item.name }}"
+    owner: root
+    group: root
+    mode: "0600"
+  loop:
+    - name: username
+      content: "{{ adguard_metrics_username }}"
+    - name: password
+      content: "{{ adguard_metrics_password }}"
+  no_log: true
+
+- name: Install AdGuard metrics collector
+  ansible.builtin.template:
+    src: adguard-metrics.py.j2
+    dest: "{{ adguard_metrics_collector_dir }}/adguard-metrics.py"
+    owner: root
+    group: root
+    mode: "0700"
+  notify: Restart AdGuard metrics timer
+
+- name: Install AdGuard metrics systemd units
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/etc/systemd/system/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - src: adguard-metrics.service.j2
+      dest: adguard-metrics.service
+    - src: adguard-metrics.timer.j2
+      dest: adguard-metrics.timer
+  notify:
+    - Reload systemd for AdGuard metrics collector
+    - Restart AdGuard metrics timer
+
+- name: Apply pending AdGuard metrics handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable AdGuard metrics timer
+  ansible.builtin.systemd:
+    name: adguard-metrics.timer
+    enabled: true
+    state: started
+
+- name: Execute initial AdGuard metrics collection
+  ansible.builtin.systemd:
+    name: adguard-metrics.service
+    state: started
+  changed_when: false
+
+- name: Read generated AdGuard metrics
+  ansible.builtin.slurp:
+    src: "{{ adguard_metrics_textfile_dir }}/adguard.prom"
+  register: adguard_metrics_output
+
+- name: Require successful AdGuard metrics collection
+  ansible.builtin.assert:
+    that:
+      - "'adguard_api_up 1' in (adguard_metrics_output.content | b64decode)"
+      - "'adguard_dns_queries_total' in (adguard_metrics_output.content | b64decode)"
+    fail_msg: The AdGuard API metrics file is incomplete.
