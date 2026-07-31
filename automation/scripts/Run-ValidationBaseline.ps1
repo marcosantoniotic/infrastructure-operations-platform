@@ -57,7 +57,7 @@ $controller = "$adminUsername@$controllerAddress"
 $remoteRoot = "/home/$adminUsername/infrastructure-operations-platform"
 
 New-Item -ItemType Directory -Path $groupVarsRoot -Force | Out-Null
-$groupVarsContent = @'
+$groupVarsContent = @"
 ---
 platform_hostname: $TargetHostname
 platform_timezone: America/Sao_Paulo
@@ -81,7 +81,7 @@ rhel_harden_ssh: false
 rhel_ssh_allow_users: []
 rhel_firewalld_enabled: true
 rhel_selinux_state: enforcing
-'@
+"@
 $utf8WithoutBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
 [System.IO.File]::WriteAllText($groupVars, $groupVarsContent, $utf8WithoutBom)
 
@@ -119,8 +119,17 @@ if ($LASTEXITCODE -ne 0) {
 $runs = if ($VerifyIdempotence) { 2 } else { 1 }
 for ($run = 1; $run -le $runs; $run++) {
     Write-Host "Executing RHEL baseline: pass $run of $runs."
-    & ssh.exe @commonOptions $controller `
-        "cd $remoteRoot && ANSIBLE_ROLES_PATH=$remoteRoot/roles ansible-playbook -i inventories/validation/hosts.yml playbooks/bootstrap-rhel.yml -e target_group=$TargetGroup"
+    $remoteBaseline = @"
+set -e
+cd $remoteRoot
+if [ -f /home/$adminUsername/.ansible/vault-password ]; then
+  ANSIBLE_ROLES_PATH=$remoteRoot/roles ansible-playbook --vault-password-file /home/$adminUsername/.ansible/vault-password -i inventories/validation/hosts.yml playbooks/bootstrap-rhel.yml -e target_group=$TargetGroup
+else
+  ANSIBLE_ROLES_PATH=$remoteRoot/roles ansible-playbook -i inventories/validation/hosts.yml playbooks/bootstrap-rhel.yml -e target_group=$TargetGroup
+fi
+"@
+    $remoteBaseline = $remoteBaseline -replace "`r`n", "`n"
+    & ssh.exe @commonOptions $controller $remoteBaseline
     if ($LASTEXITCODE -ne 0) {
         throw "RHEL baseline failed on pass $run."
     }
