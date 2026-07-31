@@ -23,6 +23,7 @@ observability_blackbox_targets:
     url: http://prometheus:9090/-/ready
   - name: grafana
     url: http://grafana:3000/api/health
+observability_dns_targets: []
 
 observability_enable_traefik: false
 observability_grafana_hostname: "grafana.<BASE_DOMAIN>"

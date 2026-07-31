@@ -8,7 +8,7 @@ an independent Compose project.
 - Prometheus stores high-resolution time series with bounded retention;
 - Node Exporter provides RHEL host metrics;
 - cAdvisor provides container resource metrics;
-- Blackbox Exporter provides HTTP/TLS availability and latency probes;
+- Blackbox Exporter provides HTTP/TLS and DNS availability and latency probes;
 - Grafana provides provisioned, version-controlled visualization.
 
 Zabbix remains responsible for operational triggers, events and maps. This
@@ -34,11 +34,14 @@ ansible-playbook \
   playbooks/observability.yml
 ```
 
-The initial dashboard is
-`Infrastructure Operations — Host & Containers`. Network monitoring exporters
-are intentionally implemented as later extensions.
+Provisioned dashboards include host and container resources, application and
+TLS health, backup health, and managed DNS service health.
 
-Each item in `observability_blackbox_targets` creates an independent probe
-module. Optional fields include `host_header`, `valid_status_codes`, and
+Each item in `observability_blackbox_targets` creates an independent HTTP
+probe module. Optional fields include `host_header`, `valid_status_codes`, and
 `tls_insecure`, allowing environment-specific behavior without hard-coding
 application endpoints in the role.
+
+Each item in `observability_dns_targets` creates an independent DNS probe with
+an explicit address, query name and optional query type. These probes require
+no AdGuard administrative credential and are suitable for availability alerts.

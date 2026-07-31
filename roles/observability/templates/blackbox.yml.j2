@@ -19,3 +19,14 @@ modules:
       tls_config:
         insecure_skip_verify: {{ target.tls_insecure | default(false) | bool | lower }}
 {% endfor %}
+{% for target in observability_dns_targets %}
+  dns_{{ target.name | regex_replace('[^A-Za-z0-9_]', '_') }}:
+    prober: dns
+    timeout: 5s
+    dns:
+      preferred_ip_protocol: ip4
+      query_name: {{ target.query_name | quote }}
+      query_type: {{ target.query_type | default('A') | quote }}
+      valid_rcodes:
+        - NOERROR
+{% endfor %}

@@ -106,6 +106,8 @@
       dest: grafana/dashboards/application-tls-health.json
     - src: backup-health.json.j2
       dest: grafana/dashboards/backup-health.json
+    - src: dns-service-health.json.j2
+      dest: grafana/dashboards/dns-service-health.json
   register: observability_rendered_configuration
 
 - name: Render observability Compose project
@@ -278,6 +280,25 @@
     (observability_blackbox_targets | length | string)
   when: not ansible_check_mode
 
+- name: Validate all configured DNS probes
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/api/v1/query?query=count(probe_success%7Bjob%3D%22blackbox-dns%22%7D%20%3D%3D%201)
+    method: GET
+    status_code: 200
+    return_content: true
+  register: observability_dns_probes
+  retries: 20
+  delay: 5
+  until: >-
+    observability_dns_probes.json.status == 'success' and
+    observability_dns_probes.json.data.result | length == 1 and
+    observability_dns_probes.json.data.result[0].value[1] ==
+    (observability_dns_targets | length | string)
+  when:
+    - not ansible_check_mode
+    - observability_dns_targets | length > 0
+
 - name: Wait for Grafana health endpoint
   ansible.builtin.uri:
     url: >-
@@ -356,6 +377,21 @@
     return_content: true
   register: observability_backup_dashboard
   failed_when: observability_backup_dashboard.json.dashboard.uid != 'backup-health'
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Validate provisioned DNS service dashboard
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_grafana_validation_host }}:{{ observability_grafana_port }}/api/dashboards/uid/dns-service-health
+    method: GET
+    user: "{{ observability_grafana_admin_user }}"
+    password: "{{ observability_grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    return_content: true
+  register: observability_dns_dashboard
+  failed_when: observability_dns_dashboard.json.dashboard.uid != 'dns-service-health'
   no_log: true
   when: not ansible_check_mode
 

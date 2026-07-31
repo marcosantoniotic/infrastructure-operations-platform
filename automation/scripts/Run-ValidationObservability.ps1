@@ -148,6 +148,11 @@ observability_blackbox_targets:
   - name: cockpit
     url: https://host.containers.internal:9091/ping
     tls_insecure: true
+observability_dns_targets:
+  - name: dns-standby
+    address: $($configuration.standby_ip):53
+    query_name: example.com
+    query_type: A
 $traefikVariablesYaml
 # END VALIDATION OBSERVABILITY
 "@
