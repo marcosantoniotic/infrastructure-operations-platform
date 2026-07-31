@@ -1,0 +1,87 @@
+---
+- name: Validate managed DNS client variables
+  ansible.builtin.assert:
+    that:
+      - dns_client_connection_name | length > 0
+      - dns_client_interface | length > 0
+      - dns_client_servers | length > 0
+      - dns_client_priority | int < 0
+    fail_msg: Managed DNS client variables are incomplete.
+
+- name: Inspect NetworkManager connection
+  ansible.builtin.command:
+    argv:
+      - nmcli
+      - --get-values
+      - GENERAL.NAME
+      - connection
+      - show
+      - "{{ dns_client_connection_name }}"
+  register: dns_client_connection
+  changed_when: false
+
+- name: Inspect current DNS client settings
+  ansible.builtin.command:
+    argv:
+      - nmcli
+      - --get-values
+      - ipv4.dns,ipv4.dns-priority,ipv4.ignore-auto-dns
+      - connection
+      - show
+      - "{{ dns_client_connection_name }}"
+  register: dns_client_current
+  changed_when: false
+
+- name: Configure managed DNS client settings
+  ansible.builtin.command:
+    argv:
+      - nmcli
+      - connection
+      - modify
+      - "{{ dns_client_connection_name }}"
+      - ipv4.dns
+      - "{{ dns_client_servers | join(',') }}"
+      - ipv4.dns-priority
+      - "{{ dns_client_priority }}"
+      - ipv4.ignore-auto-dns
+      - "{{ 'yes' if dns_client_ignore_auto_dns else 'no' }}"
+  when: >-
+    dns_client_current.stdout_lines !=
+    [dns_client_servers | join(','), dns_client_priority | string,
+     'yes' if dns_client_ignore_auto_dns else 'no']
+  notify: Reapply DNS client connection
+
+- name: Apply pending DNS client changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify configured resolver is active
+  ansible.builtin.command:
+    argv:
+      - grep
+      - --fixed-strings
+      - "nameserver {{ dns_client_servers | first }}"
+      - /etc/resolv.conf
+  changed_when: false
+
+- name: Verify external DNS resolution
+  ansible.builtin.command:
+    argv:
+      - getent
+      - ahostsv4
+      - "{{ dns_client_resolution_test_name }}"
+  changed_when: false
+
+- name: Verify DNS blocking response
+  ansible.builtin.command:
+    argv:
+      - getent
+      - ahostsv4
+      - "{{ dns_client_block_test_name }}"
+  register: dns_client_block_test
+  changed_when: false
+
+- name: Require blocked domain sinkhole response
+  ansible.builtin.assert:
+    that:
+      - "(['0', '0', '0', '0'] | join('.')) in dns_client_block_test.stdout"
+    fail_msg: The managed DNS resolver did not block the validation domain.

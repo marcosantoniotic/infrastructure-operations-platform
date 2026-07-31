@@ -1,0 +1,9 @@
+---
+- name: Reapply DNS client connection
+  ansible.builtin.command:
+    argv:
+      - nmcli
+      - device
+      - reapply
+      - "{{ dns_client_interface }}"
+  changed_when: true

@@ -1,0 +1,8 @@
+---
+dns_client_connection_name: ""
+dns_client_interface: ""
+dns_client_servers: []
+dns_client_priority: -50
+dns_client_ignore_auto_dns: true
+dns_client_resolution_test_name: example.com
+dns_client_block_test_name: doubleclick.net
