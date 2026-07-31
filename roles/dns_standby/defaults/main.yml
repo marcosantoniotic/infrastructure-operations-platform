@@ -4,4 +4,5 @@ dns_standby_image: adguard/adguardhome:v0.107.76
 dns_standby_allowed_networks: []
 dns_standby_admin_networks: []
 dns_standby_dns_port: 53
-dns_standby_admin_port: 3000
+dns_standby_initial_admin_port: 3000
+dns_standby_admin_port: 80

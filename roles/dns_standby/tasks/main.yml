@@ -55,12 +55,19 @@
 - name: Permit administration from approved networks
   ansible.posix.firewalld:
     rich_rule: >-
-      rule family=ipv4 source address={{ item }}
-      port port={{ dns_standby_admin_port }} protocol=tcp accept
+      rule family=ipv4 source address={{ item.0 }}
+      port port={{ item.1 }} protocol=tcp accept
     permanent: true
     immediate: true
     state: enabled
-  loop: "{{ dns_standby_admin_networks }}"
+  loop: >-
+    {{ dns_standby_admin_networks |
+       product([dns_standby_initial_admin_port, dns_standby_admin_port]) | list }}
+
+- name: Inspect AdGuard Home operational configuration
+  ansible.builtin.stat:
+    path: "{{ dns_standby_project_dir }}/conf/AdGuardHome.yaml"
+  register: dns_standby_configuration
 
 - name: Deploy standby DNS project
   community.docker.docker_compose_v2:
@@ -70,7 +77,12 @@
 
 - name: Wait for initial administration endpoint
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ dns_standby_admin_port }}/"
+    url: >-
+      http://127.0.0.1:{{
+        dns_standby_admin_port
+        if dns_standby_configuration.stat.exists
+        else dns_standby_initial_admin_port
+      }}/
     status_code: 200
   register: dns_standby_admin_response
   retries: 20
