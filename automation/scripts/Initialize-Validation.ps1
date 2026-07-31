@@ -8,6 +8,8 @@ param(
 
     [string]$RecoveryAddress,
 
+    [string]$StandbyAddress,
+
     [string]$IsoPath = 'D:\ISOs\rhel-9.8-x86_64-dvd.iso',
     [string]$AdminUsername = 'automation'
 )
@@ -28,7 +30,12 @@ function ConvertTo-HclString {
     return $Value.Replace('\', '/').Replace('"', '\"')
 }
 
-foreach ($address in @($ControllerAddress, $PlatformAddress, $RecoveryAddress)) {
+foreach ($address in @(
+        $ControllerAddress,
+        $PlatformAddress,
+        $RecoveryAddress,
+        $StandbyAddress
+    )) {
     if ([string]::IsNullOrWhiteSpace($address)) {
         continue
     }
@@ -101,6 +108,9 @@ $vagrantConfiguration = [ordered]@{
 if (-not [string]::IsNullOrWhiteSpace($RecoveryAddress)) {
     $vagrantConfiguration.recovery_ip = $RecoveryAddress
 }
+if (-not [string]::IsNullOrWhiteSpace($StandbyAddress)) {
+    $vagrantConfiguration.standby_ip = $StandbyAddress
+}
 $vagrantJson = $vagrantConfiguration | ConvertTo-Json
 [System.IO.File]::WriteAllText($vagrantConfigPath, $vagrantJson, $utf8WithoutBom)
 
@@ -116,6 +126,17 @@ all:
           ansible_become: true
           ansible_ssh_private_key_file: "/home/$AdminUsername/.ssh/id_ed25519"
 "@
+if (-not [string]::IsNullOrWhiteSpace($StandbyAddress)) {
+    $ansibleInventory += @"
+    standby:
+      hosts:
+        srv02-standby:
+          ansible_host: "$StandbyAddress"
+          ansible_user: "$AdminUsername"
+          ansible_become: true
+          ansible_ssh_private_key_file: "/home/$AdminUsername/.ssh/id_ed25519"
+"@
+}
 [System.IO.File]::WriteAllText(
     $ansibleInventoryPath,
     $ansibleInventory,

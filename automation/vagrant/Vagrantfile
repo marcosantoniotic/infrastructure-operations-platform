@@ -76,4 +76,17 @@ Vagrant.configure("2") do |config|
       end
     end
   end
+
+  if local_config.key?("standby_ip")
+    config.vm.define "srv02-standby" do |standby|
+      standby.vm.hostname = "srv02-standby"
+      standby.vm.network "private_network", ip: local_config.fetch("standby_ip")
+
+      standby.vm.provider "vmware_desktop" do |vmware|
+        vmware.vmx["displayName"] = "SRV02-STANDBY"
+        vmware.cpus = 2
+        vmware.memory = 4096
+      end
+    end
+  end
 end
