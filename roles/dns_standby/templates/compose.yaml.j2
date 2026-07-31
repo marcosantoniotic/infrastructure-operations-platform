@@ -5,6 +5,8 @@ services:
     image: {{ dns_standby_image }}
     container_name: dns-adguard-home
     network_mode: host
+    environment:
+      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
     volumes:
       - ./work:/opt/adguardhome/work
       - ./conf:/opt/adguardhome/conf

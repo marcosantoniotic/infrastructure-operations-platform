@@ -10,6 +10,9 @@ administration endpoint moves to port `80/tcp`. Both ports are restricted to
 the explicit administration networks so repeated automation remains valid
 across the lifecycle transition.
 
+The container receives an explicit `SSL_CERT_FILE` path so encrypted upstream
+DNS and filter downloads use the image CA trust bundle consistently.
+
 The role intentionally stops at the initial setup endpoint. It does not change
 DHCP, advertise the resolver or commit the generated `AdGuardHome.yaml`. Finish
 initial setup through the restricted administration network, then model local
