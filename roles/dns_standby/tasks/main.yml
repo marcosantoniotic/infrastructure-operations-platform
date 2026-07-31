@@ -1,0 +1,90 @@
+---
+- name: Validate standby DNS variables
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname in groups.get('standby', [])
+      - dns_standby_project_dir.startswith('/')
+      - dns_standby_allowed_networks | length > 0
+      - dns_standby_admin_networks | length > 0
+      - dns_standby_image is match('^adguard/adguardhome:v[0-9]+\.[0-9]+\.[0-9]+$')
+    fail_msg: >-
+      Standby DNS requires explicit client and administration networks and a
+      pinned stable AdGuard Home image.
+
+- name: Assert Docker is running
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Create standby DNS directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  loop:
+    - "{{ dns_standby_project_dir }}"
+    - "{{ dns_standby_project_dir }}/work"
+    - "{{ dns_standby_project_dir }}/conf"
+
+- name: Render standby DNS Compose project
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ dns_standby_project_dir }}/compose.yaml"
+    owner: root
+    group: root
+    mode: "0640"
+
+- name: Validate standby DNS Compose project
+  ansible.builtin.command:
+    cmd: docker compose --project-directory {{ dns_standby_project_dir }} config --quiet
+  changed_when: false
+
+- name: Permit DNS clients from approved networks
+  ansible.posix.firewalld:
+    rich_rule: >-
+      rule family=ipv4 source address={{ item.0 }}
+      port port={{ dns_standby_dns_port }} protocol={{ item.1 }} accept
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ dns_standby_allowed_networks | product(['tcp', 'udp']) | list }}"
+
+- name: Permit administration from approved networks
+  ansible.posix.firewalld:
+    rich_rule: >-
+      rule family=ipv4 source address={{ item.0 }}
+      port port={{ item.1 }} protocol=tcp accept
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: >-
+    {{ dns_standby_admin_networks |
+       product([dns_standby_initial_admin_port, dns_standby_admin_port]) | list }}
+
+- name: Inspect AdGuard Home operational configuration
+  ansible.builtin.stat:
+    path: "{{ dns_standby_project_dir }}/conf/AdGuardHome.yaml"
+  register: dns_standby_configuration
+
+- name: Deploy standby DNS project
+  community.docker.docker_compose_v2:
+    project_src: "{{ dns_standby_project_dir }}"
+    state: present
+    pull: missing
+
+- name: Wait for initial administration endpoint
+  ansible.builtin.uri:
+    url: >-
+      http://127.0.0.1:{{
+        dns_standby_admin_port
+        if dns_standby_configuration.stat.exists
+        else dns_standby_initial_admin_port
+      }}/
+    status_code: 200
+  register: dns_standby_admin_response
+  retries: 20
+  delay: 3
+  until: dns_standby_admin_response.status == 200

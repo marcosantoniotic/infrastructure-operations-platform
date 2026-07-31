@@ -223,6 +223,7 @@ Run preflight and the operating-system baseline against only the standby:
 .\automation\scripts\Run-ValidationDocker.ps1 `
   -TargetGroup standby `
   -VerifyIdempotence
+.\automation\scripts\Run-ValidationStandbyDns.ps1 -VerifyIdempotence
 ```
 
 The default target remains `platform`. Docker is installed only when its

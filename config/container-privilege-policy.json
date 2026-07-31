@@ -37,6 +37,22 @@
       "review_days": 180
     },
     {
+      "id": "standby-dns-low-port-bind",
+      "template": "roles/dns_standby/templates/compose.yaml.j2",
+      "service": "adguard-home",
+      "control": "capability-net-bind-service",
+      "owner_role": "network-services-administrator",
+      "rationale": "Bind DNS on privileged port 53 without granting broader Linux capabilities.",
+      "compensating_controls": [
+        "only NET_BIND_SERVICE added",
+        "all other Linux capabilities dropped",
+        "no-new-privileges enabled",
+        "client and administration networks restricted by firewalld",
+        "image version pinned and scanned"
+      ],
+      "review_days": 180
+    },
+    {
       "id": "portainer-docker-api-administration",
       "template": "roles/portainer/templates/compose.yaml.j2",
       "service": "portainer",
