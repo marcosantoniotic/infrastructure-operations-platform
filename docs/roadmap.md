@@ -58,5 +58,5 @@ Consulte [Fase futura: GLPI](glpi-phase.md).
 - [x] separar backups do host principal;
 - [x] testar recuperação dos dados e aplicações em VM isolada;
 - [x] medir reconstrução integral a partir de uma VM limpa, incluindo dependências externas;
-- [ ] avaliar proxy e DNS de contingência;
-- [ ] definir estratégia de alta disponibilidade orientada por requisitos de RTO, RPO e criticidade.
+- [x] avaliar proxy e DNS de contingência;
+- [x] definir estratégia de alta disponibilidade orientada por requisitos de RTO, RPO e criticidade.
