@@ -1,6 +1,11 @@
 [CmdletBinding()]
 param(
-    [switch]$VerifyIdempotence
+    [switch]$VerifyIdempotence,
+
+    [ValidateSet('platform', 'standby')]
+    [string]$TargetGroup = 'platform',
+
+    [string]$TargetHostname
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,7 +36,16 @@ if (-not (Test-Path -LiteralPath $role -PathType Container)) {
     throw "Required role not found: $role"
 }
 
-& $preflightRunner
+if ([string]::IsNullOrWhiteSpace($TargetHostname)) {
+    $TargetHostname = if ($TargetGroup -eq 'standby') {
+        'srv02-standby'
+    }
+    else {
+        'srv01-validation'
+    }
+}
+
+& $preflightRunner -TargetGroup $TargetGroup
 if ($LASTEXITCODE -notin @(0, $null)) {
     throw 'Validation preflight failed before baseline execution.'
 }
@@ -45,7 +59,7 @@ $remoteRoot = "/home/$adminUsername/infrastructure-operations-platform"
 New-Item -ItemType Directory -Path $groupVarsRoot -Force | Out-Null
 $groupVarsContent = @'
 ---
-platform_hostname: srv01-validation
+platform_hostname: $TargetHostname
 platform_timezone: America/Sao_Paulo
 
 rhel_apply_updates: true
@@ -106,7 +120,7 @@ $runs = if ($VerifyIdempotence) { 2 } else { 1 }
 for ($run = 1; $run -le $runs; $run++) {
     Write-Host "Executing RHEL baseline: pass $run of $runs."
     & ssh.exe @commonOptions $controller `
-        "cd $remoteRoot && ANSIBLE_ROLES_PATH=$remoteRoot/roles ansible-playbook -i inventories/validation/hosts.yml playbooks/bootstrap-rhel.yml"
+        "cd $remoteRoot && ANSIBLE_ROLES_PATH=$remoteRoot/roles ansible-playbook -i inventories/validation/hosts.yml playbooks/bootstrap-rhel.yml -e target_group=$TargetGroup"
     if ($LASTEXITCODE -ne 0) {
         throw "RHEL baseline failed on pass $run."
     }

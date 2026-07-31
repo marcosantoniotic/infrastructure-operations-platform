@@ -1,6 +1,6 @@
 ---
 - name: Validate target compatibility
-  hosts: platform
+  hosts: "{{ target_group | default('platform') }}"
   gather_facts: true
   become: false
   tasks:
@@ -16,14 +16,33 @@
     - name: Validate minimum memory
       ansible.builtin.assert:
         that:
-          - ansible_facts.memtotal_mb | int >= 4096
-        fail_msg: "At least 4 GiB of RAM is required for the initial platform modules."
+          - ansible_facts.memtotal_mb | int >= (minimum_memory_mb | default(4096) | int)
+        fail_msg: >-
+          At least {{ minimum_memory_mb | default(4096) }} MiB of guest-visible
+          RAM is required for this target profile.
 
     - name: Validate minimum processor count
       ansible.builtin.assert:
         that:
           - ansible_facts.processor_vcpus | int >= 2
         fail_msg: "At least 2 vCPUs are required."
+
+    - name: Inspect Red Hat subscription identity
+      ansible.builtin.command:
+        cmd: subscription-manager identity
+      register: preflight_subscription_identity
+      changed_when: false
+      failed_when: false
+      when: ansible_facts.distribution == "RedHat"
+
+    - name: Require registered RHEL repositories
+      ansible.builtin.assert:
+        that:
+          - preflight_subscription_identity.rc == 0
+        fail_msg: >-
+          This RHEL target is not registered. Register it interactively with
+          subscription-manager before running the operating-system baseline.
+      when: ansible_facts.distribution == "RedHat"
 
     - name: Report detected target
       ansible.builtin.debug:
