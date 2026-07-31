@@ -226,6 +226,20 @@ Run preflight and the operating-system baseline against only the standby:
 .\automation\scripts\Run-ValidationStandbyDns.ps1 -VerifyIdempotence
 ```
 
+After completing the AdGuard Home first-run wizard, enroll the platform as an
+isolated DNS client pilot:
+
+```powershell
+.\automation\scripts\Run-ValidationDnsClient.ps1 -VerifyIdempotence
+```
+
+The runner selects the validation-only `ens192` connection, gives the standby
+resolver a negative NetworkManager DNS priority, validates external resolution
+and requires a sinkhole response for a blocked test domain. A guest operating
+system reboot preserves the setting. A `vagrant reload` intentionally rebuilds
+the validation adapter, so rerun the client automation after that lifecycle
+operation.
+
 The default target remains `platform`. Docker is installed only when its
 dedicated runner is invoked. Selecting `standby` never deploys application
 stacks or stateful services.

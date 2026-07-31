@@ -1,0 +1,7 @@
+---
+- name: Configure managed DNS clients
+  hosts: "{{ target_group | default('platform') }}"
+  gather_facts: true
+  become: true
+  roles:
+    - role: dns_client
