@@ -18,7 +18,11 @@
           observability_alertmanager_smtp_password | length >= 16 and
           not observability_alertmanager_smtp_password.startswith("<") and
           observability_alertmanager_smtp_from | length > 0 and
-          observability_alertmanager_email_to | length > 0
+          observability_alertmanager_email_to | length > 0 and
+          observability_alertmanager_critical_group_wait | length > 0 and
+          observability_alertmanager_critical_repeat_interval | length > 0 and
+          observability_alertmanager_warning_group_wait | length > 0 and
+          observability_alertmanager_warning_repeat_interval | length > 0
         )
     fail_msg: >-
       Replace the Grafana password placeholder with a strong Ansible Vault
@@ -250,14 +254,14 @@
     - not ansible_check_mode
     - observability_alertmanager_enabled | bool
 
-- name: Recreate configuration consumers after atomic file replacement
+- name: Recreate configuration consumers after configuration changes
   ansible.builtin.shell:
     cmd: |
       set -o errexit -o nounset -o pipefail
       docker compose --project-directory {{ observability_project_dir }} \
-        rm --stop --force grafana prometheus blackbox-exporter{% if observability_alertmanager_enabled | bool %} alertmanager{% endif %}
+        rm --stop --force grafana prometheus blackbox-exporter{{ ' alertmanager' if observability_alertmanager_enabled | bool else '' }}
       docker compose --project-directory {{ observability_project_dir }} \
-        up --detach --force-recreate prometheus blackbox-exporter grafana{% if observability_alertmanager_enabled | bool %} alertmanager{% endif %}
+        up --detach --force-recreate prometheus blackbox-exporter grafana{{ ' alertmanager' if observability_alertmanager_enabled | bool else '' }}
     executable: /bin/bash
   changed_when: true
   when:
@@ -309,6 +313,16 @@
   retries: 30
   delay: 5
   until: observability_alertmanager_ready.status == 200
+  when:
+    - not ansible_check_mode
+    - observability_alertmanager_enabled | bool
+
+- name: Reload Alertmanager configuration
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_alertmanager_bind_address }}:{{ observability_alertmanager_port }}/-/reload
+    method: POST
+    status_code: 200
   when:
     - not ansible_check_mode
     - observability_alertmanager_enabled | bool

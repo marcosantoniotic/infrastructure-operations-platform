@@ -22,6 +22,13 @@
 - agrupa alertas por nome, serviço e severidade;
 - suprime avisos inferiores quando o mesmo incidente está crítico;
 - envia abertura e resolução por SMTP sem gravar a chave no repositório.
+
+Política padrão de notificação:
+
+- críticos: espera de 15 segundos e repetição a cada quatro horas;
+- avisos: agrupamento de dois minutos e repetição a cada 12 horas;
+- recuperação: mensagem `RESOLVED` enviada pela mesma rota;
+- certificados: o crítico de 15 dias suprime o aviso de 30 dias do mesmo serviço.
 - disponibilidade e certificados por Blackbox Exporter;
 - métricas do Traefik;
 - telemetria de rede por SNMP Exporter;
