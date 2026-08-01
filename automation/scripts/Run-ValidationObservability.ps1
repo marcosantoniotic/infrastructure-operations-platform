@@ -127,6 +127,10 @@ if ($EnableEmailAlerts) {
         "observability_alertmanager_smtp_username: `"$AlertmanagerSmtpUsername`""
         'observability_alertmanager_smtp_password: "{{ vault_alertmanager_smtp_password }}"'
         'observability_alertmanager_email_to: alerts@marnep.com.br'
+        'observability_alertmanager_critical_group_wait: 15s'
+        'observability_alertmanager_critical_repeat_interval: 4h'
+        'observability_alertmanager_warning_group_wait: 2m'
+        'observability_alertmanager_warning_repeat_interval: 12h'
     )
 }
 $alertmanagerVariablesYaml = $alertmanagerVariables -join "`n"

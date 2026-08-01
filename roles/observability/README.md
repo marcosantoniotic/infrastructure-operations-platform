@@ -53,3 +53,8 @@ no AdGuard administrative credential and are suitable for availability alerts.
 Set `observability_alertmanager_enabled: true`, provide the SMTP login and
 sender/recipient addresses, and store `vault_alertmanager_smtp_password` in the
 encrypted inventory vault. Alertmanager binds only to loopback by default.
+
+Critical alerts wait 15 seconds and repeat every four hours while the incident
+remains active. Warning alerts are grouped for two minutes and repeat every 12
+hours. A critical TLS-expiry alert inhibits the lower-priority warning for the
+same service. All routes send a resolved notification when service recovers.
