@@ -12,6 +12,7 @@ vault_zabbix_database_root_password: "<ZABBIX_DATABASE_ROOT_PASSWORD>"
 vault_zabbix_admin_password: "<ZABBIX_ADMIN_PASSWORD>"
 vault_portainer_admin_password: "<PORTAINER_ADMIN_PASSWORD>"
 vault_grafana_admin_password: "<GRAFANA_ADMIN_PASSWORD>"
+vault_alertmanager_smtp_password: "<ALERTMANAGER_SMTP_PASSWORD>"
 vault_external_backup_restic_password: "<RESTIC_REPOSITORY_PASSWORD>"
 vault_external_backup_rclone_config: |
   <COMPLETE_RCLONE_CONFIG>

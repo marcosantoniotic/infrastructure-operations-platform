@@ -7,7 +7,7 @@
 | Traefik | `/opt/traefik` | `compose.yaml`, `traefik.yml`, `dynamic/` |
 | Zabbix | `/opt/zabbix` | `compose.yaml`, `secrets/` |
 | NetBox | `/opt/netbox` | `docker-compose.yml`, `docker-compose.override.yml` |
-| Observabilidade | `/opt/observability` | `compose.yaml`, `prometheus/`, `grafana/`, `blackbox/`, `snmp/` |
+| Observabilidade | `/opt/observability` | `compose.yaml`, `prometheus/`, `alertmanager/`, `grafana/`, `blackbox/`, `secrets/` |
 | Portainer | `/opt/portainer` | `compose.yaml` |
 
 ## Cockpit
@@ -110,6 +110,8 @@ Grafana:
 Núcleo implementado:
 
 - Prometheus com retenção simultânea por tempo e tamanho;
+- Alertmanager com agrupamento, deduplicação, avisos de resolução e entrega
+  SMTP autenticada por segredo armazenado no Ansible Vault;
 - Grafana com credencial administrativa em Ansible Vault;
 - Node Exporter para métricas do RHEL;
 - cAdvisor isolado para métricas de containers;

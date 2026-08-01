@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
     [switch]$EnableTraefik,
+    [switch]$EnableEmailAlerts,
+    [string]$AlertmanagerSmtpUsername = $env:ALERTMANAGER_SMTP_USERNAME,
     [switch]$VerifyIdempotence,
     [switch]$VerifyPersistence
 )
@@ -106,6 +108,29 @@ if ($EnableTraefik) {
 }
 $traefikVariablesYaml = $traefikVariables -join "`n"
 
+$alertmanagerVariables = @('observability_alertmanager_enabled: false')
+if ($EnableEmailAlerts) {
+    if ([string]::IsNullOrWhiteSpace($AlertmanagerSmtpUsername)) {
+        throw 'Provide -AlertmanagerSmtpUsername or set ALERTMANAGER_SMTP_USERNAME.'
+    }
+    $smtpPassword = ([string](Get-Clipboard -Raw)).Trim()
+    if ($smtpPassword.Length -lt 16) {
+        throw 'Copy the Brevo SMTP key from the password manager before using -EnableEmailAlerts.'
+    }
+    $alertmanagerVariables = @(
+        'observability_alertmanager_enabled: true'
+        'observability_alertmanager_image: prom/alertmanager:v0.32.1'
+        'observability_alertmanager_bind_address: 127.0.0.1'
+        'observability_alertmanager_port: 9093'
+        'observability_alertmanager_smtp_smarthost: smtp-relay.brevo.com:587'
+        'observability_alertmanager_smtp_from: alerts@marnep.com.br'
+        "observability_alertmanager_smtp_username: `"$AlertmanagerSmtpUsername`""
+        'observability_alertmanager_smtp_password: "{{ vault_alertmanager_smtp_password }}"'
+        'observability_alertmanager_email_to: alerts@marnep.com.br'
+    )
+}
+$alertmanagerVariablesYaml = $alertmanagerVariables -join "`n"
+
 $groupVarsContent = if (Test-Path -LiteralPath $groupVars) {
     Get-Content -LiteralPath $groupVars -Raw
 }
@@ -122,6 +147,7 @@ observability_grafana_image: grafana/grafana:13.1.1
 observability_node_exporter_image: prom/node-exporter:v1.12.1
 observability_cadvisor_image: ghcr.io/google/cadvisor:v0.60.5
 observability_blackbox_image: prom/blackbox-exporter:v0.28.0
+$alertmanagerVariablesYaml
 observability_scrape_interval: 30s
 observability_prometheus_retention_time: 30d
 observability_prometheus_retention_size: 8GB
@@ -164,6 +190,12 @@ $traefikVariablesYaml
 
 $adminCredential = New-RandomSecret
 $vaultAdditions = "vault_grafana_admin_password: `"$adminCredential`"`n"
+if ($EnableEmailAlerts) {
+    $escapedSmtpPassword = $smtpPassword.Replace('"', '\"')
+    $vaultAdditions += "vault_alertmanager_smtp_password: `"$escapedSmtpPassword`"`n"
+    Set-Clipboard -Value 'CLEARED'
+    Remove-Variable smtpPassword, escapedSmtpPassword -ErrorAction SilentlyContinue
+}
 [IO.File]::WriteAllText($vaultAdditionsFile, $vaultAdditions, $utf8WithoutBom)
 Set-CurrentUserFileAcl -Path $vaultAdditionsFile
 
@@ -209,6 +241,11 @@ if ! grep -q '^vault_grafana_admin_password:' /tmp/platform-vault-plain.yml; the
   printf '%s\n' created > /tmp/grafana-secret-state
 else
   printf '%s\n' existing > /tmp/grafana-secret-state
+fi
+if grep -q '^vault_alertmanager_smtp_password:' /tmp/observability-vault-additions.yml; then
+  sed -i '/^vault_alertmanager_smtp_password:/d' /tmp/platform-vault-plain.yml
+  grep '^vault_alertmanager_smtp_password:' /tmp/observability-vault-additions.yml \
+    >> /tmp/platform-vault-plain.yml
 fi
 ansible-vault encrypt /tmp/platform-vault-plain.yml \
   --vault-password-file "`$vault_key_path" \

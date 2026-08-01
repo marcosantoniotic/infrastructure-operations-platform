@@ -15,6 +15,13 @@
 
 - métricas do RHEL por Node Exporter;
 - métricas de containers por cAdvisor;
+
+### Alertmanager
+
+- recebe as regras avaliadas pelo Prometheus;
+- agrupa alertas por nome, serviço e severidade;
+- suprime avisos inferiores quando o mesmo incidente está crítico;
+- envia abertura e resolução por SMTP sem gravar a chave no repositório.
 - disponibilidade e certificados por Blackbox Exporter;
 - métricas do Traefik;
 - telemetria de rede por SNMP Exporter;

@@ -1,18 +1,20 @@
 # Observability role
 
-Deploys Prometheus, Grafana, Node Exporter, cAdvisor and Blackbox Exporter as
-an independent Compose project.
+Deploys Prometheus, Alertmanager, Grafana, Node Exporter, cAdvisor and Blackbox
+Exporter as an independent Compose project.
 
 ## Responsibilities
 
 - Prometheus stores high-resolution time series with bounded retention;
+- Alertmanager groups, deduplicates and routes Prometheus alerts by email;
 - Node Exporter provides RHEL host metrics;
 - cAdvisor provides container resource metrics;
 - Blackbox Exporter provides HTTP/TLS and DNS availability and latency probes;
 - Grafana provides provisioned, version-controlled visualization.
 
-Zabbix remains responsible for operational triggers, events and maps. This
-module does not duplicate that responsibility.
+Zabbix remains the event and topology platform for its monitored assets.
+Alertmanager independently routes the metric and probe rules evaluated by
+Prometheus; it does not replace Zabbix triggers or maps.
 
 ## Security model
 
@@ -21,6 +23,8 @@ module does not duplicate that responsibility.
 - Blackbox Exporter has no published host port;
 - Grafana public signup, anonymous access and telemetry are disabled;
 - the Grafana administrator password is supplied through Ansible Vault;
+- the SMTP key is supplied through Ansible Vault and mounted as a read-only
+  file visible only to the Alertmanager runtime user;
 - only Grafana is optionally published through Traefik;
 - Prometheus and Grafana data use independent named volumes;
 - cAdvisor receives the host access required for container metrics and is not
@@ -45,3 +49,7 @@ application endpoints in the role.
 Each item in `observability_dns_targets` creates an independent DNS probe with
 an explicit address, query name and optional query type. These probes require
 no AdGuard administrative credential and are suitable for availability alerts.
+
+Set `observability_alertmanager_enabled: true`, provide the SMTP login and
+sender/recipient addresses, and store `vault_alertmanager_smtp_password` in the
+encrypted inventory vault. Alertmanager binds only to loopback by default.

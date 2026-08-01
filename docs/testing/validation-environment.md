@@ -241,6 +241,17 @@ publish operational AdGuard metrics through the platform Node Exporter:
 .\automation\scripts\Run-ValidationObservability.ps1 -EnableTraefik
 ```
 
+To validate email delivery, copy the SMTP key from the password manager and
+pass only the non-secret SMTP login as a parameter. The runner encrypts the key
+in Ansible Vault and clears the clipboard after capture:
+
+```powershell
+.\automation\scripts\Run-ValidationObservability.ps1 `
+  -EnableTraefik `
+  -EnableEmailAlerts `
+  -AlertmanagerSmtpUsername "<SMTP_LOGIN>"
+```
+
 The first runner generates the technical identity, stores its password and
 bcrypt material only in the encrypted validation Vault, and writes a temporary
 ACL-restricted credential record under `.validation/`. AdGuard Home does not

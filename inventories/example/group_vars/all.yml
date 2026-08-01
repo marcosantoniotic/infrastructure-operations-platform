@@ -181,11 +181,20 @@ observability_grafana_image: grafana/grafana:13.1.1
 observability_node_exporter_image: prom/node-exporter:v1.12.1
 observability_cadvisor_image: ghcr.io/google/cadvisor:v0.60.5
 observability_blackbox_image: prom/blackbox-exporter:v0.28.0
+observability_alertmanager_image: prom/alertmanager:v0.32.1
 observability_scrape_interval: 30s
 observability_prometheus_retention_time: 30d
 observability_prometheus_retention_size: 8GB
 observability_prometheus_bind_address: 127.0.0.1
 observability_prometheus_port: 9090
+observability_alertmanager_enabled: false
+observability_alertmanager_bind_address: 127.0.0.1
+observability_alertmanager_port: 9093
+observability_alertmanager_smtp_smarthost: smtp-relay.brevo.com:587
+observability_alertmanager_smtp_from: "alerts@marnep.com.br"
+observability_alertmanager_smtp_username: "<BREVO_SMTP_LOGIN>"
+observability_alertmanager_smtp_password: "{{ vault_alertmanager_smtp_password }}"
+observability_alertmanager_email_to: "alerts@marnep.com.br"
 observability_grafana_bind_address: 127.0.0.1
 observability_grafana_port: 3000
 observability_grafana_admin_user: admin
