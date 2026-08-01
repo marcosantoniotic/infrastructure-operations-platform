@@ -1,0 +1,35 @@
+global:
+  smtp_smarthost: "{{ observability_alertmanager_smtp_smarthost }}"
+  smtp_from: "{{ observability_alertmanager_smtp_from }}"
+  smtp_auth_username: "{{ observability_alertmanager_smtp_username }}"
+  smtp_auth_password_file: /run/secrets/alertmanager_smtp_password
+  smtp_require_tls: true
+
+route:
+  receiver: infrastructure-email
+  group_by:
+    - alertname
+    - service
+    - severity
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: infrastructure-email
+    email_configs:
+      - to: "{{ observability_alertmanager_email_to }}"
+        send_resolved: true
+        headers:
+          subject: >-
+            [Infrastructure Operations] {{ '{{' }} .Status | toUpper {{ '}}' }} -
+            {{ '{{' }} .CommonLabels.alertname {{ '}}' }}
+
+inhibit_rules:
+  - source_matchers:
+      - severity="critical"
+    target_matchers:
+      - severity=~"warning|info"
+    equal:
+      - alertname
+      - service

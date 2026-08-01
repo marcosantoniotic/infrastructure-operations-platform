@@ -5,6 +5,14 @@ global:
 
 rule_files:
   - /etc/prometheus/alerts.yml
+{% if observability_alertmanager_enabled | bool %}
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+{% endif %}
 
 scrape_configs:
   - job_name: prometheus

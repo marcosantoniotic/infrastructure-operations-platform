@@ -11,6 +11,15 @@
       - >-
         not (observability_enable_traefik | bool) or
         observability_grafana_hostname | length > 0
+      - >-
+        not (observability_alertmanager_enabled | bool) or
+        (
+          observability_alertmanager_smtp_username | length > 0 and
+          observability_alertmanager_smtp_password | length >= 16 and
+          not observability_alertmanager_smtp_password.startswith("<") and
+          observability_alertmanager_smtp_from | length > 0 and
+          observability_alertmanager_email_to | length > 0
+        )
     fail_msg: >-
       Replace the Grafana password placeholder with a strong Ansible Vault
       value and configure retention and ingress variables.
@@ -52,6 +61,8 @@
       mode: "0700"
     - path: "{{ observability_project_dir }}/prometheus"
       mode: "0750"
+    - path: "{{ observability_project_dir }}/alertmanager"
+      mode: "0750"
     - path: "{{ observability_project_dir }}/blackbox"
       mode: "0750"
     - path: "{{ observability_project_dir }}/grafana"
@@ -80,7 +91,19 @@
     owner: root
     group: root
     mode: "0644"
+    unsafe_writes: true
   no_log: true
+
+- name: Install Alertmanager SMTP secret
+  ansible.builtin.copy:
+    content: "{{ observability_alertmanager_smtp_password }}"
+    dest: "{{ observability_project_dir }}/secrets/alertmanager_smtp_password"
+    owner: "65534"
+    group: "65534"
+    mode: "0400"
+    unsafe_writes: true
+  no_log: true
+  when: observability_alertmanager_enabled | bool
 
 - name: Render observability configuration
   ansible.builtin.template:
@@ -89,11 +112,14 @@
     owner: root
     group: root
     mode: "0644"
+    unsafe_writes: true
   loop:
     - src: prometheus.yml.j2
       dest: prometheus/prometheus.yml
     - src: alerts.yml.j2
       dest: prometheus/alerts.yml
+    - src: alertmanager.yml.j2
+      dest: alertmanager/alertmanager.yml
     - src: blackbox.yml.j2
       dest: blackbox/blackbox.yml
     - src: grafana-datasource.yml.j2
@@ -109,6 +135,9 @@
     - src: dns-service-health.json.j2
       dest: grafana/dashboards/dns-service-health.json
   register: observability_rendered_configuration
+  when: >-
+    item.src != 'alertmanager.yml.j2' or
+    observability_alertmanager_enabled | bool
 
 - name: Render observability Compose project
   ansible.builtin.template:
@@ -117,6 +146,7 @@
     owner: root
     group: root
     mode: "0640"
+    unsafe_writes: true
 
 - name: Validate rendered observability Compose configuration
   ansible.builtin.command:
@@ -157,6 +187,26 @@
   changed_when: false
   when: not ansible_check_mode
 
+- name: Validate Alertmanager configuration
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --entrypoint
+      - /bin/amtool
+      - -v
+      - "{{ observability_project_dir }}/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro,Z"
+      - -v
+      - "{{ observability_project_dir }}/secrets/alertmanager_smtp_password:/run/secrets/alertmanager_smtp_password:ro,Z"
+      - "{{ observability_alertmanager_image }}"
+      - check-config
+      - /etc/alertmanager/alertmanager.yml
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - observability_alertmanager_enabled | bool
+
 - name: Deploy observability project
   community.docker.docker_compose_v2:
     project_src: "{{ observability_project_dir }}"
@@ -188,14 +238,26 @@
   failed_when: false
   when: not ansible_check_mode
 
+- name: Inspect Alertmanager local port publication
+  ansible.builtin.command:
+    cmd: >-
+      docker compose --project-directory {{ observability_project_dir }}
+      port alertmanager 9093
+  register: observability_alertmanager_published_port
+  changed_when: false
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - observability_alertmanager_enabled | bool
+
 - name: Recreate configuration consumers after atomic file replacement
   ansible.builtin.shell:
     cmd: |
       set -o errexit -o nounset -o pipefail
       docker compose --project-directory {{ observability_project_dir }} \
-        rm --stop --force grafana prometheus blackbox-exporter
+        rm --stop --force grafana prometheus blackbox-exporter{% if observability_alertmanager_enabled | bool %} alertmanager{% endif %}
       docker compose --project-directory {{ observability_project_dir }} \
-        up --detach prometheus blackbox-exporter grafana
+        up --detach --force-recreate prometheus blackbox-exporter grafana{% if observability_alertmanager_enabled | bool %} alertmanager{% endif %}
     executable: /bin/bash
   changed_when: true
   when:
@@ -203,7 +265,11 @@
     - >-
       observability_rendered_configuration.changed or
       observability_prometheus_published_port.stdout | trim | length == 0 or
-      observability_grafana_published_port.stdout | trim | length == 0
+      observability_grafana_published_port.stdout | trim | length == 0 or
+      (
+        observability_alertmanager_enabled | bool and
+        observability_alertmanager_published_port.stdout | default('') | trim | length == 0
+      )
 
 - name: Reload Blackbox Exporter configuration
   ansible.builtin.command:
@@ -232,6 +298,37 @@
     method: POST
     status_code: 200
   when: not ansible_check_mode
+
+- name: Wait for Alertmanager readiness
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_alertmanager_bind_address }}:{{ observability_alertmanager_port }}/-/ready
+    method: GET
+    status_code: 200
+  register: observability_alertmanager_ready
+  retries: 30
+  delay: 5
+  until: observability_alertmanager_ready.status == 200
+  when:
+    - not ansible_check_mode
+    - observability_alertmanager_enabled | bool
+
+- name: Validate Prometheus Alertmanager discovery
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/api/v1/alertmanagers
+    method: GET
+    status_code: 200
+    return_content: true
+  register: observability_prometheus_alertmanagers
+  retries: 20
+  delay: 5
+  until: >-
+    observability_prometheus_alertmanagers.json.status == 'success' and
+    observability_prometheus_alertmanagers.json.data.activeAlertmanagers | length == 1
+  when:
+    - not ansible_check_mode
+    - observability_alertmanager_enabled | bool
 
 - name: Validate all Prometheus scrape targets
   ansible.builtin.uri:
@@ -433,6 +530,10 @@
         http://{{ observability_prometheus_bind_address }}:{{ observability_prometheus_port }}
       grafana_fallback: >-
         http://{{ observability_grafana_bind_address }}:{{ observability_grafana_port }}
+      alertmanager_fallback: >-
+        {{ ('http://' + observability_alertmanager_bind_address + ':' +
+            (observability_alertmanager_port | string))
+           if observability_alertmanager_enabled else 'disabled' }}
       active_targets: >-
         {{ observability_prometheus_targets.json.data.activeTargets | length
            if not ansible_check_mode else 'not checked' }}
