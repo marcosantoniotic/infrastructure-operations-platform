@@ -56,6 +56,10 @@ foreach ($file in $files) {
         if ($pattern -eq '\b(?:\d{1,3}\.){3}\d{1,3}\b') {
             # Loopback is a public implementation constant, not infrastructure data.
             $contentToInspect = $contentToInspect -replace '\b127(?:\.\d{1,3}){3}\b', '<LOOPBACK>'
+            # RFC 5737 TEST-NET ranges are reserved for public documentation.
+            $contentToInspect = $contentToInspect -replace '\b192\.0\.2\.\d{1,3}\b', '<TEST-NET-1>'
+            $contentToInspect = $contentToInspect -replace '\b198\.51\.100\.\d{1,3}\b', '<TEST-NET-2>'
+            $contentToInspect = $contentToInspect -replace '\b203\.0\.113\.\d{1,3}\b', '<TEST-NET-3>'
         }
         if ($pattern -match 'password\|passwd') {
             # HCL variable references are wiring, not embedded secret values.

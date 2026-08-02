@@ -64,6 +64,9 @@ services:
     networks:
       - backend
       - agent
+{% if zabbix_enable_traefik and zabbix_provision_platform_map %}
+      - proxy
+{% endif %}
 
   zabbix-web:
     image: {{ zabbix_web_image }}

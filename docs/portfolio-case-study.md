@@ -2,7 +2,7 @@
 
 ## Resumo executivo
 
-O projeto consolida ferramentas utilizadas em operações de infraestrutura em uma plataforma integrada, segura e observável. A implementação serve como referência técnica reproduzível e como ambiente permanente de validação de arquitetura, mudanças e automações.
+O projeto consolida ferramentas utilizadas em operações de infraestrutura em uma plataforma integrada, segura e observável. Trata-se de uma implementação autoral e reproduzível em ambiente controlado de validação, baseada em desafios, padrões operacionais e necessidades observados ao longo da experiência profissional.
 
 ## Contexto
 
@@ -54,7 +54,11 @@ ADRs, runbooks, inventário, política de segurança, roadmap e validação auto
 - dashboards para host, Docker, proxy, certificados, UDM e MikroTik;
 - inventário técnico e configuração sanitizada;
 - repositório preparado para revisão pública;
-- roadmap claro para confiabilidade, automação, GLPI e resiliência.
+- construção reproduzível com Packer, Vagrant e Ansible;
+- CI para PowerShell, Ansible, Compose, Prometheus, inventário de imagens e segurança;
+- backups consistentes com réplica externa criptografada e restauração isolada;
+- alertas por severidade com Alertmanager e entrega de e-mail validada;
+- roadmap claro para GLPI e evolução da resiliência.
 
 ## Decisões relevantes
 
@@ -70,16 +74,24 @@ ADRs, runbooks, inventário, política de segurança, roadmap e validação auto
 
 ## Maturidade e transparência
 
-O projeto registra também lacunas atuais. A principal prioridade identificada é implantar e comprovar backups automáticos com testes de restauração. Tornar riscos e pendências explícitos faz parte da qualidade profissional da solução.
+O projeto registra também lacunas atuais. Backup, restauração, CI e alertas possuem implementação versionada e validação operacional. O pacote visual sanitizado foi concluído com evidências observadas no ambiente funcional, mantendo separação clara entre resultados comprovados e evoluções planejadas. Tornar riscos e pendências explícitos faz parte da qualidade profissional da solução.
 
 ## Próximos passos
 
-1. backup monitorado e disaster recovery comprovado;
-2. CI para validação de configuração e detecção de segredos;
-3. política formal de atualização e rotação de credenciais;
-4. integração de alertas com fluxo ITSM;
-5. fase GLPI;
-6. avaliação de resiliência multi-nó conforme requisitos.
+1. publicar a primeira release do marco funcional;
+2. formalizar política de atualização e rotação de credenciais;
+3. integrar alertas ao futuro fluxo ITSM;
+4. desenvolver a fase GLPI;
+5. avaliar resiliência multi-nó conforme requisitos.
+
+## Evidências verificáveis
+
+- [pacote de resultados e evidências](evidence/README.md);
+- [matriz requisito–implementação–prova](evidence/evidence-matrix.md);
+- [arquitetura sanitizada](evidence/assets/architecture-overview.svg);
+- [backup e restauração](runbooks/backup-restore.md);
+- [objetivos de confiabilidade](reliability-objectives.md);
+- [workflows de CI](../.github/workflows/).
 
 ## Competências evidenciadas
 

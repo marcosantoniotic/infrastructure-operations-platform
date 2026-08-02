@@ -7,14 +7,27 @@
 ![Observability](https://img.shields.io/badge/observability-Zabbix%20%7C%20Prometheus%20%7C%20Grafana-F46800)
 ![Ingress](https://img.shields.io/badge/ingress-Traefik-24A1C1?logo=traefikproxy&logoColor=white)
 ![Security](https://img.shields.io/badge/security-Zero%20Trust-0F9D58)
-![Documentation](https://img.shields.io/badge/documentation-portfolio--ready-6F42C1)
+![Evidence](https://img.shields.io/badge/portfolio_evidence-verified-2EA44F)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Validation](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml/badge.svg)](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml)
 
 Plataforma profissional de operações de infraestrutura criada para demonstrar, validar e documentar práticas aplicáveis a ambientes corporativos. O projeto integra inventário técnico, proxy reverso, Zero Trust, observabilidade, monitoramento, gestão de containers, automação e governança operacional em uma arquitetura coesa.
 
-A implementação física funciona como ambiente de validação técnica contínua das ferramentas utilizadas no dia a dia profissional. O foco do projeto não é o local onde executa, mas a qualidade de engenharia: isolamento, segurança, rastreabilidade, recuperação, documentação e decisões arquiteturais reproduzíveis.
+A implementação autoral funciona como ambiente controlado de validação técnica contínua, inspirado em desafios e padrões encontrados ao longo da experiência profissional. O foco do projeto é a qualidade de engenharia: isolamento, segurança, rastreabilidade, recuperação, documentação e decisões arquiteturais reproduzíveis.
 
 > Este repositório foi preparado para publicação. Endereços, domínios, identificadores de conta, credenciais e tokens reais não fazem parte do conteúdo versionado.
+
+![Arquitetura sanitizada da plataforma](docs/evidence/assets/architecture-overview.svg)
+
+## Leitura em dois minutos
+
+1. Consulte os [resultados e evidências](docs/evidence/README.md).
+2. Relacione competências, implementação e prova na [matriz de comprovação](docs/evidence/evidence-matrix.md).
+3. Entenda contexto, decisões e resultados no [estudo de caso](docs/portfolio-case-study.md).
+4. Verifique a automação nos workflows de [validação](.github/workflows/validation.yml) e [segurança de imagens](.github/workflows/image-security.yml).
+5. Examine os procedimentos de [backup e restauração](docs/runbooks/backup-restore.md) e os [objetivos de confiabilidade](docs/reliability-objectives.md).
+
+As capturas operacionais foram revisadas e sanitizadas antes da inclusão. O repositório não utiliza imagens simuladas como evidência.
 
 ## Executive overview
 
@@ -106,10 +119,25 @@ flowchart LR
 - sincronização controlada entre NetBox e Zabbix;
 - exemplos públicos completamente sanitizados.
 
+## Resultados e evidências
+
+| Resultado | Implementação | Evidência verificável |
+|---|---|---|
+| ambiente reproduzível | Packer, Vagrant e Ansible | [automação](automation/) e [guia do ambiente](docs/testing/validation-environment.md) |
+| exposição segura | Traefik, TLS, middlewares e Docker Socket Proxy | [arquitetura](docs/architecture/overview.md) e [segurança](docs/security.md) |
+| observabilidade integrada | Zabbix, Prometheus, Grafana e Alertmanager | [documentação](docs/observability.md) e [role versionada](roles/observability/) |
+| continuidade validada | backups consistentes, réplica criptografada e restauração isolada | [runbook](docs/runbooks/backup-restore.md) |
+| qualidade automatizada | validações de código, configuração, imagens e segurança | [GitHub Actions](.github/workflows/validation.yml) |
+| governança técnica | ADRs, runbooks, inventário e catálogo de credenciais | [decisões](docs/decisions/) e [matriz de provas](docs/evidence/evidence-matrix.md) |
+
+O [pacote de evidências](docs/evidence/README.md) reúne artefatos verificáveis e capturas operacionais revisadas, todos vinculados à [matriz de comprovação](docs/evidence/evidence-matrix.md).
+
 ## Documentation map
 
 - [Visão geral da arquitetura](docs/architecture/overview.md)
 - [Estudo de caso para portfólio](docs/portfolio-case-study.md)
+- [Resultados e evidências](docs/evidence/README.md)
+- [Matriz requisito–implementação–prova](docs/evidence/evidence-matrix.md)
 - [Dependências dos serviços](docs/architecture/service-dependencies.md)
 - [Redes e fluxos](docs/architecture/networking.md)
 - [Inventário atual](docs/inventory/current-state.md)
@@ -201,4 +229,8 @@ As próximas evoluções priorizam backup comprovado, automação de validaçõe
 
 ## Professional positioning
 
-Este repositório apresenta uma implementação real e funcional, não apenas um diagrama conceitual. Ele documenta decisões, dependências, riscos conhecidos, controles implantados e lacunas ainda em tratamento — abordagem essencial para demonstrar maturidade operacional e não apenas instalação de ferramentas.
+Este repositório apresenta uma implementação autoral, funcional e reproduzível em ambiente de validação, não apenas um diagrama conceitual. A arquitetura é orientada à produção e baseada em desafios e padrões profissionais reais. O conteúdo documenta decisões, dependências, riscos conhecidos, controles implantados e lacunas ainda em tratamento, sem caracterizar o laboratório como ambiente corporativo de terceiros.
+
+## License
+
+Distribuído sob a [Apache License 2.0](LICENSE).

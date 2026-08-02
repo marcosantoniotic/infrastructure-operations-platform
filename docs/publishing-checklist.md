@@ -2,23 +2,34 @@
 
 ## Conteúdo
 
-- [ ] README representa o estado atual.
-- [ ] versões foram conferidas.
-- [ ] roadmap diferencia implementado de planejado.
-- [ ] documentação não promete backups ainda não comprovados.
+- [x] README representa o estado atual.
+- [x] versões foram conferidas.
+- [x] roadmap diferencia implementado de planejado.
+- [x] documentação não promete backups ainda não comprovados.
 - [ ] diagramas Mermaid renderizam no GitHub.
-- [ ] links relativos funcionam.
+- [x] links relativos funcionam.
+
+## Evidências visuais
+
+- [x] diagrama sanitizado da arquitetura disponível;
+- [x] captura do dashboard executivo do Grafana;
+- [x] captura do mapa do ecossistema no Zabbix;
+- [x] captura sanitizada do inventário no NetBox;
+- [x] captura das stacks no Portainer;
+- [x] evidência visual do backup e da restauração;
+- [x] evidência visual de execução bem-sucedida da CI;
+- [x] todas as capturas foram revisadas conforme o [guia de captura](evidence/capture-guide.md).
 
 ## Segredos e privacidade
 
-- [ ] nenhum token, senha ou chave.
-- [ ] nenhum conteúdo de `.env`.
-- [ ] nenhum `acme.json`.
-- [ ] nenhum dump ou backup.
-- [ ] nenhum ID de conta ou túnel.
-- [ ] nenhum endereço real.
-- [ ] nenhum e-mail ou nome pessoal.
-- [ ] nenhum log bruto.
+- [x] nenhum token, senha ou chave.
+- [x] nenhum conteúdo de `.env`.
+- [x] nenhum `acme.json`.
+- [x] nenhum dump ou backup.
+- [x] nenhum ID de conta ou túnel.
+- [x] nenhum endereço real.
+- [x] nenhum e-mail ou nome pessoal.
+- [x] nenhum log bruto.
 
 ## Git
 
@@ -33,13 +44,16 @@ Resultados legítimos como nomes de variáveis devem ser revisados manualmente.
 
 ## Repositório
 
-- [ ] escolher licença;
+- [x] escolher licença;
 - [ ] definir visibilidade;
 - [ ] habilitar proteção da branch principal;
 - [ ] habilitar secret scanning;
 - [ ] habilitar Dependabot quando houver dependências;
 - [ ] configurar responsáveis;
 - [ ] criar release inicial.
+
+Tópicos recomendados: `ansible`, `rhel`, `docker`, `netbox`, `zabbix`,
+`prometheus`, `grafana`, `traefik`, `infrastructure-as-code` e `devops`.
 
 ## Antes do push
 

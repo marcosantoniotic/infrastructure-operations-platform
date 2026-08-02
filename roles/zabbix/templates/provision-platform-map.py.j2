@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""Provision the managed Infrastructure Operations Platform map in Zabbix."""
+
+import json
+import os
+import sys
+import urllib.request
+
+
+API_URL = sys.argv[1]
+ADMIN_USER = sys.argv[2]
+PLATFORM_ADDRESS = sys.argv[3]
+ADMIN_PASSWORD = os.environ["ZABBIX_ADMIN_PASSWORD"]
+MAP_NAME = {{ zabbix_platform_map_name | to_json }}
+HOST_NAME = {{ zabbix_platform_map_host | to_json }}
+HOST_DISPLAY_NAME = {{ zabbix_platform_display_name | to_json }}
+AGENT_TEMPLATE_NAME = {{ zabbix_agent2_template_name | to_json }}
+
+
+class ZabbixAPI:
+    def __init__(self, url):
+        self.url = url
+        self.auth = None
+        self.request_id = 0
+
+    def call(self, method, params):
+        self.request_id += 1
+        payload = {
+            "jsonrpc": "2.0",
+            "method": method,
+            "params": params,
+            "id": self.request_id,
+        }
+        request = urllib.request.Request(
+            self.url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json-rpc"},
+        )
+        if self.auth:
+            request.add_header("Authorization", "Bearer " + self.auth)
+        with urllib.request.urlopen(request, timeout=30) as response:
+            result = json.loads(response.read().decode("utf-8"))
+        if "error" in result:
+            raise RuntimeError(
+                "%s: %s" % (result["error"]["message"], result["error"]["data"])
+            )
+        return result["result"]
+
+
+def ensure_group(api):
+    groups = api.call(
+        "hostgroup.get", {"output": ["groupid", "name"], "filter": {"name": ["Infrastructure Operations"]}}
+    )
+    if groups:
+        return groups[0]["groupid"], False
+    return api.call("hostgroup.create", {"name": "Infrastructure Operations"})["groupids"][0], True
+
+
+def get_agent_template(api):
+    templates = api.call(
+        "template.get",
+        {"output": ["templateid", "host", "name"], "filter": {"host": [AGENT_TEMPLATE_NAME]}},
+    )
+    if not templates:
+        templates = api.call(
+            "template.get",
+            {"output": ["templateid", "host", "name"], "filter": {"name": [AGENT_TEMPLATE_NAME]}},
+        )
+    if len(templates) != 1:
+        raise RuntimeError("Required Zabbix template not found: " + AGENT_TEMPLATE_NAME)
+    return templates[0]["templateid"]
+
+
+def ensure_host(api, groupid, templateid):
+    hosts = api.call(
+        "host.get", {"output": ["hostid", "host", "name"], "filter": {"host": [HOST_NAME]}}
+    )
+    if hosts:
+        hostid = hosts[0]["hostid"]
+        api.call(
+            "host.update",
+            {
+                "hostid": hostid,
+                "name": "Infrastructure Operations Platform - " + HOST_DISPLAY_NAME,
+                "groups": [{"groupid": groupid}],
+                "templates": [{"templateid": templateid}],
+                "tags": [{"tag": "managed-by", "value": "ansible"}],
+            },
+        )
+        return hostid, False
+    result = api.call(
+        "host.create",
+        {
+            "host": HOST_NAME,
+            "name": "Infrastructure Operations Platform - " + HOST_DISPLAY_NAME,
+            "groups": [{"groupid": groupid}],
+            "templates": [{"templateid": templateid}],
+            "tags": [{"tag": "managed-by", "value": "ansible"}],
+        },
+    )
+    return result["hostids"][0], True
+
+
+ITEMS = [
+    ("service.traefik.available", "Traefik HTTP availability", "net.tcp.service[http,traefik,8082]"),
+    ("service.zabbix.web.available", "Zabbix frontend availability", "net.tcp.service[http,zabbix-web,8080]"),
+    ("service.zabbix.server.available", "Zabbix Server availability", "net.tcp.service[tcp,zabbix-server,10051]"),
+    ("service.zabbix.mysql.available", "Zabbix MySQL availability", "net.tcp.service[tcp,mysql,3306]"),
+    ("service.netbox.available", "NetBox stack availability", "net.tcp.service[http,netbox,8080]"),
+    ("service.grafana.available", "Grafana availability", "net.tcp.service[http,grafana,3000]"),
+    ("service.prometheus.available", "Prometheus availability", "net.tcp.service[http,prometheus,9090]"),
+    ("service.portainer.available", "Portainer availability", "net.tcp.service[http,portainer,9000]"),
+    ("service.cockpit.available", "Cockpit availability", "net.tcp.service[tcp,%s,9091]" % PLATFORM_ADDRESS),
+    ("service.host.ssh.available", "RHEL host SSH availability", "net.tcp.service[tcp,%s,22]" % PLATFORM_ADDRESS),
+]
+
+
+def ensure_items(api, hostid):
+    changed = False
+    result = {}
+    for key, name, simple_key in ITEMS:
+        existing = api.call(
+            "item.get",
+            {"output": ["itemid", "name", "key_"], "hostids": [hostid], "filter": {"key_": [simple_key]}},
+        )
+        desired = {
+            "name": name,
+            "key_": simple_key,
+            "type": 3,
+            "value_type": 3,
+            "delay": "60s",
+            "status": 0,
+            "tags": [{"tag": "component", "value": key.split(".")[1]}],
+        }
+        if existing:
+            itemid = existing[0]["itemid"]
+            desired["itemid"] = itemid
+            api.call("item.update", desired)
+        else:
+            desired["hostid"] = hostid
+            itemid = api.call("item.create", desired)["itemids"][0]
+            changed = True
+        result[key] = itemid
+    return result, changed
+
+
+TRIGGERS = [
+    ("Traefik entry point is unavailable", ["service.traefik.available"]),
+    ("Zabbix or MySQL is unavailable", ["service.zabbix.web.available", "service.zabbix.server.available", "service.zabbix.mysql.available"]),
+    ("NetBox, PostgreSQL or Valkey service chain is unavailable", ["service.netbox.available"]),
+    ("Grafana or Prometheus is unavailable", ["service.grafana.available", "service.prometheus.available"]),
+    ("Portainer is unavailable", ["service.portainer.available"]),
+    ("Cockpit is unavailable", ["service.cockpit.available"]),
+    ("RHEL platform host is unavailable", ["service.host.ssh.available"]),
+]
+
+
+def ensure_triggers(api):
+    changed = False
+    triggerids = {}
+    for description, keys in TRIGGERS:
+        item_keys = {identifier: simple_key for identifier, _, simple_key in ITEMS}
+        expressions = ["last(/%s/%s)=0" % (HOST_NAME, item_keys[key]) for key in keys]
+        expression = " or ".join(expressions)
+        existing = api.call(
+            "trigger.get",
+            {"output": ["triggerid", "description", "expression"], "filter": {"description": [description]}, "host": HOST_NAME},
+        )
+        desired = {
+            "description": description,
+            "expression": expression,
+            "priority": 4,
+            "status": 0,
+            "tags": [{"tag": "managed-by", "value": "ansible"}],
+        }
+        if existing:
+            triggerid = existing[0]["triggerid"]
+            desired["triggerid"] = triggerid
+            api.call("trigger.update", desired)
+        else:
+            triggerid = api.call("trigger.create", desired)["triggerids"][0]
+            changed = True
+        triggerids[description] = triggerid
+    return triggerids, changed
+
+
+def desired_map(triggerids):
+    nodes = [
+        ("1", "External Access\nInternet / Zero Trust", 700, 35, None, "1"),
+        ("2", "Traefik\nSecure Entry Point", 700, 180, "Traefik entry point is unavailable", "150"),
+        ("3", HOST_DISPLAY_NAME + "\nPlatform Host", 700, 360, "RHEL platform host is unavailable", "151"),
+        ("4", "Zabbix / MySQL", 120, 570, "Zabbix or MySQL is unavailable", "184"),
+        ("5", "NetBox\nPostgreSQL / Valkey", 400, 570, "NetBox, PostgreSQL or Valkey service chain is unavailable", "150"),
+        ("6", "Grafana / Prometheus", 700, 570, "Grafana or Prometheus is unavailable", "150"),
+        ("7", "Portainer", 1000, 570, "Portainer is unavailable", "150"),
+        ("8", "Cockpit", 1280, 570, "Cockpit is unavailable", "150"),
+    ]
+    selements = []
+    for sid, label, x, y, trigger, icon in nodes:
+        element = {
+            "selementid": sid,
+            "elementtype": 4 if trigger is None else 2,
+            "iconid_off": icon,
+            "label": label,
+            "label_location": 0,
+            "x": x,
+            "y": y,
+            "width": 220,
+            "height": 120,
+        }
+        if trigger:
+            element["elements"] = [{"triggerid": triggerids[trigger]}]
+        selements.append(element)
+    links = [
+        {"selementid1": "1", "selementid2": "2", "color": "3C8DBC", "drawtype": 0},
+        {"selementid1": "2", "selementid2": "3", "color": "3C8DBC", "drawtype": 0},
+    ]
+    for sid in ("4", "5", "6", "7", "8"):
+        links.append({"selementid1": "3", "selementid2": sid, "color": "6C8EAD", "drawtype": 0})
+    return {
+        "name": MAP_NAME,
+        "width": 1600,
+        "height": 800,
+        "label_type": 0,
+        "label_location": 0,
+        "highlight": 1,
+        "expandproblem": 1,
+        "markelements": 1,
+        "show_unack": 0,
+        "grid_size": 50,
+        "grid_show": 0,
+        "grid_align": 1,
+        "severity_min": 2,
+        "show_suppressed": 0,
+        "show_element_label": 1,
+        "show_link_label": 0,
+        "selements": selements,
+        "links": links,
+    }
+
+
+def ensure_map(api, triggerids):
+    desired = desired_map(triggerids)
+    maps = api.call(
+        "map.get",
+        {"output": ["sysmapid", "name", "width", "height"], "filter": {"name": [MAP_NAME]}, "selectSelements": ["label"], "selectLinks": ["linkid"]},
+    )
+    desired_labels = sorted(item["label"] for item in desired["selements"])
+    if maps:
+        current_labels = sorted(item["label"] for item in maps[0].get("selements", []))
+        if current_labels == desired_labels and len(maps[0]["links"]) == len(desired["links"]):
+            return maps[0]["sysmapid"], False
+        api.call("map.delete", [maps[0]["sysmapid"]])
+    return api.call("map.create", desired)["sysmapids"][0], True
+
+
+def main():
+    api = ZabbixAPI(API_URL)
+    api.auth = api.call("user.login", {"username": ADMIN_USER, "password": ADMIN_PASSWORD})
+    changed = False
+    try:
+        groupid, group_changed = ensure_group(api)
+        templateid = get_agent_template(api)
+        hostid, host_changed = ensure_host(api, groupid, templateid)
+        _, item_changed = ensure_items(api, hostid)
+        triggerids, trigger_changed = ensure_triggers(api)
+        sysmapid, map_changed = ensure_map(api, triggerids)
+        changed = any((group_changed, host_changed, item_changed, trigger_changed, map_changed))
+        print(json.dumps({"changed": changed, "hostid": hostid, "sysmapid": sysmapid, "map": MAP_NAME}))
+    finally:
+        api.call("user.logout", [])
+
+
+if __name__ == "__main__":
+    main()

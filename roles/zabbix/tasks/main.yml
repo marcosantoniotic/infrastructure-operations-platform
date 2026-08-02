@@ -10,6 +10,8 @@
       - zabbix_admin_password | length >= 16
       - not zabbix_admin_password.startswith("<")
       - zabbix_admin_password != zabbix_default_admin_password
+      - not (zabbix_agent2_enabled | bool) or zabbix_agent2_server_active | length > 0
+      - not (zabbix_agent2_enabled | bool) or zabbix_agent2_template_name | length > 0
       - zabbix_server_bind_address in ['127.0.0.1', '::1']
       - >-
         not (zabbix_enable_traefik | bool) or
@@ -20,6 +22,44 @@
       bound to loopback. Remote agent ingress requires a separately reviewed
       proxy or firewall design.
   no_log: true
+
+- name: Install the Zabbix 7.4 repository definition
+  ansible.builtin.dnf:
+    name: "{{ zabbix_agent2_release_package }}"
+    state: present
+    disable_gpg_check: true
+  when: zabbix_agent2_enabled | bool
+
+- name: Install Zabbix Agent 2 directly on the platform host
+  ansible.builtin.dnf:
+    name: zabbix-agent2
+    state: present
+  when: zabbix_agent2_enabled | bool
+
+- name: Configure active-only Zabbix Agent 2 collection
+  ansible.builtin.template:
+    src: zabbix-agent2-platform.conf.j2
+    dest: /etc/zabbix/zabbix_agent2.d/90-platform.conf
+    owner: root
+    group: zabbix
+    mode: "0640"
+  register: zabbix_agent2_configuration
+  when: zabbix_agent2_enabled | bool
+
+- name: Enable and start Zabbix Agent 2
+  ansible.builtin.systemd:
+    name: zabbix-agent2
+    enabled: true
+    state: started
+  when: zabbix_agent2_enabled | bool
+
+- name: Restart Zabbix Agent 2 after configuration changes
+  ansible.builtin.systemd:
+    name: zabbix-agent2
+    state: restarted
+  when:
+    - zabbix_agent2_enabled | bool
+    - zabbix_agent2_configuration.changed
 
 - name: Validate Docker service
   ansible.builtin.service_facts: {}
@@ -215,6 +255,127 @@
   failed_when: zabbix_managed_login.json.result is not defined
   no_log: true
   when: not ansible_check_mode
+
+- name: Install managed Zabbix platform map provisioner
+  ansible.builtin.template:
+    src: provision-platform-map.py.j2
+    dest: /usr/local/sbin/provision-zabbix-platform-map
+    owner: root
+    group: root
+    mode: "0750"
+  when: zabbix_provision_platform_map | bool
+
+- name: Provision monitored services and Zabbix platform map
+  ansible.builtin.command:
+    argv:
+      - /usr/local/sbin/provision-zabbix-platform-map
+      - >-
+        http://{{ zabbix_web_validation_host }}:{{ zabbix_web_port
+        }}/api_jsonrpc.php
+      - "{{ zabbix_admin_user }}"
+      - "{{ zabbix_platform_host_address }}"
+  environment:
+    ZABBIX_ADMIN_PASSWORD: "{{ zabbix_admin_password }}"
+  register: zabbix_platform_map_provision
+  changed_when: (zabbix_platform_map_provision.stdout | from_json).changed
+  no_log: true
+  when:
+    - zabbix_provision_platform_map | bool
+    - not ansible_check_mode
+
+- name: Validate managed Zabbix platform map
+  ansible.builtin.uri:
+    url: >-
+      http://{{ zabbix_web_validation_host }}:{{ zabbix_web_port
+      }}/api_jsonrpc.php
+    method: POST
+    body_format: json
+    headers:
+      Content-Type: application/json-rpc
+      Authorization: "Bearer {{ zabbix_managed_login.json.result }}"
+    body:
+      jsonrpc: "2.0"
+      method: map.get
+      params:
+        output:
+          - sysmapid
+          - name
+        filter:
+          name:
+            - "{{ zabbix_platform_map_name }}"
+        selectSelements:
+          - selementid
+        selectLinks:
+          - linkid
+      id: 40
+    return_content: true
+    status_code: 200
+  register: zabbix_platform_map_validation
+  failed_when: >-
+    zabbix_platform_map_validation.json.result | length != 1 or
+    zabbix_platform_map_validation.json.result[0].selements | length != 8 or
+    zabbix_platform_map_validation.json.result[0].links | length != 7
+  no_log: true
+  when:
+    - zabbix_provision_platform_map | bool
+    - not ansible_check_mode
+
+- name: Wait for an active Zabbix Agent 2 host metric
+  ansible.builtin.uri:
+    url: >-
+      http://{{ zabbix_web_validation_host }}:{{ zabbix_web_port
+      }}/api_jsonrpc.php
+    method: POST
+    body_format: json
+    headers:
+      Content-Type: application/json-rpc
+      Authorization: "Bearer {{ zabbix_managed_login.json.result }}"
+    body:
+      jsonrpc: "2.0"
+      method: item.get
+      params:
+        output:
+          - itemid
+          - key_
+          - lastclock
+          - lastvalue
+          - state
+          - error
+        hostids:
+          - "{{ (zabbix_platform_map_provision.stdout | from_json).hostid }}"
+        filter:
+          key_:
+            - system.uptime
+      id: 41
+    return_content: true
+    status_code: 200
+  register: zabbix_agent2_metric_validation
+  retries: 30
+  delay: 5
+  until: >-
+    zabbix_agent2_metric_validation.json.result | default([]) | length == 1 and
+    zabbix_agent2_metric_validation.json.result[0].lastclock | default('0') | int > 0 and
+    zabbix_agent2_metric_validation.json.result[0].state | default('1') == '0'
+  failed_when: false
+  no_log: true
+  when:
+    - zabbix_agent2_enabled | bool
+    - zabbix_provision_platform_map | bool
+    - not ansible_check_mode
+
+- name: Require successful active Zabbix Agent 2 collection
+  ansible.builtin.assert:
+    that:
+      - zabbix_agent2_metric_validation.json.result | default([]) | length == 1
+      - zabbix_agent2_metric_validation.json.result[0].lastclock | int > 0
+      - zabbix_agent2_metric_validation.json.result[0].state == '0'
+    fail_msg: >-
+      Zabbix Agent 2 did not deliver the expected active system.uptime metric.
+  no_log: true
+  when:
+    - zabbix_agent2_enabled | bool
+    - zabbix_provision_platform_map | bool
+    - not ansible_check_mode
 
 - name: Assert the initial Zabbix administrator credential is rejected
   ansible.builtin.uri:

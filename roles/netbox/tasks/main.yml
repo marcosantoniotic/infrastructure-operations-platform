@@ -105,6 +105,42 @@
   until: netbox_http_result.status in [200, 302]
   when: not ansible_check_mode
 
+- name: Install sanitized NetBox demonstration inventory provisioner
+  ansible.builtin.template:
+    src: provision-demo-inventory.py.j2
+    dest: "{{ netbox_project_dir }}/provision-demo-inventory.py"
+    owner: root
+    group: root
+    mode: "0640"
+  when: netbox_provision_demo_inventory | bool
+
+- name: Provision sanitized NetBox demonstration inventory
+  ansible.builtin.shell:
+    cmd: >-
+      docker compose --project-directory {{ netbox_project_dir }} exec -T netbox
+      python /opt/netbox/netbox/manage.py shell <
+      {{ netbox_project_dir }}/provision-demo-inventory.py
+  args:
+    executable: /bin/bash
+  register: netbox_demo_inventory_provision
+  changed_when: >-
+    (netbox_demo_inventory_provision.stdout_lines | last | from_json).changed
+  when:
+    - netbox_provision_demo_inventory | bool
+    - not ansible_check_mode
+
+- name: Validate sanitized NetBox demonstration inventory
+  ansible.builtin.assert:
+    that:
+      - (netbox_demo_inventory_provision.stdout_lines | last | from_json).sites == 1
+      - (netbox_demo_inventory_provision.stdout_lines | last | from_json).devices == 1
+      - (netbox_demo_inventory_provision.stdout_lines | last | from_json).virtual_machines == 4
+      - (netbox_demo_inventory_provision.stdout_lines | last | from_json).prefixes == 3
+    fail_msg: Sanitized NetBox demonstration inventory is incomplete.
+  when:
+    - netbox_provision_demo_inventory | bool
+    - not ansible_check_mode
+
 - name: Validate NetBox through Traefik HTTPS
   ansible.builtin.command:
     argv:

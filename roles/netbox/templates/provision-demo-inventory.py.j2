@@ -1,0 +1,146 @@
+"""Provision sanitized, idempotent portfolio inventory for NetBox validation."""
+
+import json
+
+from dcim.models import Device, DeviceRole, DeviceType, Manufacturer, Site
+from ipam.models import IPAddress, Prefix
+from virtualization.models import Cluster, ClusterType, VirtualMachine, VMInterface
+
+
+changed = False
+
+
+def ensure(model, lookup, defaults=None):
+    global changed
+    defaults = defaults or {}
+    obj, created = model.objects.get_or_create(defaults=defaults, **lookup)
+    if created:
+        changed = True
+        return obj
+    dirty = False
+    for field, value in defaults.items():
+        if getattr(obj, field) != value:
+            setattr(obj, field, value)
+            dirty = True
+    if dirty:
+        obj.save()
+        changed = True
+    return obj
+
+
+site = ensure(
+    Site,
+    {"slug": "validation-facility"},
+    {"name": {{ netbox_demo_site_name | to_json }}, "status": "active"},
+)
+manufacturer = ensure(
+    Manufacturer,
+    {"slug": "open-infrastructure"},
+    {"name": "Open Infrastructure"},
+)
+device_type = ensure(
+    DeviceType,
+    {"manufacturer": manufacturer, "slug": "validation-hypervisor"},
+    {
+        "model": "Validation Hypervisor",
+        "u_height": 0,
+        "is_full_depth": False,
+    },
+)
+hypervisor_role = ensure(
+    DeviceRole,
+    {"slug": "hypervisor"},
+    {"name": "Hypervisor", "color": "607d8b"},
+)
+ensure(
+    Device,
+    {"name": "HYPERVISOR-VALIDATION"},
+    {
+        "device_type": device_type,
+        "role": hypervisor_role,
+        "site": site,
+        "status": "active",
+        "comments": "Sanitized demonstration asset managed by Ansible.",
+    },
+)
+
+cluster_type = ensure(
+    ClusterType,
+    {"slug": "vmware-validation"},
+    {"name": "VMware Validation"},
+)
+cluster = ensure(
+    Cluster,
+    {"name": {{ netbox_demo_cluster_name | to_json }}},
+    {
+        "type": cluster_type,
+        "status": "active",
+        "scope": site,
+        "description": "Sanitized reproducible validation environment",
+    },
+)
+
+vm_specs = [
+    ("AUTOMATION-CONTROLLER", "automation-controller", "Automation Controller", "3f51b5", 2, 2048, 32768, "192.0.2.10/24"),
+    ("SRV01-VALIDATION", "platform-host", "Platform Host", "4caf50", 4, 8192, 81920, "192.0.2.20/24"),
+    ("SRV01-RECOVERY", "recovery-node", "Recovery Node", "ff9800", 2, 4096, 61440, "198.51.100.20/24"),
+    ("SRV02-STANDBY", "standby-node", "Standby Node", "2196f3", 2, 2048, 32768, "203.0.113.20/24"),
+]
+
+for name, role_slug, role_name, color, vcpus, memory, disk, address in vm_specs:
+    role = ensure(DeviceRole, {"slug": role_slug}, {"name": role_name, "color": color})
+    vm = ensure(
+        VirtualMachine,
+        {"name": name, "cluster": cluster},
+        {
+            "role": role,
+            "status": "active",
+            "vcpus": vcpus,
+            "memory": memory,
+            "disk": disk,
+            "comments": "Sanitized validation workload managed by Ansible.",
+        },
+    )
+    interface = ensure(
+        VMInterface,
+        {"virtual_machine": vm, "name": "eth0"},
+        {"enabled": True},
+    )
+    ip = ensure(
+        IPAddress,
+        {"address": address},
+        {
+            "status": "active",
+            "description": "RFC 5737 demonstration address",
+            "assigned_object": interface,
+        },
+    )
+    if vm.primary_ip4_id != ip.id:
+        vm.primary_ip4 = ip
+        vm.save(update_fields=["primary_ip4"])
+        changed = True
+
+for prefix, description in (
+    ("192.0.2.0/24", "Validation management - TEST-NET-1"),
+    ("198.51.100.0/24", "Validation services - TEST-NET-2"),
+    ("203.0.113.0/24", "Validation recovery - TEST-NET-3"),
+):
+    ensure(
+        Prefix,
+        {"prefix": prefix},
+        {"status": "active", "description": description},
+    )
+
+print(
+    json.dumps(
+        {
+            "changed": changed,
+            "sites": Site.objects.filter(slug="validation-facility").count(),
+            "devices": Device.objects.filter(name="HYPERVISOR-VALIDATION").count(),
+            "virtual_machines": VirtualMachine.objects.filter(cluster=cluster).count(),
+            "prefixes": Prefix.objects.filter(
+                prefix__in=["192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24"]
+            ).count(),
+        }
+    )
+)

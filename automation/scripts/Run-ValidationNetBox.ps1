@@ -154,6 +154,9 @@ netbox_superuser_name: admin
 netbox_superuser_email: '$escapedAdminEmail'
 netbox_superuser_password: "{{ vault_netbox_superuser_password }}"
 netbox_enable_metrics: true
+netbox_provision_demo_inventory: true
+netbox_demo_site_name: Validation Facility
+netbox_demo_cluster_name: Infrastructure Operations Validation
 $netboxTraefikVariablesYaml
 netbox_manage_firewall: false
 netbox_validation_host: 127.0.0.1

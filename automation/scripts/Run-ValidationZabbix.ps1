@@ -123,6 +123,14 @@ zabbix_web_bind_address: 127.0.0.1
 zabbix_web_port: 8081
 zabbix_server_bind_address: 127.0.0.1
 zabbix_server_port: 10051
+zabbix_provision_platform_map: true
+zabbix_platform_map_name: Infrastructure Operations Platform
+zabbix_platform_map_host: infrastructure-operations-platform
+zabbix_platform_display_name: SRV01-VALIDATION
+zabbix_platform_host_address: $($configuration.platform_ip)
+zabbix_agent2_enabled: true
+zabbix_agent2_server_active: 127.0.0.1:10051
+zabbix_agent2_template_name: Linux by Zabbix agent active
 $zabbixTraefikVariablesYaml
 # END VALIDATION ZABBIX
 "@
