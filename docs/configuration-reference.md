@@ -53,8 +53,9 @@ Consulte [exemplo sanitizado](../config/examples/traefik-static.yml).
 - frontend e servidor na mesma versão;
 - MySQL dedicado;
 - credenciais em arquivos read-only com relabel privado do SELinux;
-- Agent 2 instalado diretamente no RHEL;
-- mapa do ecossistema com triggers reais;
+- Agent 2 instalado diretamente no RHEL, em modo ativo, com listener passivo
+  restrito a loopback e template `Linux by Zabbix agent active`;
+- mapa do ecossistema provisionado pela API, com dez checks e sete triggers reais;
 - integração NetBox-Zabbix com token restrito;
 - banco conectado somente ao backend interno;
 - tráfego de agentes separado em rede dedicada;
@@ -78,6 +79,8 @@ Consulte [exemplo sanitizado](../config/examples/traefik-static.yml).
 - sincronização Zabbix em serviço separado;
 - plugins de topologia, QR code e cálculo IP;
 - frontend publicado somente pelo Traefik.
+- inventário demonstrativo opcional e idempotente, limitado ao ambiente de
+  validação e composto exclusivamente por nomes fictícios e prefixos RFC 5737.
 
 ## Portainer
 

@@ -27,3 +27,15 @@ zabbix_traefik_middlewares:
   - security-headers@file
 zabbix_traefik_validation_address: 127.0.0.1
 zabbix_traefik_https_port: 443
+
+zabbix_provision_platform_map: true
+zabbix_platform_map_name: Infrastructure Operations Platform
+zabbix_platform_map_host: infrastructure-operations-platform
+zabbix_platform_display_name: "{{ platform_hostname | default(ansible_hostname) | upper }}"
+zabbix_platform_host_address: 127.0.0.1
+
+zabbix_agent2_enabled: true
+zabbix_agent2_release_package: >-
+  https://repo.zabbix.com/zabbix/7.4/release/rhel/9/noarch/zabbix-release-latest-7.4.el9.noarch.rpm
+zabbix_agent2_server_active: 127.0.0.1:10051
+zabbix_agent2_template_name: Linux by Zabbix agent active

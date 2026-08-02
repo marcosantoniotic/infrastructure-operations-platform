@@ -47,6 +47,13 @@ ansible-playbook -i inventories/validation/hosts.yml playbooks/netbox.yml
 
 O playbook instala Docker quando necessário, mas não implanta Zabbix, Grafana, Prometheus, Portainer ou Cloudflare.
 
+## Inventário demonstrativo
+
+`netbox_provision_demo_inventory` é desabilitado por padrão. Quando ativado
+explicitamente no ambiente de validação, a role cria um conjunto sanitizado e
+idempotente composto por um site, um hypervisor, um cluster, quatro máquinas
+virtuais e três prefixos RFC 5737. Nenhum ativo ou endereço real é utilizado.
+
 ## Persistência
 
 - PostgreSQL;
@@ -64,6 +71,7 @@ O cache não é tratado como dado crítico.
 - rota HTTPS do Traefik respondendo com HTTP 200;
 - HSTS e proteção contra content-type sniffing presentes;
 - segundo passe do Ansible sem alterações.
+- inventário demonstrativo completo quando sua provisão estiver habilitada.
 
 ## Remoção
 

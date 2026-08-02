@@ -43,7 +43,7 @@ Política padrão de notificação:
 
 ## Mapa do ecossistema no Zabbix
 
-O mapa lógico contém:
+O mapa de referência de produção contém:
 
 - Internet;
 - Cloudflare;
@@ -56,7 +56,33 @@ O mapa lógico contém:
 - Portainer;
 - Cockpit.
 
-Cada elemento possui trigger real. Os vínculos mudam de estado conforme a trigger do componente dependente.
+No ambiente publicável de validação, dependências externas são consolidadas no
+elemento informativo `External Access — Internet / Zero Trust`, sem simular
+ativos que não pertencem ao laboratório. Os demais elementos são provisionados
+pela API e vinculados a sete triggers reais:
+
+- Traefik;
+- host RHEL;
+- Zabbix e MySQL;
+- cadeia NetBox, PostgreSQL e Valkey;
+- Grafana e Prometheus;
+- Portainer;
+- Cockpit.
+
+O elemento do host usa `platform_hostname` como rótulo. Assim, o ambiente de
+validação exibe `SRV01-VALIDATION`, enquanto cada nova implantação recebe seu
+próprio nome sem alterar o código do mapa.
+
+Dez verificações simples são executadas pelo Zabbix Server a cada 60 segundos.
+O servidor participa da rede compartilhada do proxy apenas para iniciar essas
+checagens; nenhum listener adicional é publicado. A role valida oito elementos,
+sete vínculos e idempotência do mapa.
+
+O host gerenciado também recebe o template `Linux by Zabbix agent active`.
+O Agent 2 é instalado diretamente no RHEL e envia CPU, memória, filesystem,
+rede, processos e disponibilidade ao listener do Zabbix Server publicado apenas
+em loopback. A automação exige o recebimento real de `system.uptime`; portanto,
+a conclusão do playbook comprova coleta ativa e não apenas serviço iniciado.
 
 ## Dashboards do Grafana
 

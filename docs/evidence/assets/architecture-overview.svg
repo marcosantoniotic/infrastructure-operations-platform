@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="820" viewBox="0 0 1440 820" role="img" aria-labelledby="title desc">
+  <title id="title">Infrastructure Operations Platform architecture</title>
+  <desc id="desc">Layered architecture showing access, platform services, data stores, observability, automation and recovery.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071426"/>
+      <stop offset="1" stop-color="#102a43"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#020617" flood-opacity=".45"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#67e8f9"/>
+    </marker>
+    <style>
+      .title{font:700 34px 'Segoe UI',Arial,sans-serif;fill:#f8fafc}.subtitle{font:400 17px 'Segoe UI',Arial,sans-serif;fill:#94a3b8}
+      .lane{fill:#0f2138;stroke:#24415f;stroke-width:1}.lane-title{font:700 14px 'Segoe UI',Arial,sans-serif;fill:#67e8f9;letter-spacing:1.5px}
+      .box{fill:#132d49;stroke:#3b82f6;stroke-width:1.5;rx:12;filter:url(#shadow)}.secure{stroke:#22c55e}.data{stroke:#a78bfa}.observe{stroke:#f59e0b}.auto{stroke:#38bdf8}
+      .name{font:700 17px 'Segoe UI',Arial,sans-serif;fill:#f8fafc;text-anchor:middle}.role{font:400 12px 'Segoe UI',Arial,sans-serif;fill:#a8b7c7;text-anchor:middle}
+      .flow{stroke:#67e8f9;stroke-width:2;fill:none;marker-end:url(#arrow)}.dash{stroke-dasharray:7 6}.note{font:600 12px 'Segoe UI',Arial,sans-serif;fill:#cbd5e1}
+    </style>
+  </defs>
+  <rect width="1440" height="820" fill="url(#bg)"/>
+  <text x="72" y="66" class="title">Infrastructure Operations Platform</text>
+  <text x="72" y="96" class="subtitle">Reproducible operations architecture • RHEL • Ansible • Docker • Observability • Governance</text>
+
+  <rect x="55" y="130" width="1330" height="112" rx="18" class="lane"/>
+  <text x="78" y="158" class="lane-title">ACCESS &amp; SECURITY</text>
+  <g transform="translate(190 174)"><rect width="210" height="48" class="box secure"/><text x="105" y="22" class="name">Cloudflare Access</text><text x="105" y="39" class="role">identity-aware edge</text></g>
+  <g transform="translate(615 174)"><rect width="210" height="48" class="box secure"/><text x="105" y="22" class="name">Traefik</text><text x="105" y="39" class="role">TLS • routing • middleware</text></g>
+  <g transform="translate(1040 174)"><rect width="210" height="48" class="box secure"/><text x="105" y="22" class="name">Split DNS</text><text x="105" y="39" class="role">local continuity</text></g>
+  <path d="M400 198 H615" class="flow"/><path d="M825 198 H1040" class="flow dash"/>
+
+  <rect x="55" y="266" width="1330" height="170" rx="18" class="lane"/>
+  <text x="78" y="294" class="lane-title">OPERATIONAL SERVICES</text>
+  <g transform="translate(120 326)"><rect width="210" height="72" class="box"/><text x="105" y="29" class="name">NetBox</text><text x="105" y="51" class="role">DCIM / IPAM source of truth</text></g>
+  <g transform="translate(405 326)"><rect width="210" height="72" class="box"/><text x="105" y="29" class="name">Zabbix</text><text x="105" y="51" class="role">events • triggers • maps</text></g>
+  <g transform="translate(690 326)"><rect width="210" height="72" class="box"/><text x="105" y="29" class="name">Grafana</text><text x="105" y="51" class="role">operational dashboards</text></g>
+  <g transform="translate(975 326)"><rect width="210" height="72" class="box"/><text x="105" y="29" class="name">Portainer + Cockpit</text><text x="105" y="51" class="role">container and host operations</text></g>
+  <path d="M330 362 H405" class="flow dash"/><text x="367" y="350" class="note" text-anchor="middle">sync</text>
+
+  <rect x="55" y="460" width="1330" height="160" rx="18" class="lane"/>
+  <text x="78" y="488" class="lane-title">DATA &amp; OBSERVABILITY</text>
+  <g transform="translate(105 520)"><rect width="185" height="64" class="box data"/><text x="92" y="27" class="name">PostgreSQL</text><text x="92" y="47" class="role">NetBox data</text></g>
+  <g transform="translate(320 520)"><rect width="185" height="64" class="box data"/><text x="92" y="27" class="name">Valkey</text><text x="92" y="47" class="role">queue and cache</text></g>
+  <g transform="translate(535 520)"><rect width="185" height="64" class="box data"/><text x="92" y="27" class="name">MySQL</text><text x="92" y="47" class="role">Zabbix data</text></g>
+  <g transform="translate(750 520)"><rect width="185" height="64" class="box observe"/><text x="92" y="27" class="name">Prometheus</text><text x="92" y="47" class="role">metrics and rules</text></g>
+  <g transform="translate(965 520)"><rect width="185" height="64" class="box observe"/><text x="92" y="27" class="name">Alertmanager</text><text x="92" y="47" class="role">routing and notification</text></g>
+  <g transform="translate(1180 520)"><rect width="160" height="64" class="box observe"/><text x="80" y="27" class="name">Exporters</text><text x="80" y="47" class="role">host • app • network</text></g>
+  <path d="M935 552 H965" class="flow"/><path d="M1180 552 H1150" class="flow"/>
+
+  <rect x="55" y="644" width="1330" height="120" rx="18" class="lane"/>
+  <text x="78" y="672" class="lane-title">AUTOMATION, GOVERNANCE &amp; RECOVERY</text>
+  <g transform="translate(150 696)"><rect width="240" height="48" class="box auto"/><text x="120" y="22" class="name">Packer + Vagrant</text><text x="120" y="39" class="role">reproducible validation environment</text></g>
+  <g transform="translate(475 696)"><rect width="240" height="48" class="box auto"/><text x="120" y="22" class="name">Ansible</text><text x="120" y="39" class="role">modular idempotent deployment</text></g>
+  <g transform="translate(800 696)"><rect width="240" height="48" class="box auto"/><text x="120" y="22" class="name">GitHub Actions</text><text x="120" y="39" class="role">validation • inventory • security</text></g>
+  <g transform="translate(1125 696)"><rect width="190" height="48" class="box auto"/><text x="95" y="22" class="name">Restic + DR</text><text x="95" y="39" class="role">backup and recovery drills</text></g>
+  <path d="M390 720 H475" class="flow"/><path d="M715 720 H800" class="flow"/><path d="M1040 720 H1125" class="flow"/>
+</svg>

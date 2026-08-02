@@ -347,6 +347,11 @@ two isolated Valkey instances. Persistent data is stored in named Docker
 volumes. The web service binds only to `127.0.0.1:8000` on the validation VM;
 it is not exposed directly to the host-only network.
 
+The validation runner also enables an idempotent sanitized inventory: one
+validation site, one demonstration hypervisor, one VMware validation cluster,
+four platform VMs and three RFC 5737 documentation prefixes. These objects are
+portfolio evidence only and do not represent production assets or addresses.
+
 Certification requires:
 
 - all services running and every service with a health check reporting healthy;
@@ -355,6 +360,7 @@ Certification requires:
 - persistent volumes present after a controlled VM restart;
 - housekeeping process running without a restart loop;
 - API token pepper configured;
+- sanitized inventory with one device, four VMs and three documentation prefixes;
 - final Ansible pass with `changed=0`, `unreachable=0` and `failed=0`.
 
 Open a separate Windows Terminal and keep this SSH tunnel running:
@@ -485,6 +491,15 @@ Certification requires three healthy containers, successful login with the
 managed credential, rejection of the initial default credential, active Server
 listener, HTTP 200 through Traefik, reusable security headers and a final
 Ansible pass with `changed=0`, `unreachable=0` and `failed=0`.
+
+The same run installs Zabbix Agent 2 directly on RHEL, configures active checks
+through the loopback-only server listener and links the managed host to
+`Linux by Zabbix agent active`. It provisions the `Infrastructure Operations
+Platform` map through the Zabbix API, creates ten simple checks, seven
+high-severity triggers and eight map elements for the entry point, host and
+service chains. Certification requires a real `system.uptime` value, exactly
+one managed map with eight elements and seven links, and a second pass that
+does not recreate or reconfigure them.
 
 This private CA exists only for the isolated validation environment. Production
 promotion still requires the certificate, DNS and renewal strategy for the

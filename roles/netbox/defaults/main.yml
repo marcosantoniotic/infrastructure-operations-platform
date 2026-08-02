@@ -33,3 +33,9 @@ netbox_traefik_validation_address: 127.0.0.1
 netbox_traefik_https_port: 443
 netbox_manage_firewall: false
 netbox_validation_host: 127.0.0.1
+
+# Demonstration data is opt-in and must only be enabled in disposable or
+# publishable validation environments.
+netbox_provision_demo_inventory: false
+netbox_demo_site_name: Validation Facility
+netbox_demo_cluster_name: Infrastructure Operations Validation

@@ -1,0 +1,10 @@
+# Managed by infrastructure-operations-platform.
+# Active checks use the loopback-only Zabbix Server listener; passive checks
+# remain restricted to the local host and do not require a firewall exception.
+Server=127.0.0.1
+ServerActive={{ zabbix_agent2_server_active }}
+Hostname={{ zabbix_platform_map_host }}
+HostMetadata=platform:rhel9;managed-by:ansible
+ListenIP=127.0.0.1
+RefreshActiveChecks=60
+Timeout=10
