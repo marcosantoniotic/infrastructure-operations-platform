@@ -45,12 +45,12 @@ Resultados legítimos como nomes de variáveis devem ser revisados manualmente.
 ## Repositório
 
 - [x] escolher licença;
-- [ ] definir visibilidade;
-- [ ] habilitar proteção da branch principal;
-- [ ] habilitar secret scanning;
-- [ ] habilitar Dependabot quando houver dependências;
-- [ ] configurar responsáveis;
-- [ ] criar release inicial.
+- [x] definir visibilidade pública;
+- [x] habilitar proteção da branch principal;
+- [x] habilitar Secret Scanning e Push Protection;
+- [x] habilitar Dependabot Security Updates;
+- [x] configurar responsável por meio de `CODEOWNERS`;
+- [x] publicar release do marco funcional.
 
 Tópicos recomendados: `ansible`, `rhel`, `docker`, `netbox`, `zabbix`,
 `prometheus`, `grafana`, `traefik`, `infrastructure-as-code` e `devops`.
