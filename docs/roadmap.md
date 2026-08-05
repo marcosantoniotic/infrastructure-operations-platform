@@ -54,9 +54,13 @@ Consulte [Fase futura: GLPI](glpi-phase.md).
 
 ## Fase 5 — Resiliência
 
-- [ ] avaliar segundo nó;
+- [x] avaliar e validar segundo nó de standby;
 - [x] separar backups do host principal;
 - [x] testar recuperação dos dados e aplicações em VM isolada;
 - [x] medir reconstrução integral a partir de uma VM limpa, incluindo dependências externas;
 - [x] avaliar proxy e DNS de contingência;
 - [x] definir estratégia de alta disponibilidade orientada por requisitos de RTO, RPO e criticidade.
+
+A automação de failover multi-nó e a replicação síncrona dos bancos permanecem
+fora da baseline `v1.0.0`. Sua adoção depende de requisitos que justifiquem
+quórum, fencing e a complexidade operacional adicional.

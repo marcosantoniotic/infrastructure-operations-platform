@@ -6,7 +6,7 @@
 - [x] versões foram conferidas.
 - [x] roadmap diferencia implementado de planejado.
 - [x] documentação não promete backups ainda não comprovados.
-- [ ] diagramas Mermaid renderizam no GitHub.
+- [x] diagramas Mermaid renderizam no GitHub.
 - [x] links relativos funcionam.
 
 ## Evidências visuais

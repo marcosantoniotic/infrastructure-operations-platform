@@ -78,11 +78,11 @@ O projeto registra também lacunas atuais. Backup, restauração, CI e alertas p
 
 ## Próximos passos
 
-1. publicar a primeira release do marco funcional;
-2. formalizar política de atualização e rotação de credenciais;
+1. executar exercícios periódicos de recuperação e registrar tendências de RTO;
+2. ampliar módulos opcionais de telemetria para equipamentos de rede;
 3. integrar alertas ao futuro fluxo ITSM;
-4. desenvolver a fase GLPI;
-5. avaliar resiliência multi-nó conforme requisitos.
+4. desenvolver a fase GLPI sem duplicar as responsabilidades do NetBox;
+5. evoluir resiliência multi-nó somente quando os requisitos justificarem a complexidade.
 
 ## Evidências verificáveis
 

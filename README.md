@@ -8,6 +8,7 @@
 ![Ingress](https://img.shields.io/badge/ingress-Traefik-24A1C1?logo=traefikproxy&logoColor=white)
 ![Security](https://img.shields.io/badge/security-Zero%20Trust-0F9D58)
 ![Evidence](https://img.shields.io/badge/portfolio_evidence-verified-2EA44F)
+![Release](https://img.shields.io/badge/release-v1.0.0-6f42c1)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Validation](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml/badge.svg)](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml)
 
@@ -170,6 +171,8 @@ Consulte também as provas de [stacks no Portainer](docs/evidence/portainer-stac
 - [Gestão de mudanças](docs/runbooks/change-management.md)
 - [Adoção segura de IaC para Cloudflare](docs/runbooks/cloudflare-iac-adoption.md)
 - [Publicação segura](docs/publishing-checklist.md)
+- [Changelog](CHANGELOG.md)
+- [Baseline da release v1.0.0](docs/releases/v1.0.0.md)
 - [Roadmap](docs/roadmap.md)
 - [Fase futura: GLPI](docs/glpi-phase.md)
 
@@ -235,9 +238,18 @@ Consulte o [catálogo de módulos](docs/modules.md), o [guia do módulo NetBox](
 
 ## Project evolution
 
-O GLPI será tratado como fase própria. Sua inclusão deverá respeitar o mesmo modelo de proxy, identidade, observabilidade, backup e isolamento de dados, sem sobrepor o papel do NetBox. Consulte [Fase futura: GLPI](docs/glpi-phase.md).
+O marco `v1.0.0` consolida a arquitetura de referência reproduzível, os controles
+de segurança, a observabilidade, os backups, a recuperação e as evidências
+operacionais. Consulte a [baseline da release](docs/releases/v1.0.0.md) e o
+[changelog](CHANGELOG.md).
 
-As próximas evoluções priorizam backup comprovado, automação de validações, rotação de segredos, CI para configurações e testes formais de recuperação.
+O GLPI será tratado como fase própria. Sua inclusão deverá respeitar o mesmo
+modelo de proxy, identidade, observabilidade, backup e isolamento de dados, sem
+sobrepor o papel do NetBox. Consulte [Fase futura: GLPI](docs/glpi-phase.md).
+
+As próximas evoluções concentram-se em integrações ITSM, exercícios periódicos
+de recuperação, módulos opcionais de telemetria de rede e resiliência
+multi-nó orientada por requisitos mensuráveis.
 
 ## Professional positioning
 
