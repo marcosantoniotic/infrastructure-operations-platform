@@ -20,9 +20,9 @@ de conta, inventário real ou dados de terceiros.
 
 ## Capturas operacionais
 
-As capturas abaixo são o último gate visual antes da publicação no portfólio.
-Elas devem ser geradas no ambiente de validação, revisadas conforme o
-[guia de captura](capture-guide.md) e adicionadas com estes nomes:
+As capturas abaixo compõem o pacote visual aprovado para publicação no
+portfólio. Elas foram geradas no ambiente funcional de validação e revisadas
+conforme o [guia de captura](capture-guide.md):
 
 | Arquivo | Conteúdo esperado | Estado |
 |---|---|---|
