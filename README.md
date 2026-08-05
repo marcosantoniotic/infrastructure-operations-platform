@@ -132,6 +132,18 @@ flowchart LR
 
 O [pacote de evidências](docs/evidence/README.md) reúne artefatos verificáveis e capturas operacionais revisadas, todos vinculados à [matriz de comprovação](docs/evidence/evidence-matrix.md).
 
+### Visão operacional comprovada
+
+As imagens abaixo foram capturadas no ambiente funcional de validação e sanitizadas para publicação. Clique em uma evidência para examiná-la em resolução integral.
+
+| Recursos do host e containers | Disponibilidade das aplicações e TLS |
+|---|---|
+| [![Dashboard Grafana com recursos do host e containers](docs/evidence/grafana-platform-overview.png)](docs/evidence/grafana-platform-overview.png) | [![Dashboard Grafana com disponibilidade, latência e validade TLS](docs/evidence/grafana-application-tls-health.png)](docs/evidence/grafana-application-tls-health.png) |
+| **Topologia operacional no Zabbix** | **Inventário demonstrativo no NetBox** |
+| [![Mapa do ecossistema monitorado pelo Zabbix](docs/evidence/zabbix-ecosystem-map.png)](docs/evidence/zabbix-ecosystem-map.png) | [![Inventário de máquinas virtuais no NetBox](docs/evidence/netbox-inventory.png)](docs/evidence/netbox-inventory.png) |
+
+Consulte também as provas de [stacks no Portainer](docs/evidence/portainer-stacks.png), [backup e recuperação](docs/evidence/backup-restore-validation.png) e [execuções do GitHub Actions](docs/evidence/github-actions-validation.png).
+
 ## Documentation map
 
 - [Visão geral da arquitetura](docs/architecture/overview.md)
