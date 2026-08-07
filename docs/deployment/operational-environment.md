@@ -10,6 +10,27 @@ legado e não contém endereços, credenciais ou identificadores reais.
 O resultado esperado é uma plataforma criada por código, validada antes do
 cutover e capaz de receber somente os dados necessários do ambiente anterior.
 
+Para uma primeira execução, comece pelo
+[checklist de reprodução do zero](from-zero-checklist.md). Este documento é a
+referência detalhada dos gates, decisões e critérios de aceite.
+
+## Entradas exigidas do operador
+
+| Entrada | Quando é usada | Regra |
+|---|---|---|
+| ISO RHEL 9.8 DVD e SHA-256 | Packer/Kickstart | arquivo local legítimo e checksum conferido |
+| endereço do controlador | Vagrant e inventário | exclusivo no segmento escolhido |
+| endereço da plataforma | Vagrant e inventário | exclusivo no segmento escolhido |
+| endereços de recovery/standby | Vagrant e inventário | opcionais na primeira implantação |
+| usuário administrativo | imagem, Vagrant e Ansible | conta dedicada; padrão `automation` |
+| domínio base e e-mail administrativo | aplicações e alertas | valores privados do ambiente |
+| segredos das aplicações | Ansible Vault | gerados no cofre, distintos por ambiente |
+| método de registro RHEL | controlador e hosts | credencial legítima, nunca embutida no código |
+| SMTP e backup externo | fases posteriores | necessários apenas quando esses recursos forem habilitados |
+
+Os endereços, domínios, credenciais e identificadores reais não pertencem ao
+repositório público.
+
 ## Princípios
 
 1. Packer e Kickstart produzem a imagem base do RHEL.
@@ -67,10 +88,13 @@ recursos, sem alterar o contrato dos módulos.
 
 | VM | Dimensionamento inicial | Responsabilidade |
 |---|---:|---|
-| `iop-ops-automation-01` | 2 vCPU, 4 GiB RAM, 32 GiB | execução do Ansible e ferramentas de administração |
+| `iop-ops-automation-01` | 2 vCPU, 4 GiB RAM, 80 GiB sparse | execução do Ansible e ferramentas de administração |
 | `iop-ops-platform-01` | 4 vCPU, 8 GiB RAM, 80 GiB | aplicações, bancos e observabilidade |
-| `iop-ops-recovery-01` | 4 vCPU, 8 GiB RAM, 60 GiB | restauração isolada e exercícios de recuperação |
-| `iop-ops-standby-01` | 2 vCPU, 4 GiB RAM, 32 GiB | contingência de serviços essenciais |
+| `iop-ops-recovery-01` | 4 vCPU, 8 GiB RAM, 80 GiB sparse | restauração isolada e exercícios de recuperação |
+| `iop-ops-standby-01` | 2 vCPU, 4 GiB RAM, 80 GiB sparse | contingência de serviços essenciais |
+
+As VMs derivam da mesma box com disco virtual de 80 GiB. O disco é sparse: a
+capacidade lógica é uniforme, mas o consumo físico cresce conforme o uso.
 
 O dimensionamento deve ser revisto após sete dias de métricas do novo ambiente.
 
@@ -108,15 +132,20 @@ Os parâmetros `-RecoveryAddress` e `-StandbyAddress` são opcionais. Depois:
 
 1. substitua somente na cópia privada os endereços e o domínio;
 2. obtenha os segredos no cofre aprovado;
-3. preencha `vault.yml` sem copiar valores para terminal compartilhado;
-4. criptografe o arquivo antes da primeira execução;
-5. confirme que o inventário operacional continua ignorado pelo Git.
+3. confirme que os arquivos privados continuam ignorados pelo Git;
+4. valide a fase de imagem antes de construir a box;
+5. preencha e criptografe o Vault no controlador antes do primeiro playbook.
 
 ```powershell
-ansible-vault encrypt inventories/operational/group_vars/vault.yml
 git check-ignore -v inventories/operational/hosts.yml
 git status --short
+
+.\automation\scripts\Test-OperationalConfiguration.ps1 -Phase Image
 ```
+
+O teste operacional falha se detectar ISO ausente, arquivos privados
+rastreáveis pelo Git ou configuração inválida. Placeholders e criptografia são
+validados no gate `Deployment`, depois que o controlador possuir Ansible.
 
 Consulte [inventários e gestão de segredos](../secrets-and-inventories.md).
 
@@ -138,6 +167,8 @@ Consulte [inventários e gestão de segredos](../secrets-and-inventories.md).
 .\automation\scripts\Register-RhelBox.ps1 `
   -BoxPath ".\automation\packer\rhel9\output\rhel-9.8-operational-vmware.box" `
   -BoxName "infrastructure-operations-platform/rhel9.8-operational"
+
+.\automation\scripts\Test-OperationalConfiguration.ps1 -Phase Virtualization
 ```
 
 Critério: imagem construída sem segredo no artefato público e acesso SSH por
@@ -186,6 +217,11 @@ No controlador:
 ```bash
 cd "<REPOSITORY_ROOT>"
 ansible-galaxy collection install -r requirements.yml
+ansible-vault encrypt inventories/operational/group_vars/vault.yml
+ansible-vault edit inventories/operational/group_vars/vault.yml
+rg -n '<[A-Z][A-Z0-9_]+>' \
+  inventories/operational/hosts.yml \
+  inventories/operational/group_vars/all.yml
 ansible-inventory \
   -i inventories/operational/hosts.yml \
   --graph \
@@ -199,6 +235,14 @@ ansible \
 
 Critério: o controlador alcança somente os hosts esperados e o inventário não
 aparece em `git status`.
+
+O `rg` deve terminar sem ocorrências. A primeira operação do Vault criptografa
+o modelo antes da inserção dos valores; a segunda abre o conteúdo somente no
+editor controlado. Depois de devolver a cópia já criptografada à estação, rode:
+
+```powershell
+.\automation\scripts\Test-OperationalConfiguration.ps1 -Phase Deployment
+```
 
 ### Gate 2 — preflight e baseline
 

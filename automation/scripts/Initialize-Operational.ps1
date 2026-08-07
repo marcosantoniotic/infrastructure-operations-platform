@@ -109,6 +109,7 @@ admin_password       = "$(ConvertTo-HclString $adminPassword)"
 ssh_public_key       = "$(ConvertTo-HclString $publicKey)"
 ssh_private_key_file = "$(ConvertTo-HclString $privateKeyPath)"
 box_output_filename  = "rhel-9.8-operational-vmware.box"
+disk_size_mb         = 81920
 headless             = false
 "@
 [System.IO.File]::WriteAllText(

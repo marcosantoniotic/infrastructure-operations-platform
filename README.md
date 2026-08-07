@@ -159,6 +159,7 @@ Consulte também as provas de [stacks no Portainer](docs/evidence/portainer-stac
 - [Inventários e gestão de segredos](docs/secrets-and-inventories.md)
 - [Gestão de mudanças](docs/change-management.md)
 - [Ambiente de validação como código](docs/testing/validation-environment.md)
+- [Checklist de reprodução do zero](docs/deployment/from-zero-checklist.md)
 - [Implantação reproduzível do ambiente operacional](docs/deployment/operational-environment.md)
 - [Migração controlada para o IOP](docs/migration/legacy-to-iop.md)
 - [Matriz de migração de dados](docs/migration/data-migration-matrix.md)
