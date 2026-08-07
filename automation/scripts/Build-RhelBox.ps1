@@ -1,19 +1,28 @@
 [CmdletBinding()]
 param(
-    [switch]$Force
+    [switch]$Force,
+
+    [string]$VarFile,
+
+    [string]$BoxFileName = 'rhel-9.8-vmware.box'
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $packerRoot = Join-Path $projectRoot 'automation\packer\rhel9'
-$localVarsPath = Join-Path $packerRoot 'local.auto.pkrvars.hcl'
-$boxPath = Join-Path $packerRoot 'output\rhel-9.8-vmware.box'
+$localVarsPath = if ([string]::IsNullOrWhiteSpace($VarFile)) {
+    Join-Path $packerRoot 'local.auto.pkrvars.hcl'
+}
+else {
+    [System.IO.Path]::GetFullPath($VarFile)
+}
+$boxPath = Join-Path $packerRoot "output\$BoxFileName"
 
 if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
     throw 'Packer is not available in PATH.'
 }
 if (-not (Test-Path -LiteralPath $localVarsPath)) {
-    throw 'Local Packer variables are missing. Run Initialize-Validation.ps1 first.'
+    throw "Packer variables are missing: $localVarsPath"
 }
 
 Push-Location $packerRoot
@@ -24,10 +33,10 @@ try {
     & packer fmt -check .
     if ($LASTEXITCODE -ne 0) { throw 'packer fmt check failed.' }
 
-    & packer validate .
+    & packer validate -var-file $localVarsPath .
     if ($LASTEXITCODE -ne 0) { throw 'packer validate failed.' }
 
-    $buildArguments = @('build')
+    $buildArguments = @('build', '-var-file', $localVarsPath)
     if ($Force) {
         $buildArguments += '-force'
     }

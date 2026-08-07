@@ -22,7 +22,7 @@ locals {
   })
 }
 
-source "vmware-iso" "rhel9_validation" {
+source "vmware-iso" "rhel9_base" {
   vm_name          = var.vm_name
   guest_os_type    = "rhel9-64"
   output_directory = "${path.root}/output/vmware"
@@ -65,8 +65,8 @@ source "vmware-iso" "rhel9_validation" {
 }
 
 build {
-  name    = "rhel9-validation-base"
-  sources = ["source.vmware-iso.rhel9_validation"]
+  name    = "rhel9-base"
+  sources = ["source.vmware-iso.rhel9_base"]
 
   provisioner "shell" {
     inline = [
@@ -79,7 +79,7 @@ build {
   post-processors {
     post-processor "vagrant" {
       keep_input_artifact = true
-      output              = "${path.root}/output/rhel-9.8-vmware.box"
+      output              = "${path.root}/output/${var.box_output_filename}"
     }
   }
 }

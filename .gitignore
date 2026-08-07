@@ -43,6 +43,8 @@ inventories/validation/*
 !inventories/validation/.gitkeep
 inventories/production/*
 !inventories/production/.gitkeep
+inventories/operational/*
+!inventories/operational/.gitkeep
 **/vault.yml
 **/vault.yaml
 *.vault.yml
@@ -51,10 +53,12 @@ vault-password*
 
 # Local validation infrastructure
 .validation/
+.operational/
 automation/packer/rhel9/local.auto.pkrvars.hcl
 automation/packer/rhel9/output/
 automation/packer/rhel9/packer_cache/
 automation/vagrant/.vagrant/
+automation/vagrant/operational/.vagrant/
 *.box
 *.vmdk
 *.vmem
