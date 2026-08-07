@@ -1,5 +1,17 @@
 # Validation infrastructure automation
 
+O diretório também contém o percurso operacional dedicado. Ele preserva o
+ambiente de validação e usa configuração local separada:
+
+- `automation/vagrant/Vagrantfile`: ambiente de validação existente;
+- `automation/vagrant/operational/Vagrantfile`: VMs `iop-ops-*`;
+- `.validation/`: material local do ambiente de validação;
+- `.operational/`: identidade, Packer vars e Vagrant config operacionais;
+- `inventories/operational/`: inventário privado ignorado pelo Git.
+
+O procedimento operacional completo está em
+`docs/deployment/operational-environment.md`.
+
 This layer reconstructs the validation environment from code without changing
 the existing production virtual machines.
 

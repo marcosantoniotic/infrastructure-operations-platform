@@ -67,3 +67,9 @@ variable "headless" {
   description = "Run the Packer build without opening the VM console."
   default     = false
 }
+
+variable "box_output_filename" {
+  type        = string
+  description = "Filename written under automation/packer/rhel9/output."
+  default     = "rhel-9.8-vmware.box"
+}

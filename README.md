@@ -159,6 +159,9 @@ Consulte também as provas de [stacks no Portainer](docs/evidence/portainer-stac
 - [Inventários e gestão de segredos](docs/secrets-and-inventories.md)
 - [Gestão de mudanças](docs/change-management.md)
 - [Ambiente de validação como código](docs/testing/validation-environment.md)
+- [Implantação reproduzível do ambiente operacional](docs/deployment/operational-environment.md)
+- [Migração controlada para o IOP](docs/migration/legacy-to-iop.md)
+- [Matriz de migração de dados](docs/migration/data-migration-matrix.md)
 - [Observabilidade](docs/observability.md)
 - [Segurança](docs/security.md)
 - [Operação diária](docs/runbooks/daily-operations.md)
@@ -187,8 +190,10 @@ Consulte também as provas de [stacks no Portainer](docs/evidence/portainer-stac
 ├── config/              # exemplos sanitizados e convenções
 ├── docs/
 │   ├── architecture/    # arquitetura e fluxos
+│   ├── deployment/      # implantação reproduzível por ambiente
 │   ├── decisions/       # registros de decisão arquitetural
 │   ├── inventory/       # estado conhecido da plataforma
+│   ├── migration/       # carga de dados, cutover e rollback
 │   └── runbooks/        # procedimentos operacionais
 ├── inventory/           # catálogo legível por máquinas
 └── scripts/             # validações sem segredos

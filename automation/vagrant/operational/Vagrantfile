@@ -1,0 +1,95 @@
+# frozen_string_literal: true
+
+require "json"
+
+Vagrant.configure("2") do |config|
+  project_root = File.expand_path("../../..", __dir__)
+  operational_root = File.join(project_root, ".operational")
+  local_config_path = File.join(operational_root, "vagrant.json")
+
+  unless File.file?(local_config_path)
+    raise "Missing #{local_config_path}. Run Initialize-Operational.ps1 first."
+  end
+
+  local_config = JSON.parse(File.read(local_config_path))
+  resources = local_config.fetch("resources", {})
+  private_key = local_config.fetch("ssh_private_key")
+
+  config.vm.box = local_config.fetch(
+    "box_name",
+    "infrastructure-operations-platform/rhel9.8-operational"
+  )
+  config.vm.box_check_update = false
+
+  config.ssh.username = local_config.fetch("admin_username", "automation")
+  config.ssh.private_key_path = private_key
+  config.ssh.insert_key = false
+
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  config.vm.provision "shell",
+                      inline: "sudo passwd --lock #{config.ssh.username} || true"
+
+  config.vm.provider "vmware_desktop" do |vmware|
+    vmware.gui = false
+    vmware.vmx["ethernet0.virtualDev"] = "vmxnet3"
+    vmware.vmx["ethernet0.pcislotnumber"] = "160"
+    vmware.vmx["ethernet1.pcislotnumber"] = "192"
+    vmware.vmx["mks.enable3d"] = "FALSE"
+  end
+
+  controller_resources = resources.fetch("controller", {})
+  config.vm.define "iop-ops-automation-01", primary: true do |controller|
+    controller.vm.hostname = "iop-ops-automation-01"
+    controller.vm.network "private_network",
+                          ip: local_config.fetch("controller_ip")
+
+    controller.vm.provider "vmware_desktop" do |vmware|
+      vmware.vmx["displayName"] = "IOP-OPS-AUTOMATION-01"
+      vmware.cpus = controller_resources.fetch("cpus", 2)
+      vmware.memory = controller_resources.fetch("memory_mb", 4096)
+    end
+  end
+
+  platform_resources = resources.fetch("platform", {})
+  config.vm.define "iop-ops-platform-01" do |platform|
+    platform.vm.hostname = "iop-ops-platform-01"
+    platform.vm.network "private_network",
+                        ip: local_config.fetch("platform_ip")
+
+    platform.vm.provider "vmware_desktop" do |vmware|
+      vmware.vmx["displayName"] = "IOP-OPS-PLATFORM-01"
+      vmware.cpus = platform_resources.fetch("cpus", 4)
+      vmware.memory = platform_resources.fetch("memory_mb", 8192)
+    end
+  end
+
+  if local_config.key?("recovery_ip")
+    recovery_resources = resources.fetch("recovery", {})
+    config.vm.define "iop-ops-recovery-01" do |recovery|
+      recovery.vm.hostname = "iop-ops-recovery-01"
+      recovery.vm.network "private_network",
+                          ip: local_config.fetch("recovery_ip")
+
+      recovery.vm.provider "vmware_desktop" do |vmware|
+        vmware.vmx["displayName"] = "IOP-OPS-RECOVERY-01"
+        vmware.cpus = recovery_resources.fetch("cpus", 4)
+        vmware.memory = recovery_resources.fetch("memory_mb", 8192)
+      end
+    end
+  end
+
+  if local_config.key?("standby_ip")
+    standby_resources = resources.fetch("standby", {})
+    config.vm.define "iop-ops-standby-01" do |standby|
+      standby.vm.hostname = "iop-ops-standby-01"
+      standby.vm.network "private_network",
+                         ip: local_config.fetch("standby_ip")
+
+      standby.vm.provider "vmware_desktop" do |vmware|
+        vmware.vmx["displayName"] = "IOP-OPS-STANDBY-01"
+        vmware.cpus = standby_resources.fetch("cpus", 2)
+        vmware.memory = standby_resources.fetch("memory_mb", 4096)
+      end
+    end
+  end
+end
