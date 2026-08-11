@@ -23,9 +23,11 @@ ansible-playbook \
   playbooks/traefik.yml
 ```
 
-Replace `traefik_dashboard_basic_auth` with an externally generated `htpasswd`
-entry. Keep the plaintext credential in an approved password manager, never in
-the repository.
+Replace `traefik_dashboard_basic_auth` with the complete output of an externally
+generated `htpasswd` entry, including the username and separator, for example
+`admin:<HASH>`. Supplying only the hash makes Traefik reject the authentication
+middleware and removes the dashboard router. Keep the plaintext credential in
+an approved password manager, never in the repository.
 
 The validation profile binds ports to loopback, uses an SSH tunnel and enables
 HTTPS with a private validation CA. The CA private key remains on the

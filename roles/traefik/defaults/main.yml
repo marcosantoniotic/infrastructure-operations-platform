@@ -11,7 +11,7 @@ traefik_https_port: 8443
 traefik_metrics_port: 8082
 traefik_dashboard_hostname: traefik.localhost
 traefik_validation_hostname: whoami.localhost
-traefik_dashboard_basic_auth: "<TRAEFIK_DASHBOARD_BASIC_AUTH>"
+traefik_dashboard_basic_auth: "<USERNAME:HTPASSWD_HASH>"
 
 traefik_proxy_network: proxy
 traefik_socket_network: socket-proxy

@@ -92,7 +92,7 @@ services:
       - proxy
 {% endif %}
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/login/ >/dev/null"]
+      test: ["CMD-SHELL", "curl -fsS -H 'Host: {{ netbox_allowed_hosts | first }}' http://127.0.0.1:8080/login/ >/dev/null"]
       interval: 30s
       timeout: 10s
       retries: 10

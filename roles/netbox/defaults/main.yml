@@ -9,6 +9,7 @@ netbox_compose_wait_timeout: 900
 netbox_healthcheck_start_period: 600s
 netbox_allowed_hosts:
   - localhost
+  - 127.0.0.1
 netbox_csrf_trusted_origins: []
 
 netbox_database_name: netbox

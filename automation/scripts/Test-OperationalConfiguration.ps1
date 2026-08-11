@@ -39,8 +39,8 @@ $requiredFiles = [ordered]@{
 }
 if ($Phase -eq 'Deployment') {
     $requiredFiles['Private Ansible inventory'] = Join-Path $inventoryRoot 'hosts.yml'
-    $requiredFiles['Private Ansible variables'] = Join-Path $inventoryRoot 'group_vars\all.yml'
-    $requiredFiles['Encrypted Ansible Vault'] = Join-Path $inventoryRoot 'group_vars\vault.yml'
+    $requiredFiles['Private Ansible variables'] = Join-Path $inventoryRoot 'group_vars\all\main.yml'
+    $requiredFiles['Encrypted Ansible Vault'] = Join-Path $inventoryRoot 'group_vars\all\vault.yml'
 }
 
 foreach ($entry in $requiredFiles.GetEnumerator()) {
@@ -56,8 +56,8 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
             '.operational/id_ed25519',
             '.operational/id_ed25519.pub',
             'inventories/operational/hosts.yml',
-            'inventories/operational/group_vars/all.yml',
-            'inventories/operational/group_vars/vault.yml'
+            'inventories/operational/group_vars/all/main.yml',
+            'inventories/operational/group_vars/all/vault.yml'
         )) {
         Test-GitIgnored -RelativePath $relativePath
     }
@@ -67,7 +67,7 @@ $placeholderPattern = '<[A-Z][A-Z0-9_]+>'
 if ($Phase -eq 'Deployment') {
     foreach ($relativePath in @(
             'inventories\operational\hosts.yml',
-            'inventories\operational\group_vars\all.yml'
+            'inventories\operational\group_vars\all\main.yml'
         )) {
         $fullPath = Join-Path $projectRoot $relativePath
         if (
@@ -78,7 +78,7 @@ if ($Phase -eq 'Deployment') {
         }
     }
 
-    $vaultPath = Join-Path $inventoryRoot 'group_vars\vault.yml'
+    $vaultPath = Join-Path $inventoryRoot 'group_vars\all\vault.yml'
     if (Test-Path -LiteralPath $vaultPath -PathType Leaf) {
         $vaultHeader = Get-Content -LiteralPath $vaultPath -TotalCount 1
         if ($vaultHeader -notmatch '^\$ANSIBLE_VAULT;1\.[12];AES256$') {

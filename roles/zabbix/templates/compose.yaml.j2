@@ -113,6 +113,9 @@ services:
       - ./secrets/zabbix_database_password:/run/secrets/zabbix_database_password:ro,Z
     networks:
       - backend
+      # A non-internal network is required for Docker to install the
+      # loopback-only published-port forwarding used as the local fallback.
+      - frontend
 {% if zabbix_enable_traefik %}
       - proxy
 {% endif %}
@@ -121,6 +124,8 @@ networks:
   backend:
     driver: bridge
     internal: true
+  frontend:
+    driver: bridge
   agent:
     driver: bridge
 {% if zabbix_enable_traefik %}

@@ -34,22 +34,27 @@ Set-Location "<REPOSITORY_ROOT>"
 O comando cria somente arquivos ignorados pelo Git. Edite:
 
 - `inventories/operational/hosts.yml`;
-- `inventories/operational/group_vars/all.yml`;
-- `inventories/operational/group_vars/vault.yml`.
+- `inventories/operational/group_vars/all/main.yml`;
+- `inventories/operational/group_vars/all/vault.yml`.
 
-Substitua os placeholders não secretos de `hosts.yml` e `all.yml`. O Vault será
+Substitua os placeholders não secretos de `hosts.yml` e `group_vars/all/main.yml`. O Vault será
 criptografado e preenchido no controlador, que terá `ansible-core`:
 
 ```powershell
 rg -n '<[A-Z][A-Z0-9_]+>' `
   inventories/operational/hosts.yml `
-  inventories/operational/group_vars/all.yml
+  inventories/operational/group_vars/all/main.yml
 git status --short
 ```
 
-Aceite: `hosts.yml` e `all.yml` não contêm placeholders e `git status` não
+Aceite: `hosts.yml` e `group_vars/all/main.yml` não contêm placeholders e `git status` não
 lista os arquivos privados. É esperado que o modelo `vault.yml` ainda contenha
 placeholders nesta fase.
+
+Ao preencher o Vault, use pelo menos 50 caracteres aleatórios para
+`vault_netbox_secret_key` e `vault_netbox_api_token_pepper`, e pelo menos 16
+caracteres para as senhas do NetBox. Valores menores interrompem a implantação
+antes da criação dos containers.
 
 ## 3. Validar e construir a imagem
 
@@ -96,8 +101,8 @@ Depois:
 
 ```bash
 ansible-galaxy collection install -r requirements.yml
-ansible-vault encrypt inventories/operational/group_vars/vault.yml
-ansible-vault edit inventories/operational/group_vars/vault.yml
+ansible-vault encrypt inventories/operational/group_vars/all/vault.yml
+ansible-vault edit inventories/operational/group_vars/all/vault.yml
 ansible-inventory -i inventories/operational/hosts.yml --graph --ask-vault-pass
 ansible -i inventories/operational/hosts.yml platform -m ping --ask-vault-pass
 ```
@@ -134,6 +139,25 @@ desativados até seus respectivos gates. Execute os playbooks uma segunda vez;
 mudanças inesperadas na segunda execução impedem o avanço.
 
 ## 7. Validar antes de migrar dados
+
+Com as rotas públicas ainda desativadas, abra um túnel a partir da estação e
+mantenha o terminal aberto durante os testes:
+
+```powershell
+Set-Location ".\automation\vagrant\operational"
+vagrant ssh iop-ops-platform-01 -- -N `
+  -L 8000:127.0.0.1:8000 `
+  -L 8081:127.0.0.1:8081 `
+  -L 9000:127.0.0.1:9000 `
+  -L 3000:127.0.0.1:3000 `
+  -L 9090:127.0.0.1:9090 `
+  -L 9091:127.0.0.1:9091
+```
+
+Valide `http://127.0.0.1:8000` (NetBox), `:8081` (Zabbix), `:9000`
+(Portainer), `:3000` (Grafana), `:9090` (Prometheus) e
+`https://127.0.0.1:9091` (Cockpit). A porta `8000` do NetBox é HTTP; não
+permita que o navegador a converta para HTTPS.
 
 - todos os containers esperados estão saudáveis;
 - reinício controlado preserva os dados;

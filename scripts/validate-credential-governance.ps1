@@ -6,7 +6,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $catalogPath = Join-Path $projectRoot 'config\credential-catalog.json'
 $vaultExamplePath = Join-Path (
     $projectRoot
-) 'inventories\example\group_vars\vault.example.yml'
+) 'inventories\example\group_vars\all\vault.example.yml'
 $errors = [Collections.Generic.List[string]]::new()
 
 $catalog = Get-Content -LiteralPath $catalogPath -Raw |

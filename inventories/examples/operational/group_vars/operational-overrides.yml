@@ -1,6 +1,6 @@
 ---
 # Policy deltas required by the operational workflow. The initializer generates
-# the complete private all.yml from inventories/example/group_vars/all.yml,
+# the complete private main.yml from inventories/example/group_vars/all/main.yml,
 # changes the platform hostname to iop-ops-platform-01 and preserves these safe
 # defaults from the canonical catalog.
 
