@@ -217,11 +217,11 @@ No controlador:
 ```bash
 cd "<REPOSITORY_ROOT>"
 ansible-galaxy collection install -r requirements.yml
-ansible-vault encrypt inventories/operational/group_vars/vault.yml
-ansible-vault edit inventories/operational/group_vars/vault.yml
+ansible-vault encrypt inventories/operational/group_vars/all/vault.yml
+ansible-vault edit inventories/operational/group_vars/all/vault.yml
 rg -n '<[A-Z][A-Z0-9_]+>' \
   inventories/operational/hosts.yml \
-  inventories/operational/group_vars/all.yml
+  inventories/operational/group_vars/all/main.yml
 ansible-inventory \
   -i inventories/operational/hosts.yml \
   --graph \
@@ -250,17 +250,20 @@ editor controlado. Depois de devolver a cópia já criptografada à estação, r
 ansible-playbook \
   -i inventories/operational/hosts.yml \
   playbooks/preflight.yml \
-  --limit iop-ops-platform-01
+  --limit iop-ops-platform-01 \
+  --ask-vault-pass
 
 ansible-playbook \
   -i inventories/operational/hosts.yml \
   playbooks/bootstrap-rhel.yml \
-  --limit iop-ops-platform-01
+  --limit iop-ops-platform-01 \
+  --ask-vault-pass
 
 ansible-playbook \
   -i inventories/operational/hosts.yml \
   playbooks/docker.yml \
-  --limit iop-ops-platform-01
+  --limit iop-ops-platform-01 \
+  --ask-vault-pass
 ```
 
 Critério: execução idempotente, firewall e SELinux preservados, Docker saudável
@@ -279,12 +282,12 @@ Mantenha no inventário:
 Implante por módulo para isolar falhas:
 
 ```bash
-ansible-playbook -i inventories/operational/hosts.yml playbooks/traefik.yml
-ansible-playbook -i inventories/operational/hosts.yml playbooks/netbox.yml
-ansible-playbook -i inventories/operational/hosts.yml playbooks/zabbix.yml
-ansible-playbook -i inventories/operational/hosts.yml playbooks/portainer.yml
-ansible-playbook -i inventories/operational/hosts.yml playbooks/observability.yml
-ansible-playbook -i inventories/operational/hosts.yml playbooks/cockpit.yml
+ansible-playbook -i inventories/operational/hosts.yml playbooks/traefik.yml --limit iop-ops-platform-01 --ask-vault-pass
+ansible-playbook -i inventories/operational/hosts.yml playbooks/netbox.yml --limit iop-ops-platform-01 --ask-vault-pass
+ansible-playbook -i inventories/operational/hosts.yml playbooks/zabbix.yml --limit iop-ops-platform-01 --ask-vault-pass
+ansible-playbook -i inventories/operational/hosts.yml playbooks/portainer.yml --limit iop-ops-platform-01 --ask-vault-pass
+ansible-playbook -i inventories/operational/hosts.yml playbooks/observability.yml --limit iop-ops-platform-01 --ask-vault-pass
+ansible-playbook -i inventories/operational/hosts.yml playbooks/cockpit.yml --limit iop-ops-platform-01 --ask-vault-pass
 ```
 
 Critério: containers saudáveis, persistência comprovada após reinício

@@ -43,6 +43,7 @@ netbox_bind_address: 127.0.0.1
 netbox_http_port: 8000
 netbox_allowed_hosts:
   - localhost
+  - 127.0.0.1
   - "netbox.<BASE_DOMAIN>"
 
 # Secret values are supplied by the encrypted vault.yml file.
@@ -77,7 +78,7 @@ traefik_http_port: 8080
 traefik_https_port: 8443
 traefik_metrics_port: 8082
 traefik_dashboard_hostname: "traefik.<BASE_DOMAIN>"
-traefik_dashboard_basic_auth: "<TRAEFIK_DASHBOARD_BASIC_AUTH>"
+traefik_dashboard_basic_auth: "<USERNAME:HTPASSWD_HASH>"
 traefik_proxy_network: proxy
 traefik_socket_network: socket-proxy
 traefik_enable_https: false

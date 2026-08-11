@@ -7,6 +7,10 @@
       - traefik_dashboard_hostname | length > 0
       - traefik_dashboard_basic_auth | length >= 30
       - not traefik_dashboard_basic_auth.startswith("<")
+      - >-
+        traefik_dashboard_basic_auth is match(
+          '^[^:\s]+:(\{SHA\}.+|\$apr1\$.+|\$2[aby]\$.+)$'
+        )
       - not (traefik_redirect_http_to_https | bool) or traefik_enable_https | bool
       - >-
         not (traefik_enable_https | bool) or
@@ -15,8 +19,9 @@
         not (traefik_enable_https | bool) or
         traefik_tls_private_key_source | length > 0
     fail_msg: >-
-      Configure the Traefik dashboard credential and ensure HTTPS is enabled
-      before enabling the HTTP redirect.
+      Configure the Traefik dashboard credential as a complete htpasswd entry
+      (username:hash) and ensure HTTPS is enabled before enabling the HTTP
+      redirect.
   no_log: true
 
 - name: Validate Docker service

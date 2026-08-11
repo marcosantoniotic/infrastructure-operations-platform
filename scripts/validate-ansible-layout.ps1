@@ -9,11 +9,11 @@ $requiredPaths = @(
     'ansible.cfg',
     'requirements.yml',
     'inventories/example/hosts.yml',
-    'inventories/example/group_vars/all.yml',
-    'inventories/example/group_vars/vault.example.yml',
+    'inventories/example/group_vars/all/main.yml',
+    'inventories/example/group_vars/all/vault.example.yml',
     'inventories/examples/operational/hosts.yml',
     'inventories/examples/operational/group_vars/operational-overrides.yml',
-    'inventories/examples/operational/group_vars/vault.example.yml',
+    'inventories/examples/operational/group_vars/all/vault.example.yml',
     'inventories/operational/.gitkeep',
     'inventories/validation/.gitkeep',
     'inventories/production/.gitkeep',
@@ -237,10 +237,10 @@ $exampleVars = @(
         Join-Path $projectRoot 'inventories/example/hosts.yml'
     ) -Raw
     Get-Content -LiteralPath (
-        Join-Path $projectRoot 'inventories/example/group_vars/all.yml'
+        Join-Path $projectRoot 'inventories/example/group_vars/all/main.yml'
     ) -Raw
     Get-Content -LiteralPath (
-        Join-Path $projectRoot 'inventories/example/group_vars/vault.example.yml'
+        Join-Path $projectRoot 'inventories/example/group_vars/all/vault.example.yml'
     ) -Raw
 ) -join "`n"
 
@@ -254,7 +254,7 @@ $requiredPlaceholders = @(
     '<REDIS_PASSWORD>',
     '<REDIS_CACHE_PASSWORD>',
     '<NETBOX_ADMIN_PASSWORD>',
-    '<TRAEFIK_DASHBOARD_BASIC_AUTH>',
+    '<USERNAME:HTPASSWD_HASH>',
     '<ZABBIX_DATABASE_PASSWORD>',
     '<ZABBIX_DATABASE_ROOT_PASSWORD>',
     '<ZABBIX_ADMIN_PASSWORD>',

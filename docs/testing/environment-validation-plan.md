@@ -36,9 +36,10 @@ Comprovar que a plataforma pode ser reconstruída a partir de uma instalação l
 
 ```bash
 cp -r inventories/example/* inventories/validation/
-mv inventories/validation/group_vars/vault.example.yml \
-  inventories/validation/group_vars/vault.yml
-ansible-vault encrypt inventories/validation/group_vars/vault.yml
+mkdir -p inventories/validation/group_vars/all
+mv inventories/validation/group_vars/all/vault.example.yml \
+  inventories/validation/group_vars/all/vault.yml
+ansible-vault encrypt inventories/validation/group_vars/all/vault.yml
 ansible-galaxy collection install -r requirements.yml
 ```
 

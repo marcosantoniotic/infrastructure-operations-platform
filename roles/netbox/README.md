@@ -30,6 +30,7 @@ netbox_traefik_network: proxy
 netbox_traefik_middlewares:
   - security-headers@file
 netbox_allowed_hosts:
+  - 127.0.0.1
   - "netbox.<BASE_DOMAIN>"
 netbox_csrf_trusted_origins:
   - "https://netbox.<BASE_DOMAIN>"
@@ -37,7 +38,8 @@ netbox_csrf_trusted_origins:
 
 A rede externa do proxy e o middleware informado devem existir antes da
 implantação. O bind direto pode permanecer em loopback como acesso de
-contingência sem exposição à rede.
+contingência sem exposição à rede. Mantenha `127.0.0.1` em
+`netbox_allowed_hosts` para que o fallback por túnel SSH funcione no navegador.
 
 ## Execução
 

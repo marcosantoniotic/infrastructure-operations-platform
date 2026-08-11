@@ -1,5 +1,5 @@
 ---
-# Copy as inventories/operational/group_vars/vault.yml, replace every
+# Copy as inventories/operational/group_vars/all/vault.yml, replace every
 # placeholder, encrypt with ansible-vault and never commit the resulting file.
 vault_netbox_secret_key: "<NETBOX_SECRET_KEY>"
 vault_netbox_api_token_pepper: "<NETBOX_API_TOKEN_PEPPER>"

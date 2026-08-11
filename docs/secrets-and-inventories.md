@@ -8,10 +8,16 @@ O repositório separa configuração pública de material sensível:
 - `inventories/examples/operational` contém a topologia operacional sanitizada;
 - `inventories/validation`, `inventories/operational` e
   `inventories/production` são ignorados pelo Git;
-- variáveis operacionais permanecem em `group_vars/all.yml`;
-- credenciais ficam em `group_vars/vault.yml`, criptografado com Ansible Vault.
+- variáveis operacionais permanecem em `group_vars/all/main.yml`;
+- credenciais ficam em `group_vars/all/vault.yml`, criptografado com Ansible
+  Vault. O diretório `all/` faz o Ansible carregar os segredos para todos os
+  hosts; `group_vars/vault.yml` seria interpretado como variáveis de um grupo
+  chamado `vault`.
 
-O arquivo `all.yml` referencia variáveis com prefixo `vault_`. Assim, nenhuma
+O arquivo `group_vars/all/main.yml` referencia variáveis com prefixo `vault_`.
+Manter as variáveis comuns e o Vault no mesmo diretório `all/` evita a colisão
+ambígua entre um arquivo `group_vars/all.yml` e um diretório `group_vars/all/`.
+Assim, nenhuma
 senha precisa ser escrita em playbooks, roles, templates ou parâmetros de linha
 de comando.
 
@@ -21,16 +27,17 @@ Para o ambiente de validação:
 
 ```bash
 cp -r inventories/example/* inventories/validation/
-mv inventories/validation/group_vars/vault.example.yml \
-  inventories/validation/group_vars/vault.yml
+mkdir -p inventories/validation/group_vars/all
+mv inventories/validation/group_vars/all/vault.example.yml \
+  inventories/validation/group_vars/all/vault.yml
 ```
 
-Edite `hosts.yml`, `all.yml` e `vault.yml`. Em seguida:
+Edite `hosts.yml`, `group_vars/all/main.yml` e `group_vars/all/vault.yml`. Em seguida:
 
 ```bash
-ansible-vault encrypt inventories/validation/group_vars/vault.yml
-ansible-vault view inventories/validation/group_vars/vault.yml
-ansible-vault edit inventories/validation/group_vars/vault.yml
+ansible-vault encrypt inventories/validation/group_vars/all/vault.yml
+ansible-vault view inventories/validation/group_vars/all/vault.yml
+ansible-vault edit inventories/validation/group_vars/all/vault.yml
 ```
 
 Para o ambiente operacional, use o modelo dedicado e mantenha o destino fora
@@ -38,9 +45,10 @@ do Git:
 
 ```bash
 cp -r inventories/examples/operational/* inventories/operational/
-mv inventories/operational/group_vars/vault.example.yml \
-  inventories/operational/group_vars/vault.yml
-ansible-vault encrypt inventories/operational/group_vars/vault.yml
+mkdir -p inventories/operational/group_vars/all
+mv inventories/operational/group_vars/all/vault.example.yml \
+  inventories/operational/group_vars/all/vault.yml
+ansible-vault encrypt inventories/operational/group_vars/all/vault.yml
 git check-ignore -v inventories/operational/hosts.yml
 ```
 

@@ -29,9 +29,12 @@ $packerVarsPath = Join-Path $operationalRoot 'operational.pkrvars.hcl'
 $vagrantConfigPath = Join-Path $operationalRoot 'vagrant.json'
 $inventoryRoot = Join-Path $projectRoot 'inventories\operational'
 $inventoryGroupVars = Join-Path $inventoryRoot 'group_vars'
+$inventoryAllGroupVars = Join-Path $inventoryGroupVars 'all'
+$legacyAllVarsPath = Join-Path $inventoryGroupVars 'all.yml'
+$legacyVaultPath = Join-Path $inventoryGroupVars 'vault.yml'
 $inventoryPath = Join-Path $inventoryRoot 'hosts.yml'
 $exampleRoot = Join-Path $projectRoot 'inventories\examples\operational'
-$baseAllVarsPath = Join-Path $projectRoot 'inventories\example\group_vars\all.yml'
+$baseAllVarsPath = Join-Path $projectRoot 'inventories\example\group_vars\all\main.yml'
 
 function ConvertTo-HclString {
     param([Parameter(Mandatory)][string]$Value)
@@ -189,7 +192,16 @@ if (-not [string]::IsNullOrWhiteSpace($StandbyAddress)) {
     $utf8WithoutBom
 )
 
-$allVarsDestination = Join-Path $inventoryGroupVars 'all.yml'
+New-Item -ItemType Directory -Path $inventoryAllGroupVars -Force |
+    Out-Null
+$allVarsDestination = Join-Path $inventoryAllGroupVars 'main.yml'
+if (Test-Path -LiteralPath $legacyAllVarsPath -PathType Leaf) {
+    if (Test-Path -LiteralPath $allVarsDestination -PathType Leaf) {
+        throw 'Both legacy group_vars/all.yml and group_vars/all/main.yml exist. Preserve the intended file and remove the duplicate before continuing.'
+    }
+    Move-Item -LiteralPath $legacyAllVarsPath -Destination $allVarsDestination
+    Write-Warning 'Migrated legacy group_vars/all.yml to group_vars/all/main.yml.'
+}
 if (-not (Test-Path -LiteralPath $allVarsDestination)) {
     $allVars = Get-Content -LiteralPath $baseAllVarsPath -Raw
     $allVars = $allVars.Replace(
@@ -202,10 +214,17 @@ if (-not (Test-Path -LiteralPath $allVarsDestination)) {
         $utf8WithoutBom
     )
 }
-$vaultDestination = Join-Path $inventoryGroupVars 'vault.yml'
+$vaultDestination = Join-Path $inventoryAllGroupVars 'vault.yml'
+if (Test-Path -LiteralPath $legacyVaultPath -PathType Leaf) {
+    if (Test-Path -LiteralPath $vaultDestination -PathType Leaf) {
+        throw 'Both legacy group_vars/vault.yml and group_vars/all/vault.yml exist. Preserve the encrypted Vault and remove the duplicate before continuing.'
+    }
+    Move-Item -LiteralPath $legacyVaultPath -Destination $vaultDestination
+    Write-Warning 'Migrated legacy group_vars/vault.yml to group_vars/all/vault.yml.'
+}
 if (-not (Test-Path -LiteralPath $vaultDestination)) {
     Copy-Item `
-        -LiteralPath (Join-Path $exampleRoot 'group_vars\vault.example.yml') `
+        -LiteralPath (Join-Path $exampleRoot 'group_vars\all\vault.example.yml') `
         -Destination $vaultDestination
 }
 

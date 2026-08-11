@@ -1,19 +1,52 @@
 ---
-- name: Validate NetBox variables
+- name: Evaluate NetBox secret requirements without exposing values
+  ansible.builtin.set_fact:
+    netbox_secret_validation:
+      - name: netbox_secret_key
+        valid: >-
+          {{ netbox_secret_key | default('') | string | length >= 50 and
+             not (netbox_secret_key | default('') | string).startswith('<') }}
+        requirement: at least 50 characters and no placeholder
+      - name: netbox_api_token_pepper
+        valid: >-
+          {{ netbox_api_token_pepper | default('') | string | length >= 50 and
+             not (netbox_api_token_pepper | default('') | string).startswith('<') }}
+        requirement: at least 50 characters and no placeholder
+      - name: netbox_postgres_password
+        valid: >-
+          {{ netbox_postgres_password | default('') | string | length >= 16 and
+             not (netbox_postgres_password | default('') | string).startswith('<') }}
+        requirement: at least 16 characters and no placeholder
+      - name: netbox_redis_password
+        valid: >-
+          {{ netbox_redis_password | default('') | string | length >= 16 and
+             not (netbox_redis_password | default('') | string).startswith('<') }}
+        requirement: at least 16 characters and no placeholder
+      - name: netbox_redis_cache_password
+        valid: >-
+          {{ netbox_redis_cache_password | default('') | string | length >= 16 and
+             not (netbox_redis_cache_password | default('') | string).startswith('<') }}
+        requirement: at least 16 characters and no placeholder
+      - name: netbox_superuser_password
+        valid: >-
+          {{ netbox_superuser_password | default('') | string | length >= 16 and
+             not (netbox_superuser_password | default('') | string).startswith('<') }}
+        requirement: at least 16 characters and no placeholder
+  no_log: true
+
+- name: Validate NetBox secret requirements
   ansible.builtin.assert:
     that:
-      - netbox_secret_key | length >= 50
-      - not netbox_secret_key.startswith("<")
-      - netbox_api_token_pepper | length >= 32
-      - not netbox_api_token_pepper.startswith("<")
-      - netbox_postgres_password | length >= 16
-      - not netbox_postgres_password.startswith("<")
-      - netbox_redis_password | length >= 16
-      - not netbox_redis_password.startswith("<")
-      - netbox_redis_cache_password | length >= 16
-      - not netbox_redis_cache_password.startswith("<")
-      - netbox_superuser_password | length >= 16
-      - not netbox_superuser_password.startswith("<")
+      - item.valid | bool
+    fail_msg: "{{ item.name }} is invalid: {{ item.requirement }}."
+    quiet: true
+  loop: "{{ netbox_secret_validation }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Validate NetBox non-secret variables
+  ansible.builtin.assert:
+    that:
       - not netbox_superuser_email.startswith("<")
       - netbox_allowed_hosts | length > 0
       - >-
@@ -23,9 +56,8 @@
         not (netbox_enable_traefik | bool) or
         netbox_traefik_origin in netbox_csrf_trusted_origins
     fail_msg: >-
-      Replace all NetBox placeholders with Ansible Vault values. Passwords must
-      contain at least 16 characters and SECRET_KEY at least 50 characters.
-  no_log: true
+      Review the NetBox email, allowed hosts, Traefik hostname and trusted
+      origins. No placeholder may remain in the operational inventory.
 
 - name: Validate Docker service
   ansible.builtin.service_facts: {}
@@ -95,6 +127,8 @@
   ansible.builtin.uri:
     url: "http://{{ netbox_validation_host }}:{{ netbox_http_port }}/login/"
     method: GET
+    headers:
+      Host: "{{ netbox_allowed_hosts | first }}"
     status_code:
       - 200
       - 302
