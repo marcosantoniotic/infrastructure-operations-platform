@@ -63,6 +63,8 @@ netbox_topology_views_version: "4.5.1"
 Defina `netbox_topology_views_enabled: false` somente quando a instalação não
 dever oferecer visualizações de topologia. A role valida o pacote, o registro
 em `PLUGINS` e a ausência de migrações pendentes.
+O salvamento de coordenadas é habilitado na configuração do plugin para que
+layouts ajustados na interface persistam entre acessos e reconvergências.
 
 ## Inventário demonstrativo
 

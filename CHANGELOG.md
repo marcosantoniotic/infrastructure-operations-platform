@@ -16,6 +16,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Corrigido
 
+- persistência dos layouts do NetBox Topology Views ao habilitar oficialmente
+  a gravação de coordenadas;
 - compatibilidade de datasource Grafana ao preservar o UID legado e provisionar
   o datasource canônico separadamente;
 - restore isolado Zabbix para dumps que contêm `ALTER DATABASE` com o nome do
