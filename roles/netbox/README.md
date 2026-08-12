@@ -65,6 +65,8 @@ dever oferecer visualizações de topologia. A role valida o pacote, o registro
 em `PLUGINS` e a ausência de migrações pendentes.
 O salvamento de coordenadas é habilitado na configuração do plugin para que
 layouts ajustados na interface persistam entre acessos e reconvergências.
+A imagem derivada também fornece um ícone genérico para papéis sem imagem
+associada, evitando nós invisíveis em topologias recém-implantadas.
 
 ## Inventário demonstrativo
 

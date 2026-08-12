@@ -128,6 +128,16 @@
   when: netbox_topology_views_enabled | bool
   register: netbox_custom_image_result
 
+- name: Render NetBox Topology Views fallback icon
+  ansible.builtin.template:
+    src: topology-role-unknown.svg
+    dest: "{{ netbox_project_dir }}/topology-role-unknown.svg"
+    owner: root
+    group: root
+    mode: "0644"
+  when: netbox_topology_views_enabled | bool
+  register: netbox_topology_fallback_icon_result
+
 - name: Render NetBox Compose project
   ansible.builtin.template:
     src: compose.yaml.j2
@@ -153,7 +163,8 @@
         netbox_topology_views_enabled | bool and
         (netbox_plugin_requirements_result.changed | default(false) or
          netbox_plugin_configuration_result.changed | default(false) or
-         netbox_custom_image_result.changed | default(false))
+         netbox_custom_image_result.changed | default(false) or
+         netbox_topology_fallback_icon_result.changed | default(false))
       ) else 'policy' }}
     pull: missing
     wait: true
