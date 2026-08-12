@@ -98,6 +98,36 @@
     mode: "0600"
   no_log: true
 
+- name: Render NetBox plugin requirements
+  ansible.builtin.template:
+    src: plugin-requirements.txt.j2
+    dest: "{{ netbox_project_dir }}/plugin-requirements.txt"
+    owner: root
+    group: root
+    mode: "0640"
+  when: netbox_topology_views_enabled | bool
+  register: netbox_plugin_requirements_result
+
+- name: Render NetBox plugin configuration
+  ansible.builtin.template:
+    src: plugins.py.j2
+    dest: "{{ netbox_project_dir }}/plugins.py"
+    owner: root
+    group: root
+    mode: "0640"
+  when: netbox_topology_views_enabled | bool
+  register: netbox_plugin_configuration_result
+
+- name: Render custom NetBox image
+  ansible.builtin.template:
+    src: Dockerfile.j2
+    dest: "{{ netbox_project_dir }}/Dockerfile"
+    owner: root
+    group: root
+    mode: "0640"
+  when: netbox_topology_views_enabled | bool
+  register: netbox_custom_image_result
+
 - name: Render NetBox Compose project
   ansible.builtin.template:
     src: compose.yaml.j2
@@ -118,6 +148,13 @@
     files:
       - compose.yaml
     state: present
+    build: >-
+      {{ 'always' if (
+        netbox_topology_views_enabled | bool and
+        (netbox_plugin_requirements_result.changed | default(false) or
+         netbox_plugin_configuration_result.changed | default(false) or
+         netbox_custom_image_result.changed | default(false))
+      ) else 'policy' }}
     pull: missing
     wait: true
     wait_timeout: "{{ netbox_compose_wait_timeout }}"
@@ -138,6 +175,49 @@
   delay: 10
   until: netbox_http_result.status in [200, 302]
   when: not ansible_check_mode
+
+- name: Validate NetBox Topology Views package and configuration
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ netbox_project_dir }}"
+      - exec
+      - -T
+      - netbox
+      - /opt/netbox/venv/bin/python
+      - /opt/netbox/netbox/manage.py
+      - shell
+      - -c
+      - >-
+        import importlib.metadata as m;
+        from django.conf import settings;
+        assert m.version('netbox-topology-views') == '{{ netbox_topology_views_version }}';
+        assert 'netbox_topology_views' in settings.PLUGINS
+  changed_when: false
+  when:
+    - netbox_topology_views_enabled | bool
+    - not ansible_check_mode
+
+- name: Validate that NetBox has no pending migrations
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ netbox_project_dir }}"
+      - exec
+      - -T
+      - netbox
+      - /opt/netbox/venv/bin/python
+      - /opt/netbox/netbox/manage.py
+      - migrate
+      - --check
+  changed_when: false
+  when:
+    - netbox_topology_views_enabled | bool
+    - not ansible_check_mode
 
 - name: Install sanitized NetBox demonstration inventory provisioner
   ansible.builtin.template:
