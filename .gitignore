@@ -65,3 +65,5 @@ automation/vagrant/operational/.vagrant/
 *.vmss
 *.vmsn
 *.vmx
+__pycache__/
+*.pyc

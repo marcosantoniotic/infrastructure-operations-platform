@@ -8,6 +8,7 @@
 observability_alertmanager_enabled: false
 external_backup_enabled: false
 maintenance_authorized: false
+netbox_zabbix_sync_enabled: false
 
 netbox_enable_traefik: false
 zabbix_enable_traefik: false

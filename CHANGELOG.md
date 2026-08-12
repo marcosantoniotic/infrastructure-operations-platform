@@ -3,6 +3,24 @@
 Todas as mudanças relevantes deste projeto são documentadas neste arquivo. O
 versionamento segue [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Adicionado
+
+- role e playbook dedicados para sincronização controlada NetBox-Zabbix;
+- provisionamento idempotente do campo `zabbix_hostid`, token via Vault e
+  validação dry-run;
+- relatório sanitizado da migração operacional concluída.
+
+### Corrigido
+
+- compatibilidade de datasource Grafana ao preservar o UID legado e provisionar
+  o datasource canônico separadamente;
+- restore isolado Zabbix para dumps que contêm `ALTER DATABASE` com o nome do
+  schema original;
+- recriação automática do sincronizador após rotação do token ou mudança dos
+  artefatos implantados.
+
 ## [1.0.0] - 2026-08-05
 
 ### Adicionado

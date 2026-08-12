@@ -57,6 +57,22 @@ Consulte [exemplo sanitizado](../config/examples/traefik-static.yml).
   restrito a loopback e template `Linux by Zabbix agent active`;
 - mapa do ecossistema provisionado pela API, com dez checks e sete triggers reais;
 - integração NetBox-Zabbix com token restrito;
+
+### Sincronização NetBox-Zabbix
+
+`netbox_zabbix_sync_enabled` ativa a role dedicada executada depois das roles
+NetBox e Zabbix. O segredo `vault_netbox_zabbix_sync_api_token` deve ser um token
+Zabbix restrito às operações de leitura e manutenção dos hosts gerenciados.
+
+Somente dispositivos NetBox com a tag `zabbix` e IP primário são reconciliados.
+Grupo e template são configurados por nome em `netbox_zabbix_sync_group` e
+`netbox_zabbix_sync_template`; IDs específicos de um ambiente não são aceitos.
+O campo personalizado `zabbix_hostid` é criado de forma idempotente. A remoção
+da tag desabilita o host gerenciado no Zabbix, sem apagá-lo.
+
+Tokens de API pertencem à instância Zabbix que os emitiu. Em uma migração ou
+reconstrução do banco, gere um token novo no destino e atualize o Vault; copiar
+o valor usado pela instância de origem resulta em `Not authorized`.
 - banco conectado somente ao backend interno;
 - tráfego de agentes separado em rede dedicada;
 - frontend publicado pelo Traefik, com fallback limitado ao loopback.

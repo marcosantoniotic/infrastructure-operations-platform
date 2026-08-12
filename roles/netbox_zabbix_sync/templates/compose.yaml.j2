@@ -1,0 +1,38 @@
+name: netbox-zabbix-sync
+
+services:
+  netbox-zabbix-sync:
+    image: {{ netbox_zabbix_sync_image }}
+    env_file:
+      - {{ netbox_zabbix_sync_netbox_env_file }}
+    environment:
+      ZABBIX_URL: {{ netbox_zabbix_sync_zabbix_url }}
+      ZABBIX_API_TOKEN_FILE: /run/secrets/zabbix_api_token
+      ZABBIX_GROUP: {{ netbox_zabbix_sync_group | to_json }}
+      ZABBIX_TEMPLATE: {{ netbox_zabbix_sync_template | to_json }}
+      NETBOX_TAG_SLUG: {{ netbox_zabbix_sync_tag_slug | to_json }}
+      NETBOX_ZABBIX_HOSTID_FIELD: {{ netbox_zabbix_sync_hostid_field | to_json }}
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        while true; do
+          /opt/netbox/venv/bin/python /usr/local/libexec/netbox-zabbix-sync.py --apply;
+          sleep {{ netbox_zabbix_sync_interval }};
+        done
+    user: netbox:root
+    restart: unless-stopped
+    volumes:
+      - ./netbox-zabbix-sync.py:/usr/local/libexec/netbox-zabbix-sync.py:ro,Z
+      - ./secrets/zabbix_api_token:/run/secrets/zabbix_api_token:ro,Z
+    networks:
+      - netbox
+      - zabbix
+
+networks:
+  netbox:
+    name: {{ netbox_zabbix_sync_netbox_network }}
+    external: true
+  zabbix:
+    name: {{ netbox_zabbix_sync_zabbix_network }}
+    external: true

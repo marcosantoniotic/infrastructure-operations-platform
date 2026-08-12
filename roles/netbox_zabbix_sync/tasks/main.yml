@@ -1,0 +1,85 @@
+---
+- name: Validate NetBox-Zabbix synchronization settings
+  ansible.builtin.assert:
+    that:
+      - netbox_zabbix_sync_interval | int >= 30
+      - netbox_zabbix_sync_api_token | string | length >= 16
+      - not (netbox_zabbix_sync_api_token | string).startswith('<')
+      - netbox_zabbix_sync_zabbix_url | length > 0
+      - netbox_zabbix_sync_group | length > 0
+      - netbox_zabbix_sync_template | length > 0
+    fail_msg: Review the NetBox-Zabbix synchronization variables and Vault token.
+    quiet: true
+  no_log: true
+  when: netbox_zabbix_sync_enabled | bool
+
+- name: Create NetBox-Zabbix synchronization directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - {path: "{{ netbox_zabbix_sync_project_dir }}", mode: "0750"}
+    - {path: "{{ netbox_zabbix_sync_project_dir }}/secrets", mode: "0700"}
+  when: netbox_zabbix_sync_enabled | bool
+
+- name: Store restricted Zabbix API token
+  ansible.builtin.copy:
+    content: "{{ netbox_zabbix_sync_api_token }}"
+    dest: "{{ netbox_zabbix_sync_project_dir }}/secrets/zabbix_api_token"
+    owner: root
+    group: root
+    mode: "0640"
+  register: netbox_zabbix_sync_token_file
+  no_log: true
+  when: netbox_zabbix_sync_enabled | bool
+
+- name: Render NetBox-Zabbix synchronization artifacts
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ netbox_zabbix_sync_project_dir }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - {src: compose.yaml.j2, dest: compose.yaml, mode: "0640"}
+    - {src: netbox-zabbix-sync.py.j2, dest: netbox-zabbix-sync.py, mode: "0750"}
+  register: netbox_zabbix_sync_artifacts
+  when: netbox_zabbix_sync_enabled | bool
+
+- name: Validate NetBox-Zabbix synchronization Compose project
+  ansible.builtin.command:
+    cmd: docker compose --project-directory {{ netbox_zabbix_sync_project_dir }} config --quiet
+  changed_when: false
+  when:
+    - netbox_zabbix_sync_enabled | bool
+    - not ansible_check_mode
+
+- name: Deploy NetBox-Zabbix synchronization
+  community.docker.docker_compose_v2:
+    project_src: "{{ netbox_zabbix_sync_project_dir }}"
+    state: present
+    pull: missing
+    recreate: >-
+      {{ 'always' if (
+          netbox_zabbix_sync_token_file.changed | default(false) or
+          netbox_zabbix_sync_artifacts.changed | default(false)
+        ) else 'auto' }}
+  when: netbox_zabbix_sync_enabled | bool
+
+- name: Validate NetBox-Zabbix synchronization with a dry run
+  ansible.builtin.command:
+    cmd: >-
+      docker compose --project-directory {{ netbox_zabbix_sync_project_dir }} run --rm
+      netbox-zabbix-sync /opt/netbox/venv/bin/python
+      /usr/local/libexec/netbox-zabbix-sync.py
+  changed_when: false
+  register: netbox_zabbix_sync_validation
+  retries: 10
+  delay: 10
+  until: netbox_zabbix_sync_validation.rc == 0
+  when:
+    - netbox_zabbix_sync_enabled | bool
+    - not ansible_check_mode
