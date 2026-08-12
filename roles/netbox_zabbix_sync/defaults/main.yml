@@ -1,7 +1,7 @@
 ---
 netbox_zabbix_sync_enabled: false
 netbox_zabbix_sync_project_dir: /opt/netbox-zabbix-sync
-netbox_zabbix_sync_image: "{{ netbox_image | default('netboxcommunity/netbox:v4.5.10-4.0.2') }}"
+netbox_zabbix_sync_image: netboxcommunity/netbox:v4.5.10-4.0.2
 netbox_zabbix_sync_interval: 60
 netbox_zabbix_sync_api_token: "<ZABBIX_API_TOKEN>"
 netbox_zabbix_sync_zabbix_url: http://zabbix-web:8080/api_jsonrpc.php
