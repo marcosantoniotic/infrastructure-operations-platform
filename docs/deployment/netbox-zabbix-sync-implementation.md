@@ -24,9 +24,8 @@ O token Zabbix fica em Ansible Vault e é materializado como arquivo
 por bind mount somente leitura. Mudanças no token, script ou Compose forçam a
 recriação do contêiner, evitando que mounts continuem presos ao inode anterior.
 
-Tokens não são portáveis entre bancos Zabbix. O ambiente operacional recebeu
-um token emitido pela instância de destino; o token legado foi rejeitado como
-esperado e não foi reutilizado.
+Tokens não são portáveis entre bancos Zabbix. Em reconstruções ou migrações,
+use um token emitido pela instância que permanecerá ativa.
 
 ## Artefatos adicionados
 
@@ -37,26 +36,13 @@ esperado e não foi reutilizado.
 - renderização e validação do Compose no CI;
 - referência operacional em `docs/configuration-reference.md`.
 
-## Evidências de validação — 2026-08-11
+## Validação
 
-- Python, YAML e `git diff --check`: aprovados;
-- `ansible-playbook --syntax-check`: aprovado no controller;
-- Compose operacional: válido;
-- criação idempotente do campo `zabbix_hostid`: aprovada;
-- API NetBox/PostgreSQL e API Zabbix: autorizadas;
-- dispositivo temporário `codex-sync-validation` criado no NetBox;
-- host correspondente criado no Zabbix com IP `192.0.2.254`;
-- host e objetos temporários removidos após o teste;
-- convergência final da role: `ok=7 changed=0 failed=0`;
-- contêiner `netbox-zabbix-sync-netbox-zabbix-sync-1`: ativo.
+O pipeline valida a sintaxe Python/YAML, o playbook Ansible e o Compose
+renderizado. Na implantação, a role exige autenticação nas APIs, cria o campo
+personalizado de forma idempotente e executa uma reconciliação em dry-run.
 
-## Migração dos dados reais
-
-Os bancos reais foram restaurados em 2026-08-12. A integração reconciliou os
-dois dispositivos marcados com `zabbix` com dois hosts gerenciados e terminou
-com dry-run limpo. O token usado pertence ao banco Zabbix restaurado.
-
-No ambiente migrado em 2026-08-11, o token restaurado possui acesso ao grupo
-`NetBox - Managed` e a integração usa o template `ICMP Ping`. Esses nomes ficam
-no inventário privado operacional; a role permanece reutilizável e resolve os
-objetos por nome em cada ambiente.
+Para um teste funcional controlado, use um dispositivo descartável com a tag
+configurada e um endereço reservado para documentação. Confirme a criação do
+host no grupo esperado, remova os objetos de teste e exija uma segunda
+convergência sem mudanças.
