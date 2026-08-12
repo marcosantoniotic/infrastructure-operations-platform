@@ -3,7 +3,7 @@ netbox_project_dir: /opt/netbox
 netbox_image: netboxcommunity/netbox:v4.5.10-4.0.2
 netbox_topology_views_enabled: true
 netbox_topology_views_version: "4.5.1"
-netbox_custom_image: "infrastructure-operations-platform/netbox:4.5.10-topology-{{ netbox_topology_views_version }}"
+netbox_custom_image_name: "infrastructure-operations-platform/netbox:4.5.10-topology-4.5.1"
 netbox_postgres_image: postgres:18-alpine
 netbox_valkey_image: valkey/valkey:9.0-alpine
 netbox_bind_address: 127.0.0.1
