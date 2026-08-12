@@ -95,6 +95,8 @@ zabbix_database_user: zabbix
 zabbix_database_password: "{{ vault_zabbix_database_password }}"
 zabbix_database_root_password: "{{ vault_zabbix_database_root_password }}"
 zabbix_admin_password: "{{ vault_zabbix_admin_password }}"
+netbox_zabbix_sync_enabled: false
+netbox_zabbix_sync_api_token: "{{ vault_netbox_zabbix_sync_api_token }}"
 zabbix_timezone: America/Sao_Paulo
 zabbix_web_bind_address: 127.0.0.1
 zabbix_web_port: 8081

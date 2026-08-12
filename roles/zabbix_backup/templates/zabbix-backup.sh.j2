@@ -111,7 +111,10 @@ verify_backup() {
   tar -tzf "${directory}/server-data.tar.gz" >/dev/null
 
   container="zabbix-restore-check-${RANDOM}-$$"
-  database="zabbix_restore"
+  # Use the source database name inside the disposable container. MySQL dumps
+  # can contain an ALTER DATABASE statement naming the original schema even
+  # when mysqldump was called without --databases.
+  database="$DATABASE_NAME"
   verify_password="$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
   cleanup_container() {
     docker rm -f "$container" >/dev/null 2>&1 || true

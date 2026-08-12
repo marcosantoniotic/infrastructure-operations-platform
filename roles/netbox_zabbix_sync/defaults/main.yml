@@ -1,0 +1,14 @@
+---
+netbox_zabbix_sync_enabled: false
+netbox_zabbix_sync_project_dir: /opt/netbox-zabbix-sync
+netbox_zabbix_sync_image: netboxcommunity/netbox:v4.5.10-4.0.2
+netbox_zabbix_sync_interval: 60
+netbox_zabbix_sync_api_token: "<ZABBIX_API_TOKEN>"
+netbox_zabbix_sync_zabbix_url: http://zabbix-web:8080/api_jsonrpc.php
+netbox_zabbix_sync_group: Linux servers
+netbox_zabbix_sync_template: Linux by Zabbix agent active
+netbox_zabbix_sync_tag_slug: zabbix
+netbox_zabbix_sync_hostid_field: zabbix_hostid
+netbox_zabbix_sync_netbox_env_file: /opt/netbox/.env
+netbox_zabbix_sync_netbox_network: netbox_backend
+netbox_zabbix_sync_zabbix_network: zabbix_backend

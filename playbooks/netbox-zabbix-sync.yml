@@ -1,0 +1,7 @@
+---
+- name: Deploy and validate NetBox-Zabbix synchronization
+  hosts: platform
+  gather_facts: false
+  become: true
+  roles:
+    - role: netbox_zabbix_sync

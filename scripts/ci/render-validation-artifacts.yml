@@ -21,6 +21,7 @@
         - traefik
         - zabbix
         - netbox
+        - netbox_zabbix_sync
         - portainer
         - observability
 
@@ -64,6 +65,20 @@
           POSTGRES_PASSWORD=ci
           REDIS_PASSWORD=ci
           REDIS_CACHE_PASSWORD=ci
+
+    - name: Load NetBox-Zabbix synchronization defaults
+      ansible.builtin.include_vars:
+        file: ../../roles/netbox_zabbix_sync/defaults/main.yml
+
+    - name: Point synchronization at the sanitized NetBox environment
+      ansible.builtin.set_fact:
+        netbox_zabbix_sync_netbox_env_file: "{{ ci_output_dir }}/netbox/.env"
+
+    - name: Render NetBox-Zabbix synchronization Compose definition
+      ansible.builtin.template:
+        src: ../../roles/netbox_zabbix_sync/templates/compose.yaml.j2
+        dest: "{{ ci_output_dir }}/netbox_zabbix_sync/compose.yaml"
+        mode: "0644"
 
     - name: Load Portainer defaults
       ansible.builtin.include_vars:

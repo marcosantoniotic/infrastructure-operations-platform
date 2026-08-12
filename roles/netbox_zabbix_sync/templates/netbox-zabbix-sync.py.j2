@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""Reconcile tagged NetBox devices with Zabbix hosts."""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import os
+import sys
+from pathlib import Path
+from typing import Any
+
+import requests
+
+sys.path.insert(0, "/opt/netbox/netbox")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "netbox.settings")
+
+import django  # noqa: E402
+
+django.setup()
+
+from dcim.models import Device  # noqa: E402
+from django.contrib.contenttypes.models import ContentType  # noqa: E402
+from extras.models import CustomField  # noqa: E402
+
+LOG = logging.getLogger("netbox-zabbix-sync")
+MANAGED_TAG_KEYS = {
+    "source", "netbox_id", "netbox_status", "netbox_site", "netbox_role", "netbox_platform"
+}
+
+
+class ZabbixAPI:
+    def __init__(self, url: str, token: str) -> None:
+        self.url = url
+        self.token = token
+        self.request_id = 0
+
+    def call(self, method: str, params: dict[str, Any]) -> Any:
+        self.request_id += 1
+        response = requests.post(
+            self.url,
+            headers={"Authorization": f"Bearer {self.token}"},
+            json={"jsonrpc": "2.0", "method": method, "params": params, "id": self.request_id},
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if "error" in payload:
+            error = payload["error"]
+            raise RuntimeError(f"{method}: {error.get('message')}: {error.get('data')}")
+        return payload["result"]
+
+
+def unique_id(api: ZabbixAPI, method: str, key: str, value: str) -> str:
+    result = api.call(method, {"output": [key, "name"], "filter": {"name": [value]}})
+    if len(result) != 1:
+        raise RuntimeError(f"Expected exactly one Zabbix object for {value!r}; found {len(result)}")
+    return str(result[0][key])
+
+
+def primary_ip(device: Device) -> str | None:
+    address = device.primary_ip4 or device.primary_ip6
+    return str(address.address.ip) if address else None
+
+
+def managed_tags(device: Device) -> list[dict[str, str]]:
+    return [
+        {"tag": "source", "value": "netbox"},
+        {"tag": "netbox_id", "value": str(device.pk)},
+        {"tag": "netbox_status", "value": str(device.status)},
+        {"tag": "netbox_site", "value": device.site.slug if device.site else ""},
+        {"tag": "netbox_role", "value": device.role.slug if device.role else ""},
+        {"tag": "netbox_platform", "value": device.platform.slug if device.platform else ""},
+    ]
+
+
+def normalized(tags: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    return sorted((str(tag.get("tag", "")), str(tag.get("value", ""))) for tag in tags)
+
+
+def ensure_custom_field(name: str, apply: bool) -> None:
+    field = CustomField.objects.filter(name=name).first()
+    if field is None:
+        if not apply:
+            raise RuntimeError(f"NetBox custom field is missing: {name}; run once with --apply")
+        field = CustomField.objects.create(name=name, label="Zabbix Host ID", type="text", required=False)
+        LOG.info("CREATE-CUSTOM-FIELD field=%s", name)
+    device_type = ContentType.objects.get_for_model(Device)
+    if not field.object_types.filter(pk=device_type.pk).exists():
+        if not apply:
+            raise RuntimeError(f"NetBox custom field {name} is not assigned to devices")
+        field.object_types.add(device_type)
+        LOG.info("ASSIGN-CUSTOM-FIELD field=%s object=device", name)
+
+
+def set_hostid(device: Device, field_name: str, hostid: str, apply: bool) -> bool:
+    if str(device.custom_field_data.get(field_name) or "") == hostid:
+        return False
+    if apply:
+        data = dict(device.custom_field_data)
+        data[field_name] = hostid
+        device.custom_field_data = data
+        device.save(update_fields=["custom_field_data"])
+    return True
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--verbose", action="store_true")
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
+                        format="%(asctime)s %(levelname)s %(message)s")
+
+    token = Path(os.environ["ZABBIX_API_TOKEN_FILE"]).read_text(encoding="utf-8").strip()
+    if not token:
+        raise RuntimeError("Zabbix API token file is empty")
+    api = ZabbixAPI(os.environ["ZABBIX_URL"], token)
+    groupid = unique_id(api, "hostgroup.get", "groupid", os.environ["ZABBIX_GROUP"])
+    templateid = unique_id(api, "template.get", "templateid", os.environ["ZABBIX_TEMPLATE"])
+    tag_slug = os.environ["NETBOX_TAG_SLUG"]
+    field_name = os.environ["NETBOX_ZABBIX_HOSTID_FIELD"]
+    ensure_custom_field(field_name, args.apply)
+
+    hosts = api.call("host.get", {
+        "output": ["hostid", "host", "name", "status"], "groupids": [groupid],
+        "selectTags": "extend", "selectInterfaces": "extend",
+    })
+    managed = {
+        next(tag["value"] for tag in host.get("tags", []) if tag.get("tag") == "netbox_id"): host
+        for host in hosts
+        if any(t.get("tag") == "source" and t.get("value") == "netbox" for t in host.get("tags", []))
+        and any(t.get("tag") == "netbox_id" for t in host.get("tags", []))
+    }
+    by_name = {host["host"]: host for host in hosts}
+    desired_ids: set[str] = set()
+    changes = 0
+
+    devices = Device.objects.filter(tags__slug=tag_slug).select_related(
+        "site", "role", "platform", "primary_ip4", "primary_ip6"
+    ).distinct().order_by("name")
+    for device in devices:
+        netbox_id = str(device.pk)
+        desired_ids.add(netbox_id)
+        ip = primary_ip(device)
+        existing = managed.get(netbox_id)
+        if not ip:
+            LOG.warning("SKIP device=%s reason=no-primary-ip", device.name)
+            if existing and existing["status"] != "1":
+                changes += 1
+                if args.apply:
+                    api.call("host.update", {"hostid": existing["hostid"], "status": 1})
+            continue
+        if existing is None and device.name in by_name:
+            raise RuntimeError(f"Unmanaged Zabbix host already uses NetBox device name: {device.name}")
+
+        tags = managed_tags(device)
+        status = 0 if str(device.status) == "active" else 1
+        if existing is None:
+            changes += 1
+            LOG.info("CREATE host=%s ip=%s", device.name, ip)
+            if args.apply:
+                result = api.call("host.create", {
+                    "host": device.name, "name": device.name, "status": status,
+                    "groups": [{"groupid": groupid}], "templates": [{"templateid": templateid}],
+                    "interfaces": [{"type": 1, "main": 1, "useip": 1, "ip": ip, "dns": "", "port": "10050"}],
+                    "tags": tags,
+                })
+                set_hostid(device, field_name, str(result["hostids"][0]), True)
+            continue
+
+        update: dict[str, Any] = {"hostid": existing["hostid"]}
+        if existing["host"] != device.name:
+            update.update({"host": device.name, "name": device.name})
+        if int(existing["status"]) != status:
+            update["status"] = status
+        preserved = [t for t in existing.get("tags", []) if t.get("tag") not in MANAGED_TAG_KEYS]
+        merged = preserved + tags
+        if normalized(existing.get("tags", [])) != normalized(merged):
+            update["tags"] = merged
+        interface = next((i for i in existing.get("interfaces", [])
+                          if str(i.get("type")) == "1" and str(i.get("main")) == "1"), None)
+        changed = len(update) > 1 or interface is None or interface.get("ip") != ip
+        if changed:
+            changes += 1
+            LOG.info("UPDATE host=%s ip=%s", device.name, ip)
+            if args.apply:
+                if len(update) > 1:
+                    api.call("host.update", update)
+                if interface is None:
+                    api.call("hostinterface.create", {"hostid": existing["hostid"], "type": 1,
+                             "main": 1, "useip": 1, "ip": ip, "dns": "", "port": "10050"})
+                elif interface.get("ip") != ip:
+                    api.call("hostinterface.update", {"interfaceid": interface["interfaceid"], "ip": ip,
+                             "useip": 1, "dns": "", "port": "10050"})
+        if set_hostid(device, field_name, str(existing["hostid"]), args.apply):
+            changes += 1
+
+    for netbox_id, host in managed.items():
+        if netbox_id not in desired_ids and host["status"] != "1":
+            changes += 1
+            LOG.info("DISABLE host=%s reason=tag-removed", host["host"])
+            if args.apply:
+                api.call("host.update", {"hostid": host["hostid"], "status": 1})
+
+    LOG.info("Synchronization complete mode=%s devices=%d changes=%d",
+             "apply" if args.apply else "dry-run", len(desired_ids), changes)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except Exception:
+        LOG.exception("Synchronization failed")
+        raise SystemExit(1)
