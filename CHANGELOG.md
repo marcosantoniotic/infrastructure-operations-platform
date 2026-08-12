@@ -10,7 +10,7 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 - role e playbook dedicados para sincronização controlada NetBox-Zabbix;
 - provisionamento idempotente do campo `zabbix_hostid`, token via Vault e
   validação dry-run;
-- relatório sanitizado da migração operacional concluída.
+- documentação reutilizável da integração e de seus critérios de validação.
 
 ### Corrigido
 
