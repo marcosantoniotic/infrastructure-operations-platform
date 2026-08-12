@@ -1,0 +1,7 @@
+FROM {{ netbox_image }}
+
+COPY plugin-requirements.txt /opt/netbox/plugin-requirements.txt
+RUN /usr/local/bin/uv pip install --no-cache --requirement /opt/netbox/plugin-requirements.txt \
+    && mkdir -p /opt/netbox/netbox/static/netbox_topology_views/img \
+    && rm -f /opt/netbox/plugin-requirements.txt
+COPY plugins.py /etc/netbox/config/plugins.py

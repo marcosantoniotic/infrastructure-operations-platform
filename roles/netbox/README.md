@@ -49,6 +49,21 @@ ansible-playbook -i inventories/validation/hosts.yml playbooks/netbox.yml
 
 O playbook instala Docker quando necessário, mas não implanta Zabbix, Grafana, Prometheus, Portainer ou Cloudflare.
 
+## NetBox Topology Views
+
+O plugin `netbox-topology-views` é instalado e habilitado por padrão em uma
+imagem derivada e reproduzível. A versão do plugin é fixada para acompanhar a
+versão suportada do NetBox:
+
+```yaml
+netbox_topology_views_enabled: true
+netbox_topology_views_version: "4.5.1"
+```
+
+Defina `netbox_topology_views_enabled: false` somente quando a instalação não
+dever oferecer visualizações de topologia. A role valida o pacote, o registro
+em `PLUGINS` e a ausência de migrações pendentes.
+
 ## Inventário demonstrativo
 
 `netbox_provision_demo_inventory` é desabilitado por padrão. Quando ativado
@@ -70,6 +85,7 @@ O cache não é tratado como dado crítico.
 - containers iniciados;
 - healthchecks;
 - endpoint `/login/` respondendo com HTTP 200 ou 302.
+- NetBox Topology Views instalado, habilitado e sem migrações pendentes;
 - rota HTTPS do Traefik respondendo com HTTP 200;
 - HSTS e proteção contra content-type sniffing presentes;
 - segundo passe do Ansible sem alterações.

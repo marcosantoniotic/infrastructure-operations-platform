@@ -7,6 +7,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Adicionado
 
+- instalação reproduzível e validação do NetBox Topology Views compatível com
+  NetBox 4.5;
 - role e playbook dedicados para sincronização controlada NetBox-Zabbix;
 - provisionamento idempotente do campo `zabbix_hostid`, token via Vault e
   validação dry-run;

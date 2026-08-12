@@ -1,7 +1,12 @@
 name: netbox
 
 x-netbox-common: &netbox-common
-  image: {{ netbox_image }}
+  image: {{ netbox_custom_image_name if netbox_topology_views_enabled else netbox_image }}
+{% if netbox_topology_views_enabled %}
+  build:
+    context: .
+    dockerfile: Dockerfile
+{% endif %}
   env_file:
     - .env
   depends_on:
