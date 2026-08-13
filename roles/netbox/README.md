@@ -67,6 +67,8 @@ O salvamento de coordenadas é habilitado na configuração do plugin para que
 layouts ajustados na interface persistam entre acessos e reconvergências.
 A imagem derivada também fornece um ícone genérico para papéis sem imagem
 associada, evitando nós invisíveis em topologias recém-implantadas.
+Após a implantação, a role coleta os arquivos estáticos do plugin e valida que
+seu JavaScript principal responde com HTTP 200 antes de concluir.
 
 ## Inventário demonstrativo
 

@@ -1,8 +1,8 @@
 FROM {{ netbox_image }}
 
 COPY plugin-requirements.txt /opt/netbox/plugin-requirements.txt
+COPY plugins.py /etc/netbox/config/plugins.py
+COPY topology-role-unknown.svg /opt/netbox/netbox/static/netbox_topology_views/img/role-unknown.svg
 RUN /usr/local/bin/uv pip install --no-cache --requirement /opt/netbox/plugin-requirements.txt \
     && mkdir -p /opt/netbox/netbox/static/netbox_topology_views/img \
     && rm -f /opt/netbox/plugin-requirements.txt
-COPY topology-role-unknown.svg /opt/netbox/netbox/static/netbox_topology_views/img/role-unknown.svg
-COPY plugins.py /etc/netbox/config/plugins.py

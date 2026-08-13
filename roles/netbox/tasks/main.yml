@@ -187,6 +187,27 @@
   until: netbox_http_result.status in [200, 302]
   when: not ansible_check_mode
 
+- name: Collect NetBox plugin static assets
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ netbox_project_dir }}"
+      - exec
+      - -T
+      - netbox
+      - /opt/netbox/venv/bin/python
+      - /opt/netbox/netbox/manage.py
+      - collectstatic
+      - --no-input
+  register: netbox_collectstatic_result
+  changed_when: >-
+    '0 static files copied' not in netbox_collectstatic_result.stdout
+  when:
+    - netbox_topology_views_enabled | bool
+    - not ansible_check_mode
+
 - name: Validate NetBox Topology Views package and configuration
   ansible.builtin.command:
     argv:
@@ -206,6 +227,21 @@
         from django.conf import settings;
         assert m.version('netbox-topology-views') == '{{ netbox_topology_views_version }}';
         assert 'netbox_topology_views' in settings.PLUGINS
+  changed_when: false
+  when:
+    - netbox_topology_views_enabled | bool
+    - not ansible_check_mode
+
+- name: Validate NetBox Topology Views JavaScript asset
+  ansible.builtin.uri:
+    url: >-
+      http://{{ netbox_validation_host }}:{{ netbox_http_port
+      }}/static/netbox_topology_views/js/app.js
+    method: GET
+    headers:
+      Host: "{{ netbox_allowed_hosts | first }}"
+    status_code: 200
+    return_content: false
   changed_when: false
   when:
     - netbox_topology_views_enabled | bool
