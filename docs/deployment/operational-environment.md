@@ -344,6 +344,7 @@ dependências:
 | Grafana/Prometheus | preflight → baseline → Docker → Traefik → observabilidade |
 | Portainer | preflight → baseline → Docker → Traefik → Portainer |
 | host RHEL | preflight → baseline → Docker → Cockpit |
+| acesso público | Docker → Traefik e serviços → Cloudflare Access → Cloudflare Tunnel |
 
 Os módulos são descritos em [catálogo de módulos](../modules.md).
 

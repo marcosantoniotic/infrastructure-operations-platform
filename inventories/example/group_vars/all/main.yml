@@ -94,6 +94,16 @@ traefik_tls_private_key_source: >-
 traefik_redirect_http_to_https: false
 traefik_enable_validation_service: false
 
+# Outbound-only Cloudflare Tunnel (public access remains opt-in)
+cloudflare_tunnel_enabled: false
+cloudflare_tunnel_project_dir: /opt/cloudflare-tunnel
+cloudflare_tunnel_image: cloudflare/cloudflared:2026.7.3
+cloudflare_tunnel_token: "{{ vault_cloudflare_tunnel_token }}"
+cloudflare_tunnel_origin_ca_source: >-
+  {{ inventory_dir }}/files/traefik/origin-ca.crt
+cloudflare_tunnel_proxy_network: proxy
+cloudflare_tunnel_metrics_port: 20241
+
 # Zabbix monitoring
 zabbix_project_dir: /opt/zabbix
 zabbix_server_image: zabbix/zabbix-server-mysql:7.4.12-alpine

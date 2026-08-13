@@ -22,5 +22,7 @@
     - role: portainer
     - role: observability
     - role: observability_backup
+    - role: cloudflare_tunnel
+      when: cloudflare_tunnel_enabled | default(false) | bool
     - role: external_backup
       when: external_backup_enabled | default(false) | bool

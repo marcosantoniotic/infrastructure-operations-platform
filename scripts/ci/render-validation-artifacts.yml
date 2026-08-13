@@ -19,6 +19,7 @@
         mode: "0755"
       loop:
         - traefik
+        - cloudflare_tunnel
         - zabbix
         - netbox
         - netbox_zabbix_sync
@@ -33,6 +34,16 @@
       ansible.builtin.template:
         src: ../../roles/traefik/templates/compose.yaml.j2
         dest: "{{ ci_output_dir }}/traefik/compose.yaml"
+        mode: "0644"
+
+    - name: Load Cloudflare Tunnel defaults
+      ansible.builtin.include_vars:
+        file: ../../roles/cloudflare_tunnel/defaults/main.yml
+
+    - name: Render Cloudflare Tunnel Compose definition
+      ansible.builtin.template:
+        src: ../../roles/cloudflare_tunnel/templates/compose.yaml.j2
+        dest: "{{ ci_output_dir }}/cloudflare_tunnel/compose.yaml"
         mode: "0644"
 
     - name: Load Zabbix defaults

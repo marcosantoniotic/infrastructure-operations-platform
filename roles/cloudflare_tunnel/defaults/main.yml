@@ -1,0 +1,11 @@
+---
+cloudflare_tunnel_enabled: false
+cloudflare_tunnel_project_dir: /opt/cloudflare-tunnel
+cloudflare_tunnel_image: cloudflare/cloudflared:2026.7.3
+cloudflare_tunnel_token: ""
+cloudflare_tunnel_origin_ca_source: ""
+cloudflare_tunnel_proxy_network: proxy
+cloudflare_tunnel_metrics_port: 20241
+cloudflare_tunnel_container_name: iop-cloudflared
+cloudflare_tunnel_connection_retries: 30
+cloudflare_tunnel_connection_delay: 5

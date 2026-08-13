@@ -5,6 +5,7 @@
 | Projeto | Diretório | Arquivo principal |
 |---|---|---|
 | Traefik | `/opt/traefik` | `compose.yaml`, `traefik.yml`, `dynamic/` |
+| Cloudflare Tunnel | `/opt/cloudflare-tunnel` | `compose.yaml`, `secrets/`, `certs/` |
 | Zabbix | `/opt/zabbix` | `compose.yaml`, `secrets/` |
 | NetBox | `/opt/netbox` | `docker-compose.yml`, `docker-compose.override.yml` |
 | Observabilidade | `/opt/observability` | `compose.yaml`, `prometheus/`, `alertmanager/`, `grafana/`, `blackbox/`, `secrets/` |
@@ -54,6 +55,38 @@ HTTPS por túnel SSH com uma porta externa diferente de `443`, configure a mesma
 porta em `traefik_https_port` e nas variáveis `*_traefik_https_port` dos
 serviços. O certificado deve conter todos os nomes publicados, e o NetBox exige
 que `netbox_traefik_origin` e `netbox_csrf_trusted_origins` incluam a porta.
+
+## Cloudflare Tunnel
+
+O acesso público é opcional e sai do host por um conector `cloudflared`; nenhuma
+porta de entrada é aberta. As rotas remotas apontam para `https://traefik:443`
+na rede Docker `proxy` e validam o certificado com a CA privada instalada pela
+role. Cada rota deve informar o hostname HTTP e o `originServerName` do serviço.
+
+O nome público não precisa ser igual ao nome interno do Traefik. Quando eles
+forem diferentes, o `httpHostHeader` e o `originServerName` devem manter o nome
+interno coberto pelo certificado privado e usado na regra `Host()` do Traefik.
+Por exemplo, `netbox-edge.<BASE_DOMAIN>` pode encaminhar para a origem com Host
+e SNI `netbox.internal.<BASE_DOMAIN>`.
+
+Antes de escolher nomes públicos, confirme a cobertura do certificado de
+borda. O Universal SSL cobre o domínio raiz e o curinga de primeiro nível, mas
+não cobre automaticamente nomes aninhados como `app.ops.<BASE_DOMAIN>`. Para
+esses nomes, habilite previamente um certificado compatível/Total TLS ou adote
+um nome de primeiro nível, como `app-ops.<BASE_DOMAIN>`.
+
+| Variável | Padrão | Finalidade |
+|---|---|---|
+| `cloudflare_tunnel_enabled` | `false` | ativa a implantação do conector |
+| `cloudflare_tunnel_image` | `cloudflare/cloudflared:2026.7.3` | imagem fixada do conector |
+| `cloudflare_tunnel_token` | vazio | token remoto fornecido pelo Vault |
+| `cloudflare_tunnel_origin_ca_source` | vazio | CA usada para validar o Traefik |
+| `cloudflare_tunnel_proxy_network` | `proxy` | rede externa compartilhada com o Traefik |
+
+Antes de criar os CNAMEs, crie a aplicação Cloudflare Access e uma política de
+menor privilégio. A configuração remota do túnel deve exigir a validação do JWT
+Access (`originRequest.access.required=true`) e terminar em `http_status:404`.
+Prometheus, Alertmanager, bancos, caches e portas de fallback não são publicados.
 
 ## Zabbix
 

@@ -19,3 +19,4 @@ vault_alertmanager_smtp_password: "<ALERTMANAGER_SMTP_PASSWORD>"
 vault_external_backup_restic_password: "<RESTIC_REPOSITORY_PASSWORD>"
 vault_external_backup_rclone_config: |
   <COMPLETE_RCLONE_CONFIG>
+vault_cloudflare_tunnel_token: "<REMOTELY_MANAGED_TUNNEL_TOKEN>"

@@ -176,6 +176,7 @@ Consulte também as provas de [stacks no Portainer](docs/evidence/portainer-stac
 - [Contingência de DNS e proxy](docs/runbooks/dns-proxy-contingency.md)
 - [Gestão de mudanças](docs/runbooks/change-management.md)
 - [Adoção segura de IaC para Cloudflare](docs/runbooks/cloudflare-iac-adoption.md)
+- [Módulo Cloudflare Tunnel](roles/cloudflare_tunnel/README.md)
 - [Publicação segura](docs/publishing-checklist.md)
 - [Changelog](CHANGELOG.md)
 - [Baseline da release v1.0.0](docs/releases/v1.0.0.md)
