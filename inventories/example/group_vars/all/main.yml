@@ -46,8 +46,10 @@ netbox_allowed_hosts:
   - localhost
   - 127.0.0.1
   - "netbox.<BASE_DOMAIN>"
+  - "netbox-edge.<BASE_DOMAIN>"
 netbox_csrf_trusted_origins:
   - "https://netbox.<BASE_DOMAIN>:8443"
+  - "https://netbox-edge.<BASE_DOMAIN>"
 
 # Secret values are supplied by the encrypted vault.yml file.
 netbox_secret_key: "{{ vault_netbox_secret_key }}"

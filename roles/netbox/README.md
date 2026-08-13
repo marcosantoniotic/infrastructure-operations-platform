@@ -34,12 +34,17 @@ netbox_allowed_hosts:
   - "netbox.<BASE_DOMAIN>"
 netbox_csrf_trusted_origins:
   - "https://netbox.<BASE_DOMAIN>"
+  - "https://netbox-edge.<BASE_DOMAIN>"
 ```
 
 A rede externa do proxy e o middleware informado devem existir antes da
 implantação. O bind direto pode permanecer em loopback como acesso de
 contingência sem exposição à rede. Mantenha `127.0.0.1` em
 `netbox_allowed_hosts` para que o fallback por túnel SSH funcione no navegador.
+Inclua também cada hostname público em `netbox_allowed_hosts` e sua origem HTTPS
+completa, sem caminho, em `netbox_csrf_trusted_origins`. Isso é obrigatório
+mesmo quando o túnel substitui o cabeçalho Host pelo nome interno do Traefik,
+pois o navegador mantém o hostname público no cabeçalho `Origin` dos POSTs.
 
 ## Execução
 
