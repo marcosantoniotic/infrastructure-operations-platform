@@ -184,6 +184,8 @@ observability_grafana_image: grafana/grafana:13.1.1
 observability_node_exporter_image: prom/node-exporter:v1.12.1
 observability_cadvisor_image: ghcr.io/google/cadvisor:v0.60.5
 observability_blackbox_image: prom/blackbox-exporter:v0.28.0
+observability_snmp_exporter_image: prom/snmp-exporter:v0.30.1
+observability_unifi_poller_image: ghcr.io/unpoller/unpoller:v3.4.1
 observability_alertmanager_image: prom/alertmanager:v0.32.1
 observability_scrape_interval: 30s
 observability_prometheus_retention_time: 30d
@@ -215,6 +217,28 @@ observability_blackbox_targets:
   # - name: netbox
   #   url: http://netbox:8080/login/
   #   host_header: "netbox.<BASE_DOMAIN>"
+observability_snmp_enabled: false
+observability_snmp_auth_name: iop_snmp_v2
+observability_snmp_community: "{{ vault_observability_snmp_community }}"
+observability_snmp_modules:
+  - system
+  - if_mib
+  - hrDevice
+  - hrStorage
+  - hrSystem
+  - mikrotik
+observability_snmp_module_concurrency: 3
+observability_snmp_scrape_timeout: 25s
+observability_snmp_targets:
+  # Use an address reachable from the observability host.
+  - name: core-router
+    address: 192.0.2.1
+observability_unifi_poller_enabled: false
+observability_unifi_url: "https://192.0.2.2"
+observability_unifi_username: "<UNIFI_READ_ONLY_USER>"
+observability_unifi_password: "{{ vault_observability_unifi_password }}"
+observability_unifi_verify_ssl: false
+observability_unifi_save_dpi: true
 observability_enable_traefik: false
 observability_grafana_hostname: "grafana.<BASE_DOMAIN>"
 observability_traefik_network: proxy

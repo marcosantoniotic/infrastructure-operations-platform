@@ -12,7 +12,11 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 - role e playbook dedicados para sincronização controlada NetBox-Zabbix;
 - provisionamento idempotente do campo `zabbix_hostid`, token via Vault e
   validação dry-run;
-- documentação reutilizável da integração e de seus critérios de validação.
+- documentação reutilizável da integração e de seus critérios de validação;
+- SNMP Exporter opcional com módulos oficiais, segredo no Vault e validação de
+  todos os alvos configurados;
+- UniFi Poller opcional e reproduzível, com conta somente leitura, segredo no
+  Vault, coleta Prometheus e validação obrigatória de telemetria real.
 
 ### Corrigido
 

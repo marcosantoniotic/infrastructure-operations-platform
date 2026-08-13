@@ -145,8 +145,11 @@ Exporters:
 - Node Exporter com filesystems do host em somente leitura;
 - cAdvisor com acesso necessário ao runtime;
 - Blackbox com alvos por hostname;
-- SNMP Exporter para equipamentos de rede;
-- UniFi Poller para UDM/UniFi.
+- SNMP Exporter opcional, com os módulos oficiais do exporter e autenticação
+  armazenada no Vault, para equipamentos de rede como MikroTik;
+- UniFi Poller opcional, com versão fixada, conta local somente leitura, senha
+  materializada por arquivo protegido e validação de métricas reais no
+  Prometheus.
 
 Consulte os exemplos de [Prometheus](../config/examples/prometheus.yml) e [Blackbox](../config/examples/blackbox.yml).
 
@@ -158,8 +161,9 @@ Consulte os exemplos de [Prometheus](../config/examples/prometheus.yml) e [Black
 | MySQL do Zabbix | Docker secret |
 | PostgreSQL do NetBox | arquivo/variável externa ao Git |
 | token Zabbix API | arquivo `.env` restrito |
-| credencial UniFi | arquivo `.env` restrito |
+| credencial UniFi somente leitura | Ansible Vault + arquivo read-only |
 | senha administrativa Portainer | Ansible Vault + arquivo read-only |
 | senha administrativa Grafana | Ansible Vault + arquivo read-only |
+| comunidade SNMP de leitura | Ansible Vault + arquivo read-only |
 
 O valor nunca é documentado ou versionado.

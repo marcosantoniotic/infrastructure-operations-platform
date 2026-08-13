@@ -152,6 +152,57 @@ services:
       - proxy
 {% endif %}
 
+{% if observability_snmp_enabled | bool %}
+  snmp-exporter:
+    image: {{ observability_snmp_exporter_image }}
+    command:
+      - --config.file=/etc/snmp_exporter/snmp.yml
+      - --config.file=/etc/snmp_exporter/auth.yml
+      - --snmp.module-concurrency={{ observability_snmp_module_concurrency }}
+    volumes:
+      - ./secrets/snmp-auth.yml:/etc/snmp_exporter/auth.yml:ro,Z
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - metrics
+      - access
+{% endif %}
+
+{% if observability_unifi_poller_enabled | bool %}
+  unifi-poller:
+    image: {{ observability_unifi_poller_image }}
+    environment:
+      UP_INFLUXDB_DISABLE: "true"
+      UP_PROMETHEUS_DISABLE: "false"
+      UP_PROMETHEUS_HTTP_LISTEN: 0.0.0.0:9130
+      UP_PROMETHEUS_NAMESPACE: unpoller
+      UP_UNIFI_DEFAULT_URL: {{ observability_unifi_url }}
+      UP_UNIFI_DEFAULT_USER: {{ observability_unifi_username }}
+      UP_UNIFI_DEFAULT_PASS: file:///run/secrets/unifi_password
+      UP_UNIFI_DEFAULT_VERIFY_SSL: "{{ observability_unifi_verify_ssl | bool | lower }}"
+      UP_UNIFI_DEFAULT_SAVE_DPI: "{{ observability_unifi_save_dpi | bool | lower }}"
+      UP_UNIFI_DEFAULT_SAVE_SITES: "true"
+    volumes:
+      - ./secrets/unifi_password:/run/secrets/unifi_password:ro,Z
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - metrics
+      - access
+{% endif %}
+
   grafana:
     image: {{ observability_grafana_image }}
     environment:

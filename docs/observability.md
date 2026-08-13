@@ -15,6 +15,40 @@
 
 - métricas do RHEL por Node Exporter;
 - métricas de containers por cAdvisor;
+- disponibilidade e certificados por Blackbox Exporter;
+- métricas do Traefik quando a integração está habilitada;
+- telemetria de equipamentos de rede pelo SNMP Exporter opcional.
+
+#### SNMP Exporter
+
+Defina `observability_snmp_enabled: true`, armazene a comunidade somente em
+`vault_observability_snmp_community` e declare cada equipamento em
+`observability_snmp_targets`. Para MikroTik, a configuração padrão combina os
+módulos oficiais `system`, `if_mib`, `hrDevice`, `hrStorage`, `hrSystem` e
+`mikrotik`; isso atende métricas `sys*`, `if*`, `hr*` e `mtxr*` usadas pelos
+dashboards.
+
+O papel cria os jobs `network-snmp` e `snmp-exporter`, testa a resolução e o
+endpoint do exporter a partir do container Prometheus e falha quando qualquer
+alvo configurado não retorna `up=1`. `observability_snmp_scrape_timeout` deve
+permanecer menor ou igual ao intervalo global de coleta.
+
+#### UniFi Poller
+
+Defina `observability_unifi_poller_enabled: true`, informe a URL HTTPS interna
+da API do controller, sem proxy de autenticação interativo, e use uma conta
+local dedicada com perfil somente leitura. A senha
+fica exclusivamente em `vault_observability_unifi_password`; o papel a
+materializa em arquivo protegido e o container lê o valor por `file://`, sem
+publicá-lo no Compose ou no ambiente do processo.
+
+O papel provisiona a versão fixada do UniFi Poller, habilita a coleta
+Prometheus no namespace `unpoller`, cria o job `unifi-poller` e valida que
+`unpoller_device_info` contém ao menos um dispositivo. A implantação falha se o
+endpoint não estiver acessível, se a autenticação for recusada ou se nenhuma
+telemetria real for coletada. `observability_unifi_verify_ssl` deve permanecer
+ativado quando o certificado do endpoint interno for confiável; para acesso
+direto por IP com certificado próprio do appliance, desative-o explicitamente.
 
 ### Alertmanager
 
@@ -29,11 +63,6 @@ Política padrão de notificação:
 - avisos: agrupamento de dois minutos e repetição a cada 12 horas;
 - recuperação: mensagem `RESOLVED` enviada pela mesma rota;
 - certificados: o crítico de 15 dias suprime o aviso de 30 dias do mesmo serviço.
-- disponibilidade e certificados por Blackbox Exporter;
-- métricas do Traefik;
-- telemetria de rede por SNMP Exporter;
-- telemetria UniFi por UniFi Poller.
-
 ### Grafana
 
 - visão consolidada do SRV01;

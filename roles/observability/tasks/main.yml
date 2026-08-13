@@ -9,6 +9,33 @@
       - observability_prometheus_retention_time | length > 0
       - observability_prometheus_retention_size | length > 0
       - >-
+        not (observability_snmp_enabled | bool) or
+        (
+          observability_snmp_auth_name | length > 0 and
+          observability_snmp_community | length > 0 and
+          not observability_snmp_community.startswith("<") and
+          observability_snmp_modules | length > 0 and
+          observability_snmp_module_concurrency | int > 0 and
+          observability_snmp_scrape_timeout | length > 0 and
+          observability_snmp_targets | length > 0 and
+          observability_snmp_targets |
+          selectattr('name', 'defined') |
+          selectattr('address', 'defined') |
+          list |
+          length == observability_snmp_targets | length
+        )
+      - >-
+        not (observability_unifi_poller_enabled | bool) or
+        (
+          observability_unifi_url | length > 0 and
+          observability_unifi_url.startswith("https://") and
+          not observability_unifi_url.startswith("https://<") and
+          observability_unifi_username | length > 0 and
+          not observability_unifi_username.startswith("<") and
+          observability_unifi_password | length >= 16 and
+          not observability_unifi_password.startswith("<")
+        )
+      - >-
         not (observability_enable_traefik | bool) or
         observability_grafana_hostname | length > 0
       - >-
@@ -108,6 +135,30 @@
     unsafe_writes: true
   no_log: true
   when: observability_alertmanager_enabled | bool
+
+- name: Install SNMP Exporter authentication
+  ansible.builtin.template:
+    src: snmp-auth.yml.j2
+    dest: "{{ observability_project_dir }}/secrets/snmp-auth.yml"
+    owner: root
+    group: root
+    mode: "0400"
+    unsafe_writes: true
+  register: observability_snmp_auth
+  no_log: true
+  when: observability_snmp_enabled | bool
+
+- name: Install UniFi Poller password
+  ansible.builtin.copy:
+    content: "{{ observability_unifi_password }}"
+    dest: "{{ observability_project_dir }}/secrets/unifi_password"
+    owner: root
+    group: root
+    mode: "0400"
+    unsafe_writes: true
+  register: observability_unifi_password_file
+  no_log: true
+  when: observability_unifi_poller_enabled | bool
 
 - name: Render observability configuration
   ansible.builtin.template:
@@ -259,21 +310,69 @@
     cmd: |
       set -o errexit -o nounset -o pipefail
       docker compose --project-directory {{ observability_project_dir }} \
-        rm --stop --force grafana prometheus blackbox-exporter{{ ' alertmanager' if observability_alertmanager_enabled | bool else '' }}
+        rm --stop --force grafana prometheus blackbox-exporter{{ ' snmp-exporter' if observability_snmp_enabled | bool else '' }}{{ ' unifi-poller' if observability_unifi_poller_enabled | bool else '' }}{{ ' alertmanager' if observability_alertmanager_enabled | bool else '' }}
       docker compose --project-directory {{ observability_project_dir }} \
-        up --detach --force-recreate prometheus blackbox-exporter grafana{{ ' alertmanager' if observability_alertmanager_enabled | bool else '' }}
+        up --detach --force-recreate prometheus blackbox-exporter{{ ' snmp-exporter' if observability_snmp_enabled | bool else '' }}{{ ' unifi-poller' if observability_unifi_poller_enabled | bool else '' }} grafana{{ ' alertmanager' if observability_alertmanager_enabled | bool else '' }}
     executable: /bin/bash
   changed_when: true
   when:
     - not ansible_check_mode
     - >-
       observability_rendered_configuration.changed or
+      (observability_snmp_auth.changed | default(false)) or
+      (observability_unifi_password_file.changed | default(false)) or
       observability_prometheus_published_port.stdout | trim | length == 0 or
       observability_grafana_published_port.stdout | trim | length == 0 or
       (
         observability_alertmanager_enabled | bool and
         observability_alertmanager_published_port.stdout | default('') | trim | length == 0
       )
+
+- name: Wait for SNMP Exporter discovery from Prometheus
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ observability_project_dir }}"
+      - exec
+      - --no-TTY
+      - prometheus
+      - wget
+      - --quiet
+      - --spider
+      - http://snmp-exporter:9116/metrics
+  register: observability_snmp_exporter_discovery
+  changed_when: false
+  retries: 30
+  delay: 2
+  until: observability_snmp_exporter_discovery.rc == 0
+  when:
+    - not ansible_check_mode
+    - observability_snmp_enabled | bool
+
+- name: Wait for UniFi Poller discovery from Prometheus
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ observability_project_dir }}"
+      - exec
+      - --no-TTY
+      - prometheus
+      - wget
+      - --quiet
+      - --spider
+      - http://unifi-poller:9130/metrics
+  register: observability_unifi_poller_discovery
+  changed_when: false
+  retries: 30
+  delay: 2
+  until: observability_unifi_poller_discovery.rc == 0
+  when:
+    - not ansible_check_mode
+    - observability_unifi_poller_enabled | bool
 
 - name: Reload Blackbox Exporter configuration
   ansible.builtin.command:
@@ -373,6 +472,43 @@
       length
     ) > 0
   when: not ansible_check_mode
+
+- name: Validate configured SNMP targets expose metrics
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/api/v1/query?query=count(up%7Bjob%3D%22network-snmp%22%7D%20%3D%3D%201)
+    method: GET
+    status_code: 200
+    return_content: true
+  register: observability_snmp_targets_up
+  retries: 20
+  delay: 5
+  until: >-
+    observability_snmp_targets_up.json.status == 'success' and
+    observability_snmp_targets_up.json.data.result | length == 1 and
+    observability_snmp_targets_up.json.data.result[0].value[1] ==
+    (observability_snmp_targets | length | string)
+  when:
+    - not ansible_check_mode
+    - observability_snmp_enabled | bool
+
+- name: Validate UniFi Poller exports controller metrics
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/api/v1/query?query=count(unpoller_device_info)
+    method: GET
+    status_code: 200
+    return_content: true
+  register: observability_unifi_metrics
+  retries: 30
+  delay: 5
+  until: >-
+    observability_unifi_metrics.json.status == 'success' and
+    observability_unifi_metrics.json.data.result | length == 1 and
+    observability_unifi_metrics.json.data.result[0].value[1] | int > 0
+  when:
+    - not ansible_check_mode
+    - observability_unifi_poller_enabled | bool
 
 - name: Validate all configured application probes
   ansible.builtin.uri:
