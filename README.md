@@ -87,6 +87,8 @@ flowchart LR
     Proxy --> Grafana["Grafana"]
     Grafana --> Prometheus["Prometheus"]
     Prometheus --> Exporters["Node Exporter<br/>cAdvisor<br/>Blackbox<br/>SNMP Exporter<br/>UniFi Poller"]
+    Gateway -. "telemetria somente leitura" .-> UniFiPoller["UniFi Poller"]
+    UniFiPoller --> Prometheus
 
     Proxy --> Portainer["Portainer"]
     Proxy --> Cockpit["Cockpit"]

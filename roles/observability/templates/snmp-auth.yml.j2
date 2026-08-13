@@ -1,0 +1,8 @@
+---
+auths:
+  {{ observability_snmp_auth_name }}:
+    community: {{ observability_snmp_community | to_json }}
+    security_level: noAuthNoPriv
+    auth_protocol: MD5
+    priv_protocol: DES
+    version: 2

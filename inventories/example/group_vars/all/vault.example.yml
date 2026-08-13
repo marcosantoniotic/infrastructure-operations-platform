@@ -13,6 +13,8 @@ vault_zabbix_admin_password: "<ZABBIX_ADMIN_PASSWORD>"
 vault_netbox_zabbix_sync_api_token: "<ZABBIX_API_TOKEN>"
 vault_portainer_admin_password: "<PORTAINER_ADMIN_PASSWORD>"
 vault_grafana_admin_password: "<GRAFANA_ADMIN_PASSWORD>"
+vault_observability_snmp_community: "<READ_ONLY_SNMP_COMMUNITY>"
+vault_observability_unifi_password: "<UNIFI_READ_ONLY_PASSWORD>"
 vault_alertmanager_smtp_password: "<ALERTMANAGER_SMTP_PASSWORD>"
 vault_external_backup_restic_password: "<RESTIC_REPOSITORY_PASSWORD>"
 vault_external_backup_rclone_config: |
