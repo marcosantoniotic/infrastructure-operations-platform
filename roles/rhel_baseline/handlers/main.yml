@@ -1,4 +1,14 @@
 ---
+- name: Reapply platform network connections
+  ansible.builtin.command:
+    argv:
+      - nmcli
+      - device
+      - reapply
+      - "{{ item.device }}"
+  loop: "{{ platform_static_routes }}"
+  listen: Reapply platform network connections
+
 - name: Restart sshd
   ansible.builtin.service:
     name: sshd

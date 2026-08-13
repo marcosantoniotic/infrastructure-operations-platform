@@ -44,7 +44,7 @@
       "targets": [{"expr": "probe_duration_seconds{job=\"blackbox-dns\"}", "legendFormat": "{{ '{{' }}service{{ '}}' }}", "refId": "A"}],
       "title": "Histórico de latência DNS",
       "type": "timeseries"
-    },
+    }{% if observability_adguard_metrics_enabled | bool %},
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [{"options": {"0": {"color": "red", "text": "FALHA"}, "1": {"color": "green", "text": "OPERACIONAL"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
@@ -85,6 +85,7 @@
       "title": "Processamento médio",
       "type": "stat"
     }
+{% endif %}
   ],
   "refresh": "30s",
   "schemaVersion": 41,

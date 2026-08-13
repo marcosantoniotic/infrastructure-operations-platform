@@ -31,6 +31,12 @@ observability_grafana_bind_address: 127.0.0.1
 observability_grafana_port: 3000
 observability_grafana_admin_user: admin
 observability_grafana_admin_password: "<GRAFANA_ADMIN_PASSWORD>"
+observability_zabbix_enabled: false
+observability_zabbix_network: zabbix_frontend
+observability_zabbix_url: http://zabbix-web:8080/api_jsonrpc.php
+observability_zabbix_datasource_uid: zabbix
+observability_zabbix_username: Admin
+observability_zabbix_password: ""
 observability_grafana_validation_host: 127.0.0.1
 observability_prometheus_validation_host: 127.0.0.1
 observability_blackbox_targets:
@@ -38,7 +44,9 @@ observability_blackbox_targets:
     url: http://prometheus:9090/-/ready
   - name: grafana
     url: http://grafana:3000/api/health
+observability_blackbox_external_networks: []
 observability_dns_targets: []
+observability_adguard_metrics_enabled: false
 observability_snmp_enabled: false
 observability_snmp_auth_name: iop_snmp_v2
 observability_snmp_community: "<SNMP_COMMUNITY>"

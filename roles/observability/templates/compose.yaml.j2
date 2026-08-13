@@ -148,6 +148,9 @@ services:
     networks:
       - metrics
       - access
+{% for network in observability_blackbox_external_networks %}
+      - blackbox_external_{{ loop.index }}
+{% endfor %}
 {% if observability_enable_traefik %}
       - proxy
 {% endif %}
@@ -231,6 +234,9 @@ services:
         protocol: tcp
     volumes:
       - ./secrets/grafana_admin_password:/run/secrets/grafana_admin_password:ro,Z
+{% if observability_zabbix_enabled | bool %}
+      - ./secrets/zabbix_datasource_password:/run/secrets/zabbix_datasource_password:ro,Z
+{% endif %}
       - ./grafana/provisioning:/etc/grafana/provisioning:ro,Z
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro,Z
       - grafana_data:/var/lib/grafana
@@ -262,6 +268,9 @@ services:
     networks:
       - metrics
       - access
+{% if observability_zabbix_enabled | bool %}
+      - zabbix
+{% endif %}
 {% if observability_enable_traefik %}
       - proxy
 {% endif %}
@@ -272,6 +281,16 @@ networks:
     internal: true
   access:
     driver: bridge
+{% for network in observability_blackbox_external_networks %}
+  blackbox_external_{{ loop.index }}:
+    name: {{ network }}
+    external: true
+{% endfor %}
+{% if observability_zabbix_enabled | bool %}
+  zabbix:
+    name: {{ observability_zabbix_network }}
+    external: true
+{% endif %}
 {% if observability_enable_traefik %}
   proxy:
     name: {{ observability_traefik_network }}

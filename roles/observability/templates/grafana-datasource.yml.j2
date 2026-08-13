@@ -15,3 +15,18 @@ datasources:
       prometheusType: Prometheus
       prometheusVersion: 3.13.1
       timeInterval: {{ observability_scrape_interval }}
+{% if observability_zabbix_enabled | bool %}
+  - name: Zabbix
+    uid: {{ observability_zabbix_datasource_uid }}
+    type: alexanderzobnin-zabbix-datasource
+    access: proxy
+    url: {{ observability_zabbix_url }}
+    editable: false
+    jsonData:
+      authType: userLogin
+      username: {{ observability_zabbix_username }}
+      trends: true
+      disableReadOnlyUsersAck: true
+    secureJsonData:
+      password: $__file{/run/secrets/zabbix_datasource_password}
+{% endif %}

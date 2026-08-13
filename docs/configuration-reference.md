@@ -35,7 +35,8 @@ Configuração estática esperada:
 - provider Docker apontando para Socket Proxy;
 - `exposedByDefault=false`;
 - provider de arquivos dinâmicos;
-- ACME por DNS challenge;
+- certificado e chave fornecidos pelo inventário privado, sem armazenar
+  material TLS no repositório;
 - access log habilitado.
 
 Configuração dinâmica:
@@ -48,6 +49,12 @@ Configuração dinâmica:
 
 Consulte [exemplo sanitizado](../config/examples/traefik-static.yml).
 
+O perfil de implantação mantém os listeners em loopback por padrão. Para usar
+HTTPS por túnel SSH com uma porta externa diferente de `443`, configure a mesma
+porta em `traefik_https_port` e nas variáveis `*_traefik_https_port` dos
+serviços. O certificado deve conter todos os nomes publicados, e o NetBox exige
+que `netbox_traefik_origin` e `netbox_csrf_trusted_origins` incluam a porta.
+
 ## Zabbix
 
 - frontend e servidor na mesma versão;
@@ -57,6 +64,7 @@ Consulte [exemplo sanitizado](../config/examples/traefik-static.yml).
   restrito a loopback e template `Linux by Zabbix agent active`;
 - mapa do ecossistema provisionado pela API, com dez checks e sete triggers reais;
 - integração NetBox-Zabbix com token restrito;
+- redes Docker externas opcionais para o mapa alcançar dependências reais;
 
 ### Sincronização NetBox-Zabbix
 
@@ -76,6 +84,11 @@ o valor usado pela instância de origem resulta em `Not authorized`.
 - banco conectado somente ao backend interno;
 - tráfego de agentes separado em rede dedicada;
 - frontend publicado pelo Traefik, com fallback limitado ao loopback.
+
+O Grafana pode provisionar o datasource Zabbix com
+`observability_zabbix_enabled`. A senha permanece em arquivo montado a partir
+do Vault, e a role valida a existência da rede Docker compartilhada antes de
+convergir.
 
 ### Backup do Zabbix
 
@@ -145,6 +158,10 @@ Exporters:
 - Node Exporter com filesystems do host em somente leitura;
 - cAdvisor com acesso necessário ao runtime;
 - Blackbox com alvos por hostname;
+- probes DNS opcionais por resolvedor, consulta e tipo de registro, validados
+  individualmente antes da conclusão da convergência;
+- painéis de API AdGuard condicionados a
+  `observability_adguard_metrics_enabled` e à presença de `adguard_api_up=1`;
 - SNMP Exporter opcional, com os módulos oficiais do exporter e autenticação
   armazenada no Vault, para equipamentos de rede como MikroTik;
 - UniFi Poller opcional, com versão fixada, conta local somente leitura, senha

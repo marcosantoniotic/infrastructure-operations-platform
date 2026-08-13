@@ -18,6 +18,7 @@ rhel_baseline_packages:
   - unzip
   - vim-enhanced
   - wget
+platform_static_routes: []
 
 # SSH hardening is opt-in to prevent administrative lockout.
 rhel_harden_ssh: false
@@ -45,6 +46,8 @@ netbox_allowed_hosts:
   - localhost
   - 127.0.0.1
   - "netbox.<BASE_DOMAIN>"
+netbox_csrf_trusted_origins:
+  - "https://netbox.<BASE_DOMAIN>:8443"
 
 # Secret values are supplied by the encrypted vault.yml file.
 netbox_secret_key: "{{ vault_netbox_secret_key }}"
@@ -59,7 +62,9 @@ netbox_superuser_password: "{{ vault_netbox_superuser_password }}"
 netbox_enable_metrics: true
 netbox_enable_traefik: false
 netbox_traefik_hostname: "netbox.<BASE_DOMAIN>"
+netbox_traefik_origin: "https://netbox.<BASE_DOMAIN>:8443"
 netbox_traefik_network: proxy
+netbox_traefik_https_port: 8443
 
 # NetBox backup
 netbox_backup_root: /var/backups/infrastructure-platform/netbox
@@ -82,6 +87,10 @@ traefik_dashboard_basic_auth: "<USERNAME:HTPASSWD_HASH>"
 traefik_proxy_network: proxy
 traefik_socket_network: socket-proxy
 traefik_enable_https: false
+traefik_tls_certificate_source: >-
+  {{ inventory_dir }}/files/traefik/tls.crt
+traefik_tls_private_key_source: >-
+  {{ inventory_dir }}/files/traefik/tls.key
 traefik_redirect_http_to_https: false
 traefik_enable_validation_service: false
 
@@ -105,6 +114,9 @@ zabbix_server_port: 10051
 zabbix_enable_traefik: false
 zabbix_traefik_hostname: "zabbix.<BASE_DOMAIN>"
 zabbix_traefik_network: proxy
+zabbix_traefik_https_port: 8443
+zabbix_platform_map_external_networks: []
+zabbix_agent_network_subnet: ""
 
 # Zabbix backup
 zabbix_backup_project_dir: /opt/zabbix
@@ -164,6 +176,7 @@ portainer_http_port: 9000
 portainer_enable_traefik: false
 portainer_traefik_hostname: "portainer.<BASE_DOMAIN>"
 portainer_traefik_network: proxy
+portainer_traefik_https_port: 8443
 
 # Native RHEL web console
 cockpit_hostname: "cockpit.<BASE_DOMAIN>"
@@ -208,6 +221,12 @@ observability_grafana_bind_address: 127.0.0.1
 observability_grafana_port: 3000
 observability_grafana_admin_user: admin
 observability_grafana_admin_password: "{{ vault_grafana_admin_password }}"
+observability_zabbix_enabled: false
+observability_zabbix_network: zabbix_frontend
+observability_zabbix_url: http://zabbix-web:8080/api_jsonrpc.php
+observability_zabbix_datasource_uid: zabbix
+observability_zabbix_username: Admin
+observability_zabbix_password: "{{ vault_zabbix_admin_password }}"
 observability_blackbox_targets:
   - name: prometheus
     url: http://prometheus:9090/-/ready
@@ -217,6 +236,13 @@ observability_blackbox_targets:
   # - name: netbox
   #   url: http://netbox:8080/login/
   #   host_header: "netbox.<BASE_DOMAIN>"
+observability_blackbox_external_networks: []
+observability_dns_targets:
+  - name: primary-dns
+    address: 192.0.2.53:53
+    query_name: example.com
+    query_type: A
+observability_adguard_metrics_enabled: false
 observability_snmp_enabled: false
 observability_snmp_auth_name: iop_snmp_v2
 observability_snmp_community: "{{ vault_observability_snmp_community }}"
@@ -242,3 +268,4 @@ observability_unifi_save_dpi: true
 observability_enable_traefik: false
 observability_grafana_hostname: "grafana.<BASE_DOMAIN>"
 observability_traefik_network: proxy
+observability_traefik_https_port: 8443

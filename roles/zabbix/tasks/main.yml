@@ -83,6 +83,26 @@
     - zabbix_enable_traefik | bool
     - not ansible_check_mode
 
+- name: Validate Zabbix platform-map external networks
+  ansible.builtin.assert:
+    that:
+      - item.key | default('') | length > 0
+      - item.name | default('') | length > 0
+    fail_msg: >-
+      Each zabbix_platform_map_external_networks entry requires key and name.
+  loop: "{{ zabbix_platform_map_external_networks }}"
+
+- name: Verify Zabbix platform-map external networks exist
+  ansible.builtin.command:
+    argv:
+      - docker
+      - network
+      - inspect
+      - "{{ item.name }}"
+  loop: "{{ zabbix_platform_map_external_networks }}"
+  changed_when: false
+  when: not ansible_check_mode
+
 - name: Create Zabbix project directories
   ansible.builtin.file:
     path: "{{ item.path }}"

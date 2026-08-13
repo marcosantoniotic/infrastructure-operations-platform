@@ -64,6 +64,9 @@ services:
     networks:
       - backend
       - agent
+{% for network in zabbix_platform_map_external_networks %}
+      - {{ network.key }}
+{% endfor %}
 {% if zabbix_enable_traefik and zabbix_provision_platform_map %}
       - proxy
 {% endif %}
@@ -128,6 +131,16 @@ networks:
     driver: bridge
   agent:
     driver: bridge
+{% if zabbix_agent_network_subnet | length > 0 %}
+    ipam:
+      config:
+        - subnet: {{ zabbix_agent_network_subnet }}
+{% endif %}
+{% for network in zabbix_platform_map_external_networks %}
+  {{ network.key }}:
+    name: {{ network.name }}
+    external: true
+{% endfor %}
 {% if zabbix_enable_traefik %}
   proxy:
     name: {{ zabbix_traefik_network }}
