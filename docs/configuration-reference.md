@@ -21,6 +21,7 @@ porta sem desabilitar o modo enforcing.
 | Variável | Padrão | Finalidade |
 |---|---|---|
 | `cockpit_hostname` | `cockpit.<BASE_DOMAIN>` | nome DNS publicado |
+| `cockpit_additional_hostnames` | `[]` | aliases HTTPS/WSS adicionais autorizados |
 | `cockpit_listen_port` | `9091` | porta HTTPS nativa |
 | `cockpit_enable_traefik` | `false` | publica o serviço no proxy |
 | `cockpit_direct_firewall_access` | `false` | permite acesso direto pela rede |

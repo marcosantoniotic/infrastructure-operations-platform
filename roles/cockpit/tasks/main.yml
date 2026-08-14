@@ -5,6 +5,10 @@
       - cockpit_hostname | length > 0
       - cockpit_packages | length > 0
       - >-
+        cockpit_additional_hostnames | unique | list | length ==
+        cockpit_additional_hostnames | length
+      - cockpit_hostname not in cockpit_additional_hostnames
+      - >-
         not (cockpit_admin_enabled | bool) or
         cockpit_admin_username is match('^[a-z_][a-z0-9_-]{2,31}$')
       - >-
@@ -99,6 +103,23 @@
     group: root
     mode: "0644"
   notify: Restart Cockpit socket
+
+- name: Inspect rendered Cockpit origins
+  ansible.builtin.command:
+    argv:
+      - grep
+      - ^Origins =
+      - /etc/cockpit/cockpit.conf
+  register: cockpit_rendered_origins
+  changed_when: false
+
+- name: Validate rendered Cockpit origins
+  ansible.builtin.assert:
+    that:
+      - "('https://' + item) in cockpit_rendered_origins.stdout.split()"
+      - "('wss://' + item) in cockpit_rendered_origins.stdout.split()"
+      - "'ProtocolHeader' not in cockpit_rendered_origins.stdout"
+  loop: "{{ [cockpit_hostname] + cockpit_additional_hostnames }}"
 
 - name: Enable Cockpit socket activation
   ansible.builtin.systemd:
