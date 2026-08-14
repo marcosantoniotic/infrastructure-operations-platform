@@ -22,6 +22,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Corrigido
 
+- raiz do hostname do Traefik redirecionada para `/dashboard/`, eliminando o
+  `404` ao acessar o endereço público sem caminho;
 - autorização de origens HTTPS/WSS adicionais no Cockpit para aliases publicados
   pelo Traefik, evitando falha da sessão interativa após o login;
 - imagens de tipos de dispositivo e anexos do NetBox restauradas ao publicar o

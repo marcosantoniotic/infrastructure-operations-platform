@@ -158,6 +158,26 @@
     - not (traefik_enable_https | bool)
     - not ansible_check_mode
 
+- name: Assert HTTP dashboard root redirects to dashboard path
+  ansible.builtin.uri:
+    url: "http://{{ traefik_bind_address }}:{{ traefik_http_port }}/"
+    method: GET
+    headers:
+      Host: "{{ traefik_dashboard_hostname }}"
+    follow_redirects: none
+    status_code: 301
+  register: traefik_dashboard_http_root
+  retries: 15
+  delay: 2
+  until:
+    - traefik_dashboard_http_root.status == 301
+    - >-
+      traefik_dashboard_http_root.location ==
+      'http://' + traefik_dashboard_hostname + '/dashboard/'
+  when:
+    - not (traefik_enable_https | bool)
+    - not ansible_check_mode
+
 - name: Assert unauthenticated HTTPS dashboard is rejected
   ansible.builtin.command:
     argv:
@@ -166,6 +186,8 @@
       - --insecure
       - --resolve
       - "{{ traefik_dashboard_hostname }}:{{ traefik_https_port }}:{{ traefik_bind_address }}"
+      - --header
+      - "Host: {{ traefik_dashboard_hostname }}"
       - --output
       - /dev/null
       - --write-out
@@ -177,6 +199,35 @@
   delay: 2
   until: traefik_dashboard_https_unauthenticated.stdout == "401"
   failed_when: traefik_dashboard_https_unauthenticated.stdout != "401"
+  when:
+    - traefik_enable_https | bool
+    - not ansible_check_mode
+
+- name: Assert HTTPS dashboard root redirects to dashboard path
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --silent
+      - --insecure
+      - --resolve
+      - "{{ traefik_dashboard_hostname }}:{{ traefik_https_port }}:{{ traefik_bind_address }}"
+      - --header
+      - "Host: {{ traefik_dashboard_hostname }}"
+      - --output
+      - /dev/null
+      - --write-out
+      - "%{http_code} %{redirect_url}"
+      - "https://{{ traefik_dashboard_hostname }}:{{ traefik_https_port }}/"
+  register: traefik_dashboard_https_root
+  changed_when: false
+  retries: 15
+  delay: 2
+  until: >-
+    traefik_dashboard_https_root.stdout ==
+    '301 https://' + traefik_dashboard_hostname + '/dashboard/'
+  failed_when: >-
+    traefik_dashboard_https_root.stdout !=
+    '301 https://' + traefik_dashboard_hostname + '/dashboard/'
   when:
     - traefik_enable_https | bool
     - not ansible_check_mode

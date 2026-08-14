@@ -10,6 +10,7 @@ the proxy container.
 - Docker API mutations are denied;
 - `exposedByDefault=false`;
 - the dashboard uses the secure `api@internal` service;
+- the dashboard hostname root redirects to `/dashboard/`;
 - dashboard authentication and standard headers are applied as reusable file
   middlewares;
 - Traefik and validation workloads run read-only with dropped capabilities;

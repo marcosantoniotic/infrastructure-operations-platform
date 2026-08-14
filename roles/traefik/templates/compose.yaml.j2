@@ -76,14 +76,14 @@ services:
       - traefik.docker.network={{ traefik_proxy_network }}
       - >-
         traefik.http.routers.traefik-dashboard.rule=({% for hostname in [traefik_dashboard_hostname] + traefik_dashboard_additional_hostnames %}{% if not loop.first %} || {% endif %}Host(`{{ hostname }}`){% endfor %})
-        && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))
+        && (Path(`/`) || PathPrefix(`/api`) || PathPrefix(`/dashboard`))
       - >-
         traefik.http.routers.traefik-dashboard.entrypoints={{
         'websecure' if traefik_enable_https else 'web' }}
 {% if traefik_enable_https %}
       - traefik.http.routers.traefik-dashboard.tls=true
 {% endif %}
-      - traefik.http.routers.traefik-dashboard.middlewares=dashboard-auth@file,security-headers@file
+      - traefik.http.routers.traefik-dashboard.middlewares=dashboard-root-redirect@file,dashboard-auth@file,security-headers@file
       - traefik.http.routers.traefik-dashboard.service=api@internal
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
