@@ -101,7 +101,7 @@
 
 - name: Replicate recovery points externally when requested
   ansible.builtin.command:
-    cmd: /usr/local/sbin/external-backup
+    cmd: /usr/local/sbin/infrastructure-external-backup
   register: maintenance_external_backup_result
   changed_when: true
   when: maintenance_run_external_backup | bool

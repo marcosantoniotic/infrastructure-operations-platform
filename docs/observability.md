@@ -33,6 +33,15 @@ endpoint do exporter a partir do container Prometheus e falha quando qualquer
 alvo configurado não retorna `up=1`. `observability_snmp_scrape_timeout` deve
 permanecer menor ou igual ao intervalo global de coleta.
 
+#### DNS gerenciado
+
+Cada entrada em `observability_dns_targets` verifica uma consulta real no
+resolvedor informado e exige `probe_success=1`. Os painéis portáveis apresentam
+disponibilidade, latência total, tempo de resolução e histórico sem depender do
+produto que fornece DNS. Os painéis específicos do AdGuard só são renderizados
+com `observability_adguard_metrics_enabled: true`; nesse modo a convergência
+também exige `adguard_api_up=1` produzido pelo coletor dedicado.
+
 #### UniFi Poller
 
 Defina `observability_unifi_poller_enabled: true`, informe a URL HTTPS interna
@@ -153,6 +162,13 @@ Cada alvo gera um módulo Blackbox próprio e pode declarar URL, cabeçalho
 `Host`, códigos HTTP aceitos e política TLS. O Cockpit utiliza o endpoint
 `/ping` do serviço nativo e também participa dos probes HTTP centralizados.
 
+Serviços não publicados podem ser alcançados pelo exporter através das redes
+externas declaradas em `observability_blackbox_external_networks`, sem conectar
+o Prometheus ou o Grafana às redes das aplicações. Os painéis de validade TLS
+só são renderizados quando existe ao menos um alvo HTTPS; após a publicação dos
+nomes oficiais, basta incluir esses endpoints para habilitar a coleta dos
+certificados automaticamente.
+
 ## Alertas recomendados
 
 - host indisponível;
@@ -162,6 +178,12 @@ Cada alvo gera um módulo Blackbox próprio e pode declarar URL, cabeçalho
 - container reiniciando repetidamente;
 - certificado com menos de 30 e 15 dias;
 - falha de backup ou ausência de arquivo recente;
+
+O procedimento controlado de validação de entrega e resolução por e-mail
+está documentado em
+`docs/runbooks/alertmanager-notification-test.md`. A chave SMTP anterior só
+deve ser revogada depois que os estados firing e resolved forem entregues sem
+incremento dos contadores de falha.
 
 ## Saúde dos backups
 

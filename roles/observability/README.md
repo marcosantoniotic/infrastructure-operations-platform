@@ -46,9 +46,20 @@ probe module. Optional fields include `host_header`, `valid_status_codes`, and
 `tls_insecure`, allowing environment-specific behavior without hard-coding
 application endpoints in the role.
 
+Use `observability_blackbox_external_networks` to attach only the Blackbox
+Exporter to existing application networks when services are intentionally not
+published on the host. TLS panels are rendered only when at least one declared
+target uses HTTPS, preventing an inapplicable `No data` state during pre-TLS
+deployments.
+
 Each item in `observability_dns_targets` creates an independent DNS probe with
 an explicit address, query name and optional query type. These probes require
 no AdGuard administrative credential and are suitable for availability alerts.
+
+Set `observability_adguard_metrics_enabled: true` only after deploying the
+separate AdGuard metrics collector. When disabled, the DNS dashboard omits the
+provider-specific panels and displays only portable DNS availability and
+latency. When enabled, the role requires `adguard_api_up=1` before convergence.
 
 Set `observability_alertmanager_enabled: true`, provide the SMTP login and
 sender/recipient addresses, and store `vault_alertmanager_smtp_password` in the

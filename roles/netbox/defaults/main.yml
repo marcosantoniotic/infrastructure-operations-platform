@@ -29,6 +29,7 @@ netbox_superuser_password: "<NETBOX_ADMIN_PASSWORD>"
 netbox_enable_metrics: true
 netbox_enable_traefik: false
 netbox_traefik_hostname: "netbox.<BASE_DOMAIN>"
+netbox_traefik_additional_hostnames: []
 netbox_traefik_origin: "https://netbox.<BASE_DOMAIN>"
 netbox_traefik_network: proxy
 netbox_traefik_middlewares:

@@ -20,6 +20,24 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Corrigido
 
+- publicação HTTPS interna agora documenta certificado privado, portas de
+  validação por serviço, origem CSRF do NetBox e fallback por túnel SSH;
+- observabilidade pode provisionar o datasource Zabbix por rede externa e
+  segredo montado, com validação prévia da dependência;
+- rotas estáticas do host e redes externas do mapa Zabbix são declarativas,
+  validadas e idempotentes;
+- janela de manutenção agora chama o executável realmente instalado para a
+  réplica externa criptografada;
+- documentada a preservação obrigatória de repositórios Restic existentes
+  quando a chave configurada não corresponde ao destino;
+- definido o ensaio operacional seguro e a cadência recomendada para a janela
+  mensal de manutenção;
+- documentada a rotação segura da chave SMTP e a validação completa dos
+  estados firing e resolved do Alertmanager;
+- dashboard de aplicações agora monitora serviços internos por redes Docker
+  declaradas e só exibe validade TLS quando há alvos HTTPS reais;
+- dashboard DNS agora oculta métricas específicas do AdGuard quando o coletor
+  opcional não está habilitado e mantém os probes portáveis por resolvedor;
 - persistência dos layouts do NetBox Topology Views ao habilitar oficialmente
   a gravação de coordenadas;
 - nós invisíveis no Topology Views quando um papel não possui imagem associada;

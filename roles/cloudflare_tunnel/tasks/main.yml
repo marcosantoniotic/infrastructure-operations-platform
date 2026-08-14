@@ -1,0 +1,128 @@
+---
+- name: Validate Cloudflare Tunnel variables
+  ansible.builtin.assert:
+    that:
+      - cloudflare_tunnel_project_dir.startswith("/")
+      - cloudflare_tunnel_token | length >= 100
+      - not cloudflare_tunnel_token.startswith("<")
+      - cloudflare_tunnel_origin_ca_source | length > 0
+      - cloudflare_tunnel_proxy_network | length > 0
+      - cloudflare_tunnel_metrics_port | int > 0
+      - cloudflare_tunnel_metrics_port | int < 65536
+    fail_msg: >-
+      Configure a remotely managed tunnel token in Ansible Vault and provide
+      the private CA certificate used to validate the Traefik origin.
+  no_log: true
+
+- name: Validate Docker service
+  ansible.builtin.service_facts: {}
+
+- name: Assert Docker is running
+  ansible.builtin.assert:
+    that:
+      - "'docker.service' in ansible_facts.services"
+      - ansible_facts.services.get('docker.service', {}).get('state', '') == 'running'
+    fail_msg: "Docker must be installed and running before Cloudflare Tunnel deployment."
+
+- name: Verify the external Traefik network exists
+  ansible.builtin.command:
+    argv:
+      - docker
+      - network
+      - inspect
+      - "{{ cloudflare_tunnel_proxy_network }}"
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Create Cloudflare Tunnel project directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ cloudflare_tunnel_project_dir }}"
+      mode: "0750"
+    - path: "{{ cloudflare_tunnel_project_dir }}/secrets"
+      mode: "0710"
+    - path: "{{ cloudflare_tunnel_project_dir }}/certs"
+      mode: "0750"
+
+- name: Install Cloudflare Tunnel token
+  ansible.builtin.copy:
+    content: "{{ cloudflare_tunnel_token }}"
+    dest: "{{ cloudflare_tunnel_project_dir }}/secrets/tunnel_token"
+    owner: "65532"
+    group: "65532"
+    mode: "0400"
+  no_log: true
+
+- name: Install private CA for origin validation
+  ansible.builtin.copy:
+    src: "{{ cloudflare_tunnel_origin_ca_source }}"
+    dest: "{{ cloudflare_tunnel_project_dir }}/certs/origin-ca.crt"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Render Cloudflare Tunnel Compose project
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ cloudflare_tunnel_project_dir }}/compose.yaml"
+    owner: root
+    group: root
+    mode: "0640"
+
+- name: Validate rendered Cloudflare Tunnel Compose configuration
+  ansible.builtin.command:
+    cmd: docker compose --project-directory {{ cloudflare_tunnel_project_dir }} config --quiet
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Deploy Cloudflare Tunnel project
+  community.docker.docker_compose_v2:
+    project_src: "{{ cloudflare_tunnel_project_dir }}"
+    files:
+      - compose.yaml
+    state: present
+    pull: missing
+    wait: true
+    wait_timeout: 180
+  when: not ansible_check_mode
+
+- name: Wait for a registered Cloudflare Tunnel connection
+  ansible.builtin.command:
+    argv:
+      - docker
+      - logs
+      - --since
+      - 10m
+      - "{{ cloudflare_tunnel_container_name }}"
+  register: cloudflare_tunnel_logs
+  changed_when: false
+  retries: "{{ cloudflare_tunnel_connection_retries }}"
+  delay: "{{ cloudflare_tunnel_connection_delay }}"
+  until: >-
+    'registered tunnel connection' in
+    (cloudflare_tunnel_logs.stdout ~ cloudflare_tunnel_logs.stderr) | lower
+  when: not ansible_check_mode
+
+- name: Assert the connector exposes no host ports
+  ansible.builtin.command:
+    argv:
+      - docker
+      - port
+      - "{{ cloudflare_tunnel_container_name }}"
+  register: cloudflare_tunnel_ports
+  changed_when: false
+  failed_when: cloudflare_tunnel_ports.stdout | trim | length > 0
+  when: not ansible_check_mode
+
+- name: Report Cloudflare Tunnel deployment
+  ansible.builtin.debug:
+    msg:
+      project_directory: "{{ cloudflare_tunnel_project_dir }}"
+      proxy_network: "{{ cloudflare_tunnel_proxy_network }}"
+      public_host_ports: none
+      origin_tls_validation: private CA

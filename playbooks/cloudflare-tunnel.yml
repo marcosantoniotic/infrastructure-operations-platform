@@ -1,0 +1,9 @@
+---
+- name: Deploy outbound-only Cloudflare Tunnel connector
+  hosts: platform
+  gather_facts: true
+  become: true
+  roles:
+    - role: docker_engine
+    - role: cloudflare_tunnel
+      when: cloudflare_tunnel_enabled | default(false) | bool

@@ -38,7 +38,10 @@ services:
       - traefik.enable={{ portainer_enable_traefik | bool | lower }}
 {% if portainer_enable_traefik %}
       - traefik.docker.network={{ portainer_traefik_network }}
-      - traefik.http.routers.portainer.rule=Host(`{{ portainer_traefik_hostname }}`)
+      - >-
+        traefik.http.routers.portainer.rule={{
+        ([portainer_traefik_hostname] + portainer_traefik_additional_hostnames) |
+        map('regex_replace', '^(.*)$', 'Host(`\\g<1>`)') | join(' || ') }}
       - traefik.http.routers.portainer.entrypoints=websecure
       - traefik.http.routers.portainer.tls=true
 {% if portainer_traefik_middlewares | length > 0 %}

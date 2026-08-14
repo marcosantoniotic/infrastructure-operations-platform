@@ -9,6 +9,7 @@
 | NetBox | `playbooks/netbox.yml` | implementado, validado e integrado ao Traefik | Docker; Traefik opcional |
 | Backup do NetBox | `playbooks/netbox-backup.yml` | implementado e validado | systemd + Docker |
 | Traefik | `playbooks/traefik.yml` | implementado e validado | Docker |
+| Cloudflare Tunnel | `playbooks/cloudflare-tunnel.yml` | implementado; ativação externa opcional | Docker; Traefik; Cloudflare Access |
 | Zabbix | `playbooks/zabbix.yml` | implementado e validado | Docker; Traefik opcional |
 | Backup do Zabbix | `playbooks/zabbix-backup.yml` | implementado e validado | systemd + Docker + Zabbix |
 | Observabilidade | `playbooks/observability.yml` | implementado com host e containers | Docker; Traefik opcional |

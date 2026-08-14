@@ -39,6 +39,28 @@
         not (observability_enable_traefik | bool) or
         observability_grafana_hostname | length > 0
       - >-
+        not (observability_enable_traefik | bool) or
+        observability_grafana_additional_hostnames | unique | list | length ==
+        observability_grafana_additional_hostnames | length
+      - >-
+        not (observability_enable_traefik | bool) or
+        observability_grafana_hostname not in
+        observability_grafana_additional_hostnames
+      - >-
+        not (observability_enable_traefik | bool) or
+        observability_grafana_root_url | length == 0 or
+        observability_grafana_root_url.startswith('https://')
+      - >-
+        not (observability_zabbix_enabled | bool) or
+        (
+          observability_zabbix_network | length > 0 and
+          observability_zabbix_url | length > 0 and
+          observability_zabbix_datasource_uid | length > 0 and
+          observability_zabbix_username | length > 0 and
+          observability_zabbix_password | length >= 16 and
+          not observability_zabbix_password.startswith("<")
+        )
+      - >-
         not (observability_alertmanager_enabled | bool) or
         (
           observability_alertmanager_smtp_username | length > 0 and
@@ -53,7 +75,8 @@
         )
     fail_msg: >-
       Replace the Grafana password placeholder with a strong Ansible Vault
-      value and configure retention and ingress variables.
+      value and configure retention, unique ingress hostnames and an HTTPS
+      Grafana root URL when an external canonical URL is required.
   no_log: true
 
 - name: Validate Docker service
@@ -76,6 +99,18 @@
   changed_when: false
   when:
     - observability_enable_traefik | bool
+    - not ansible_check_mode
+
+- name: Verify the external Zabbix network exists
+  ansible.builtin.command:
+    argv:
+      - docker
+      - network
+      - inspect
+      - "{{ observability_zabbix_network }}"
+  changed_when: false
+  when:
+    - observability_zabbix_enabled | bool
     - not ansible_check_mode
 
 - name: Create observability project directories
@@ -124,6 +159,17 @@
     mode: "0644"
     unsafe_writes: true
   no_log: true
+
+- name: Install Zabbix datasource secret
+  ansible.builtin.copy:
+    content: "{{ observability_zabbix_password }}"
+    dest: "{{ observability_project_dir }}/secrets/zabbix_datasource_password"
+    owner: root
+    group: root
+    mode: "0644"
+    unsafe_writes: true
+  no_log: true
+  when: observability_zabbix_enabled | bool
 
 - name: Install Alertmanager SMTP secret
   ansible.builtin.copy:
@@ -545,6 +591,28 @@
   when:
     - not ansible_check_mode
     - observability_dns_targets | length > 0
+
+- name: Validate optional AdGuard operational metrics
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/api/v1/query?query=adguard_api_up
+    method: GET
+    status_code: 200
+    return_content: true
+  register: observability_adguard_metrics
+  retries: 20
+  delay: 5
+  until: >-
+    observability_adguard_metrics.json.status == 'success' and
+    observability_adguard_metrics.json.data.result | length > 0 and
+    observability_adguard_metrics.json.data.result |
+    map(attribute='value') |
+    map('last') |
+    map('int') |
+    min == 1
+  when:
+    - not ansible_check_mode
+    - observability_adguard_metrics_enabled | bool
 
 - name: Wait for Grafana health endpoint
   ansible.builtin.uri:

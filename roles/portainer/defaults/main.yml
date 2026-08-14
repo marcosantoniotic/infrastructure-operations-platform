@@ -10,6 +10,7 @@ portainer_validation_host: 127.0.0.1
 
 portainer_enable_traefik: false
 portainer_traefik_hostname: "portainer.<BASE_DOMAIN>"
+portainer_traefik_additional_hostnames: []
 portainer_traefik_network: proxy
 portainer_traefik_middlewares:
   - security-headers@file

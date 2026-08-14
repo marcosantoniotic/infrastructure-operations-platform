@@ -5,6 +5,20 @@
       - traefik_project_dir.startswith("/")
       - traefik_bind_address | length > 0
       - traefik_dashboard_hostname | length > 0
+      - >-
+        traefik_dashboard_additional_hostnames | unique | list | length ==
+        traefik_dashboard_additional_hostnames | length
+      - >-
+        traefik_dashboard_hostname not in
+        traefik_dashboard_additional_hostnames
+      - >-
+        not (traefik_enable_cockpit | bool) or
+        traefik_cockpit_additional_hostnames | unique | list | length ==
+        traefik_cockpit_additional_hostnames | length
+      - >-
+        not (traefik_enable_cockpit | bool) or
+        traefik_cockpit_hostname not in
+        traefik_cockpit_additional_hostnames
       - traefik_dashboard_basic_auth | length >= 30
       - not traefik_dashboard_basic_auth.startswith("<")
       - >-
@@ -20,8 +34,8 @@
         traefik_tls_private_key_source | length > 0
     fail_msg: >-
       Configure the Traefik dashboard credential as a complete htpasswd entry
-      (username:hash) and ensure HTTPS is enabled before enabling the HTTP
-      redirect.
+      (username:hash), use unique ingress hostnames, and ensure HTTPS is enabled
+      before enabling the HTTP redirect.
   no_log: true
 
 - name: Validate Docker service

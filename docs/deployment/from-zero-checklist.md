@@ -159,6 +159,15 @@ Valide `http://127.0.0.1:8000` (NetBox), `:8081` (Zabbix), `:9000`
 `https://127.0.0.1:9091` (Cockpit). A porta `8000` do NetBox é HTTP; não
 permita que o navegador a converta para HTTPS.
 
+No gate de publicação, preserve esses fallbacks e adicione um único forward
+para o entrypoint HTTPS do Traefik, por exemplo
+`-L 8443:127.0.0.1:8443`. Resolva os nomes sanitizados das aplicações para
+`127.0.0.1` na estação e acesse `https://<SERVICO>.<BASE_DOMAIN>:8443`.
+Habilite as variáveis `*_enable_traefik` somente depois de instalar um
+certificado que cubra os nomes e validar NetBox, Zabbix, Grafana, Portainer,
+Cockpit e o dashboard autenticado do Traefik. DNS ou Tunnel público permanece
+um gate separado e não deve substituir o acesso local de contingência.
+
 - todos os containers esperados estão saudáveis;
 - reinício controlado preserva os dados;
 - dashboards e targets internos estão íntegros;

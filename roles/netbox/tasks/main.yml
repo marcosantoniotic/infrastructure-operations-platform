@@ -54,10 +54,28 @@
         netbox_traefik_hostname in netbox_allowed_hosts
       - >-
         not (netbox_enable_traefik | bool) or
+        netbox_traefik_additional_hostnames | difference(netbox_allowed_hosts) |
+        length == 0
+      - >-
+        not (netbox_enable_traefik | bool) or
+        netbox_traefik_additional_hostnames | unique | list | length ==
+        netbox_traefik_additional_hostnames | length
+      - >-
+        not (netbox_enable_traefik | bool) or
+        netbox_traefik_hostname not in netbox_traefik_additional_hostnames
+      - >-
+        not (netbox_enable_traefik | bool) or
         netbox_traefik_origin in netbox_csrf_trusted_origins
+      - >-
+        not (netbox_enable_traefik | bool) or
+        netbox_traefik_additional_hostnames |
+        map('regex_replace', '^(.*)$', 'https://\\1') | list |
+        difference(netbox_csrf_trusted_origins) | length == 0
     fail_msg: >-
-      Review the NetBox email, allowed hosts, Traefik hostname and trusted
-      origins. No placeholder may remain in the operational inventory.
+      Review the NetBox email, allowed hosts, Traefik hostnames and trusted
+      origins. Additional public hostnames must be unique, allowed by NetBox
+      and included as HTTPS origins. No placeholder may remain in the
+      operational inventory.
 
 - name: Validate Docker service
   ansible.builtin.service_facts: {}

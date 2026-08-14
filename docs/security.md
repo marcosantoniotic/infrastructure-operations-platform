@@ -29,9 +29,12 @@ imagens deve evoluir para bloquear novos achados corrigíveis.
 ### Borda
 
 - Cloudflare Access antes das aplicações publicadas;
-- túnel sem necessidade de exposição direta do serviço à Internet;
+- túnel outbound-only sem exposição direta do serviço à Internet;
+- validação do JWT Access no próprio conector antes de alcançar a origem;
+- TLS até o Traefik validado pela CA privada, sem `noTLSVerify`;
 - TLS no Traefik;
-- DNS dividido para acesso local e externo pelos mesmos nomes.
+- DNS e rotas com mapeamento explícito entre o hostname público e o Host/SNI
+  interno, preservando a validação TLS nas duas pontas.
 
 ### Proxy
 

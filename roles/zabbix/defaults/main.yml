@@ -22,6 +22,7 @@ zabbix_web_validation_host: 127.0.0.1
 
 zabbix_enable_traefik: false
 zabbix_traefik_hostname: "zabbix.<BASE_DOMAIN>"
+zabbix_traefik_additional_hostnames: []
 zabbix_traefik_network: proxy
 zabbix_traefik_middlewares:
   - security-headers@file
@@ -33,6 +34,8 @@ zabbix_platform_map_name: Infrastructure Operations Platform
 zabbix_platform_map_host: infrastructure-operations-platform
 zabbix_platform_display_name: "{{ platform_hostname | default(ansible_hostname) | upper }}"
 zabbix_platform_host_address: 127.0.0.1
+zabbix_platform_map_external_networks: []
+zabbix_agent_network_subnet: ""
 
 zabbix_agent2_enabled: true
 zabbix_agent2_release_package: >-

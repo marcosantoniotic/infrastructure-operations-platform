@@ -10,6 +10,7 @@ traefik_http_port: 8080
 traefik_https_port: 8443
 traefik_metrics_port: 8082
 traefik_dashboard_hostname: traefik.localhost
+traefik_dashboard_additional_hostnames: []
 traefik_validation_hostname: whoami.localhost
 traefik_dashboard_basic_auth: "<USERNAME:HTPASSWD_HASH>"
 
@@ -23,5 +24,6 @@ traefik_tls_private_key_source: ""
 traefik_enable_validation_service: false
 traefik_enable_cockpit: false
 traefik_cockpit_hostname: "cockpit.<BASE_DOMAIN>"
+traefik_cockpit_additional_hostnames: []
 traefik_cockpit_backend_url: https://host.containers.internal:9091
 traefik_log_level: INFO

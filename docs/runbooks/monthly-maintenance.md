@@ -7,6 +7,34 @@ preserving a verified recovery point and producing sanitized operational
 evidence. The workflow is operator initiated and is intentionally not scheduled
 as an unattended timer.
 
+## Recommended cadence
+
+Reserve the second Saturday of each month at 02:00 in the platform's local
+timezone. Keep the execution operator initiated so that incident status,
+capacity, backups and the approved change reference are reviewed immediately
+before authorization. Use `CHG-YYYY-NNNN` for an approved maintenance window
+and `SIM-YYYYMMDD-NNN` for a rehearsal.
+
+An operational rehearsal exercises recovery points, Compose reconciliation,
+health checks, evidence and metrics without applying packages, refreshing
+images, rebooting or replicating externally:
+
+```bash
+ansible-playbook \
+  -i inventories/operational/hosts.yml \
+  playbooks/maintenance-window.yml \
+  --ask-vault-pass \
+  -e maintenance_authorized=true \
+  -e maintenance_change_reference=SIM-YYYYMMDD-NNN \
+  -e maintenance_apply_os_updates=false \
+  -e maintenance_refresh_container_images=false \
+  -e maintenance_reboot_if_required=false \
+  -e maintenance_run_external_backup=false
+```
+
+Authorization is supplied only on the command line for that execution. Keep
+`maintenance_authorized: false` in every persistent inventory.
+
 ## Before authorization
 
 1. confirm the approved change reference and maintenance window;

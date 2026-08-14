@@ -20,6 +20,42 @@
     name: "{{ rhel_baseline_packages }}"
     state: present
 
+- name: Validate persistent platform routes
+  ansible.builtin.assert:
+    that:
+      - item.connection | default('') | length > 0
+      - item.device | default('') | length > 0
+      - item.route | default('') | length > 0
+    fail_msg: >-
+      Each platform_static_routes entry requires connection, device and route.
+  loop: "{{ platform_static_routes }}"
+
+- name: Read persistent routes
+  ansible.builtin.command:
+    argv:
+      - nmcli
+      - -g
+      - ipv4.routes
+      - connection
+      - show
+      - "{{ item.connection }}"
+  loop: "{{ platform_static_routes }}"
+  register: platform_route_state
+  changed_when: false
+
+- name: Configure persistent platform routes
+  ansible.builtin.command:
+    argv:
+      - nmcli
+      - connection
+      - modify
+      - "{{ item.item.connection }}"
+      - +ipv4.routes
+      - "{{ item.item.route }}"
+  loop: "{{ platform_route_state.results }}"
+  when: item.item.route not in item.stdout
+  notify: Reapply platform network connections
+
 - name: Apply operating system updates
   ansible.builtin.dnf:
     name: "*"

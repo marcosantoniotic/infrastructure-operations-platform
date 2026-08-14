@@ -148,6 +148,9 @@ services:
     networks:
       - metrics
       - access
+{% for network in observability_blackbox_external_networks %}
+      - blackbox_external_{{ loop.index }}
+{% endfor %}
 {% if observability_enable_traefik %}
       - proxy
 {% endif %}
@@ -215,9 +218,14 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_SECURITY_COOKIE_SECURE: "{{ observability_enable_traefik | bool | lower }}"
       GF_SECURITY_COOKIE_SAMESITE: strict
-      GF_SERVER_DOMAIN: {{ observability_grafana_hostname }}
+      GF_SERVER_DOMAIN: >-
+        {{ (observability_grafana_root_url | urlsplit('hostname'))
+           if observability_grafana_root_url | length > 0
+           else observability_grafana_hostname }}
       GF_SERVER_ROOT_URL: >-
-        {{ ('https://' + observability_grafana_hostname)
+        {{ observability_grafana_root_url
+           if observability_grafana_root_url | length > 0
+           else ('https://' + observability_grafana_hostname)
            if observability_enable_traefik
            else ('http://' + observability_grafana_bind_address + ':' +
                  (observability_grafana_port | string)) }}
@@ -231,6 +239,9 @@ services:
         protocol: tcp
     volumes:
       - ./secrets/grafana_admin_password:/run/secrets/grafana_admin_password:ro,Z
+{% if observability_zabbix_enabled | bool %}
+      - ./secrets/zabbix_datasource_password:/run/secrets/zabbix_datasource_password:ro,Z
+{% endif %}
       - ./grafana/provisioning:/etc/grafana/provisioning:ro,Z
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro,Z
       - grafana_data:/var/lib/grafana
@@ -250,7 +261,11 @@ services:
       - traefik.enable={{ observability_enable_traefik | bool | lower }}
 {% if observability_enable_traefik %}
       - traefik.docker.network={{ observability_traefik_network }}
-      - traefik.http.routers.grafana.rule=Host(`{{ observability_grafana_hostname }}`)
+      - >-
+        traefik.http.routers.grafana.rule={{
+        ([observability_grafana_hostname] +
+         observability_grafana_additional_hostnames) |
+        map('regex_replace', '^(.*)$', 'Host(`\\g<1>`)') | join(' || ') }}
       - traefik.http.routers.grafana.entrypoints=websecure
       - traefik.http.routers.grafana.tls=true
 {% if observability_traefik_middlewares | length > 0 %}
@@ -262,6 +277,9 @@ services:
     networks:
       - metrics
       - access
+{% if observability_zabbix_enabled | bool %}
+      - zabbix
+{% endif %}
 {% if observability_enable_traefik %}
       - proxy
 {% endif %}
@@ -272,6 +290,16 @@ networks:
     internal: true
   access:
     driver: bridge
+{% for network in observability_blackbox_external_networks %}
+  blackbox_external_{{ loop.index }}:
+    name: {{ network }}
+    external: true
+{% endfor %}
+{% if observability_zabbix_enabled | bool %}
+  zabbix:
+    name: {{ observability_zabbix_network }}
+    external: true
+{% endif %}
 {% if observability_enable_traefik %}
   proxy:
     name: {{ observability_traefik_network }}

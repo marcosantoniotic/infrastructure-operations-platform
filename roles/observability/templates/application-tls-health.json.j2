@@ -1,3 +1,4 @@
+{% set has_tls_targets = observability_blackbox_targets | selectattr('url', 'match', '^https://') | list | length > 0 %}
 {
   "annotations": {"list": []},
   "editable": false,
@@ -17,7 +18,7 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "gridPos": {"h": 5, "w": {{ 6 if has_tls_targets else 8 }}, "x": 0, "y": 0},
       "id": 1,
       "options": {
         "colorMode": "background",
@@ -39,7 +40,7 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "gridPos": {"h": 5, "w": {{ 6 if has_tls_targets else 8 }}, "x": {{ 6 if has_tls_targets else 8 }}, "y": 0},
       "id": 2,
       "options": {
         "colorMode": "value",
@@ -61,7 +62,7 @@
         },
         "overrides": []
       },
-      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "gridPos": {"h": 5, "w": {{ 6 if has_tls_targets else 8 }}, "x": {{ 12 if has_tls_targets else 16 }}, "y": 0},
       "id": 3,
       "options": {
         "colorMode": "value",
@@ -73,6 +74,7 @@
       "title": "Latência média",
       "type": "stat"
     },
+{% if has_tls_targets %}
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {
@@ -95,6 +97,7 @@
       "title": "Menor validade TLS",
       "type": "stat"
     },
+{% endif %}
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "custom": {"align": "auto"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
@@ -113,13 +116,13 @@
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "fillOpacity": 15, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never"}, "unit": "s"}, "overrides": []},
-      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 13},
+      "gridPos": {"h": 9, "w": {{ 12 if has_tls_targets else 24 }}, "x": 0, "y": 13},
       "id": 6,
       "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
       "targets": [{"expr": "probe_duration_seconds{job=\"blackbox-http\"}", "legendFormat": "{{ '{{' }}service{{ '}}' }}", "refId": "A"}],
       "title": "Latência por aplicação",
       "type": "timeseries"
-    },
+    }{% if has_tls_targets %},
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "fillOpacity": 10, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never"}, "unit": "d"}, "overrides": []},
@@ -130,6 +133,7 @@
       "title": "Validade dos certificados",
       "type": "timeseries"
     }
+{% endif %}
   ],
   "refresh": "30s",
   "schemaVersion": 41,

@@ -54,6 +54,8 @@ foreach ($file in $files) {
     foreach ($pattern in $forbiddenContentPatterns) {
         $contentToInspect = $content
         if ($pattern -eq '\b(?:\d{1,3}\.){3}\d{1,3}\b') {
+            # The unspecified address is a public bind constant, not infrastructure data.
+            $contentToInspect = $contentToInspect -replace '\b0\.0\.0\.0\b', '<UNSPECIFIED>'
             # Loopback is a public implementation constant, not infrastructure data.
             $contentToInspect = $contentToInspect -replace '\b127(?:\.\d{1,3}){3}\b', '<LOOPBACK>'
             # RFC 5737 TEST-NET ranges are reserved for public documentation.

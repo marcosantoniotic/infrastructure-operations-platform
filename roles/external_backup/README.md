@@ -12,6 +12,13 @@ publishes sanitized Prometheus textfile metrics.
 Secrets must be supplied through Ansible Vault. Never commit `rclone.conf`, the
 Restic password, repository contents or command output containing tokens.
 
+The Restic repository password is part of the recovery chain and must remain
+available for the lifetime of that repository. If an existing destination
+rejects the configured password, preserve it unchanged and either recover the
+original password from the authorized secret store or select a new, empty
+repository path. Never delete or reinitialize an unknown repository merely to
+make convergence pass.
+
 Run the module independently:
 
 ```bash

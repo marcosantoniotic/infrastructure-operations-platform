@@ -85,7 +85,10 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network={{ netbox_traefik_network }}
-      - traefik.http.routers.netbox.rule=Host(`{{ netbox_traefik_hostname }}`)
+      - >-
+        traefik.http.routers.netbox.rule={{
+        ([netbox_traefik_hostname] + netbox_traefik_additional_hostnames) |
+        map('regex_replace', '^(.*)$', 'Host(`\\g<1>`)') | join(' || ') }}
       - traefik.http.routers.netbox.entrypoints=websecure
       - traefik.http.routers.netbox.tls=true
 {% if netbox_traefik_middlewares | length > 0 %}
