@@ -204,6 +204,11 @@ cockpit_enable_traefik: false
 cockpit_direct_firewall_access: false
 cockpit_login_title: Infrastructure Operations Platform
 cockpit_listen_port: 9091
+cockpit_admin_enabled: false
+cockpit_admin_username: cockpit-admin
+cockpit_admin_password_hash: "{{ vault_cockpit_admin_password_hash }}"
+cockpit_admin_groups:
+  - wheel
 
 # Optional Cockpit backend published by Traefik
 traefik_enable_cockpit: false

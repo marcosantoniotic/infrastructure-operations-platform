@@ -25,6 +25,13 @@ porta sem desabilitar o modo enforcing.
 | `cockpit_enable_traefik` | `false` | publica o serviço no proxy |
 | `cockpit_direct_firewall_access` | `false` | permite acesso direto pela rede |
 | `cockpit_login_title` | `Infrastructure Operations Platform` | identificação da tela de login |
+| `cockpit_admin_enabled` | `false` | provisiona uma conta local dedicada ao Cockpit |
+| `cockpit_admin_username` | `cockpit-admin` | nome da conta administrativa dedicada |
+| `cockpit_admin_password_hash` | placeholder | hash protegido no Ansible Vault |
+| `cockpit_admin_groups` | `[wheel]` | grupos administrativos permitidos |
+
+A conta de automação permanece bloqueada para senha e continua acessível
+somente por chave SSH. Não reutilize essa identidade no login do Cockpit.
 
 ## Traefik
 
