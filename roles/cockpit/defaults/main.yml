@@ -11,3 +11,8 @@ cockpit_login_title: Infrastructure Operations Platform
 cockpit_validation_address: 127.0.0.1
 cockpit_validation_port: 9091
 cockpit_listen_port: 9091
+cockpit_admin_enabled: false
+cockpit_admin_username: cockpit-admin
+cockpit_admin_password_hash: "<COCKPIT_ADMIN_PASSWORD_HASH>"
+cockpit_admin_groups:
+  - wheel

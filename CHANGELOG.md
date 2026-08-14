@@ -7,6 +7,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Adicionado
 
+- conta administrativa dedicada e governada por Vault para acesso ao Cockpit,
+  mantendo a identidade de automação restrita a chave SSH;
 - instalação reproduzível e validação do NetBox Topology Views compatível com
   NetBox 4.5;
 - role e playbook dedicados para sincronização controlada NetBox-Zabbix;

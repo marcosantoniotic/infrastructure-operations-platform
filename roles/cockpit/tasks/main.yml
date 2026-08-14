@@ -4,6 +4,55 @@
     that:
       - cockpit_hostname | length > 0
       - cockpit_packages | length > 0
+      - >-
+        not (cockpit_admin_enabled | bool) or
+        cockpit_admin_username is match('^[a-z_][a-z0-9_-]{2,31}$')
+      - >-
+        not (cockpit_admin_enabled | bool) or
+        cockpit_admin_password_hash is match('^\\$(?:6|y)\\$')
+      - >-
+        not (cockpit_admin_enabled | bool) or
+        'wheel' in cockpit_admin_groups
+
+- name: Provision dedicated Cockpit administrator
+  ansible.builtin.user:
+    name: "{{ cockpit_admin_username }}"
+    password: "{{ cockpit_admin_password_hash | trim }}"
+    groups: "{{ cockpit_admin_groups }}"
+    append: true
+    create_home: true
+    shell: /bin/bash
+    password_lock: false
+    state: present
+  no_log: true
+  when: cockpit_admin_enabled | bool
+
+- name: Inspect dedicated Cockpit administrator status
+  ansible.builtin.command:
+    argv:
+      - passwd
+      - -S
+      - "{{ cockpit_admin_username }}"
+  register: cockpit_admin_password_status
+  changed_when: false
+  when: cockpit_admin_enabled | bool
+
+- name: Inspect dedicated Cockpit administrator groups
+  ansible.builtin.command:
+    argv:
+      - id
+      - -nG
+      - "{{ cockpit_admin_username }}"
+  register: cockpit_admin_group_status
+  changed_when: false
+  when: cockpit_admin_enabled | bool
+
+- name: Validate dedicated Cockpit administrator
+  ansible.builtin.assert:
+    that:
+      - cockpit_admin_password_status.stdout.split()[1] in ['P', 'PS']
+      - "'wheel' in cockpit_admin_group_status.stdout.split()"
+  when: cockpit_admin_enabled | bool
 
 - name: Install RHEL web console packages
   ansible.builtin.dnf:
@@ -88,3 +137,5 @@
         https://{{ cockpit_validation_address }}:{{ cockpit_validation_port }}
       traefik_hostname: >-
         {{ cockpit_hostname if cockpit_enable_traefik else 'disabled' }}
+      administrator: >-
+        {{ cockpit_admin_username if cockpit_admin_enabled else 'not managed' }}
