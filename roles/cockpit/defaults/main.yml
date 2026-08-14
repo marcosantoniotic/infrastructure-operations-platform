@@ -5,6 +5,7 @@ cockpit_packages:
   - cockpit-storaged
   - policycoreutils-python-utils
 cockpit_hostname: "cockpit.<BASE_DOMAIN>"
+cockpit_additional_hostnames: []
 cockpit_enable_traefik: false
 cockpit_direct_firewall_access: false
 cockpit_login_title: Infrastructure Operations Platform

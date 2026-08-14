@@ -22,6 +22,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Corrigido
 
+- autorização de origens HTTPS/WSS adicionais no Cockpit para aliases publicados
+  pelo Traefik, evitando falha da sessão interativa após o login;
 - imagens de tipos de dispositivo e anexos do NetBox restauradas ao publicar o
   volume persistente `/media` pelo Granian e validar a rota em cada convergência;
 - publicação HTTPS interna agora documenta certificado privado, portas de

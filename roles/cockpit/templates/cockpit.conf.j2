@@ -1,5 +1,5 @@
 [WebService]
-Origins = https://{{ cockpit_hostname }} wss://{{ cockpit_hostname }}
+Origins ={% for hostname in [cockpit_hostname] + cockpit_additional_hostnames %} https://{{ hostname }} wss://{{ hostname }}{% endfor %}{{ '' }}
 ProtocolHeader = X-Forwarded-Proto
 ForwardedForHeader = X-Forwarded-For
 LoginTitle = {{ cockpit_login_title }}
