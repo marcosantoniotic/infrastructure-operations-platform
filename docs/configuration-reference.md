@@ -61,13 +61,15 @@ que `netbox_traefik_origin` e `netbox_csrf_trusted_origins` incluam a porta.
 O acesso público é opcional e sai do host por um conector `cloudflared`; nenhuma
 porta de entrada é aberta. As rotas remotas apontam para `https://traefik:443`
 na rede Docker `proxy` e validam o certificado com a CA privada instalada pela
-role. Cada rota deve informar o hostname HTTP e o `originServerName` do serviço.
+role. Cada rota preserva o hostname HTTP público e informa em
+`originServerName` o nome interno coberto pelo certificado privado.
 
 O nome público não precisa ser igual ao nome interno do Traefik. Quando eles
-forem diferentes, o `httpHostHeader` e o `originServerName` devem manter o nome
-interno coberto pelo certificado privado e usado na regra `Host()` do Traefik.
-Por exemplo, `netbox-edge.<BASE_DOMAIN>` pode encaminhar para a origem com Host
-e SNI `netbox.internal.<BASE_DOMAIN>`.
+forem diferentes, adicione o nome público em `*_traefik_additional_hostnames`,
+omita `httpHostHeader` e mantenha apenas `originServerName` com o nome interno.
+Assim o Traefik aceita o `Host` público, enquanto o TLS de origem continua
+validando o certificado privado. Para Grafana, configure também
+`observability_grafana_root_url` com a URL pública canônica.
 
 Antes de escolher nomes públicos, confirme a cobertura do certificado de
 borda. O Universal SSL cobre o domínio raiz e o curinga de primeiro nível, mas

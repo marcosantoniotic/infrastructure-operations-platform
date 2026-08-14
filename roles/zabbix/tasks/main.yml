@@ -16,11 +16,18 @@
       - >-
         not (zabbix_enable_traefik | bool) or
         zabbix_traefik_hostname | length > 0
+      - >-
+        not (zabbix_enable_traefik | bool) or
+        zabbix_traefik_additional_hostnames | unique | list | length ==
+        zabbix_traefik_additional_hostnames | length
+      - >-
+        not (zabbix_enable_traefik | bool) or
+        zabbix_traefik_hostname not in zabbix_traefik_additional_hostnames
     fail_msg: >-
       Replace all Zabbix placeholders with strong Ansible Vault values,
-      configure a hostname before enabling Traefik, and keep the server listener
-      bound to loopback. Remote agent ingress requires a separately reviewed
-      proxy or firewall design.
+      configure unique hostnames before enabling Traefik, and keep the server
+      listener bound to loopback. Remote agent ingress requires a separately
+      reviewed proxy or firewall design.
   no_log: true
 
 - name: Install the Zabbix 7.4 repository definition

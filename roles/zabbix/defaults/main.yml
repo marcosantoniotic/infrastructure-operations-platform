@@ -22,6 +22,7 @@ zabbix_web_validation_host: 127.0.0.1
 
 zabbix_enable_traefik: false
 zabbix_traefik_hostname: "zabbix.<BASE_DOMAIN>"
+zabbix_traefik_additional_hostnames: []
 zabbix_traefik_network: proxy
 zabbix_traefik_middlewares:
   - security-headers@file

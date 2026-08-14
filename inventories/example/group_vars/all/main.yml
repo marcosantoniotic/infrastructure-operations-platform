@@ -64,6 +64,8 @@ netbox_superuser_password: "{{ vault_netbox_superuser_password }}"
 netbox_enable_metrics: true
 netbox_enable_traefik: false
 netbox_traefik_hostname: "netbox.<BASE_DOMAIN>"
+netbox_traefik_additional_hostnames:
+  - "netbox-edge.<BASE_DOMAIN>"
 netbox_traefik_origin: "https://netbox.<BASE_DOMAIN>:8443"
 netbox_traefik_network: proxy
 netbox_traefik_https_port: 8443
@@ -85,6 +87,8 @@ traefik_http_port: 8080
 traefik_https_port: 8443
 traefik_metrics_port: 8082
 traefik_dashboard_hostname: "traefik.<BASE_DOMAIN>"
+traefik_dashboard_additional_hostnames:
+  - "traefik-edge.<BASE_DOMAIN>"
 traefik_dashboard_basic_auth: "<USERNAME:HTPASSWD_HASH>"
 traefik_proxy_network: proxy
 traefik_socket_network: socket-proxy
@@ -125,6 +129,8 @@ zabbix_server_bind_address: 127.0.0.1
 zabbix_server_port: 10051
 zabbix_enable_traefik: false
 zabbix_traefik_hostname: "zabbix.<BASE_DOMAIN>"
+zabbix_traefik_additional_hostnames:
+  - "zabbix-edge.<BASE_DOMAIN>"
 zabbix_traefik_network: proxy
 zabbix_traefik_https_port: 8443
 zabbix_platform_map_external_networks: []
@@ -187,6 +193,8 @@ portainer_bind_address: 127.0.0.1
 portainer_http_port: 9000
 portainer_enable_traefik: false
 portainer_traefik_hostname: "portainer.<BASE_DOMAIN>"
+portainer_traefik_additional_hostnames:
+  - "portainer-edge.<BASE_DOMAIN>"
 portainer_traefik_network: proxy
 portainer_traefik_https_port: 8443
 
@@ -200,6 +208,8 @@ cockpit_listen_port: 9091
 # Optional Cockpit backend published by Traefik
 traefik_enable_cockpit: false
 traefik_cockpit_hostname: "cockpit.<BASE_DOMAIN>"
+traefik_cockpit_additional_hostnames:
+  - "cockpit-edge.<BASE_DOMAIN>"
 traefik_cockpit_backend_url: https://host.containers.internal:9091
 
 # Metrics and visualization
@@ -279,5 +289,8 @@ observability_unifi_verify_ssl: false
 observability_unifi_save_dpi: true
 observability_enable_traefik: false
 observability_grafana_hostname: "grafana.<BASE_DOMAIN>"
+observability_grafana_additional_hostnames:
+  - "grafana-edge.<BASE_DOMAIN>"
+observability_grafana_root_url: "https://grafana-edge.<BASE_DOMAIN>"
 observability_traefik_network: proxy
 observability_traefik_https_port: 8443

@@ -69,6 +69,8 @@ observability_unifi_save_dpi: true
 
 observability_enable_traefik: false
 observability_grafana_hostname: "grafana.<BASE_DOMAIN>"
+observability_grafana_additional_hostnames: []
+observability_grafana_root_url: ""
 observability_traefik_network: proxy
 observability_traefik_middlewares:
   - security-headers@file

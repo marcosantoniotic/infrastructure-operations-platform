@@ -39,6 +39,18 @@
         not (observability_enable_traefik | bool) or
         observability_grafana_hostname | length > 0
       - >-
+        not (observability_enable_traefik | bool) or
+        observability_grafana_additional_hostnames | unique | list | length ==
+        observability_grafana_additional_hostnames | length
+      - >-
+        not (observability_enable_traefik | bool) or
+        observability_grafana_hostname not in
+        observability_grafana_additional_hostnames
+      - >-
+        not (observability_enable_traefik | bool) or
+        observability_grafana_root_url | length == 0 or
+        observability_grafana_root_url.startswith('https://')
+      - >-
         not (observability_zabbix_enabled | bool) or
         (
           observability_zabbix_network | length > 0 and
@@ -63,7 +75,8 @@
         )
     fail_msg: >-
       Replace the Grafana password placeholder with a strong Ansible Vault
-      value and configure retention and ingress variables.
+      value and configure retention, unique ingress hostnames and an HTTPS
+      Grafana root URL when an external canonical URL is required.
   no_log: true
 
 - name: Validate Docker service

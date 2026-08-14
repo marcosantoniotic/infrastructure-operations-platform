@@ -9,9 +9,16 @@
       - >-
         not (portainer_enable_traefik | bool) or
         portainer_traefik_hostname | length > 0
+      - >-
+        not (portainer_enable_traefik | bool) or
+        portainer_traefik_additional_hostnames | unique | list | length ==
+        portainer_traefik_additional_hostnames | length
+      - >-
+        not (portainer_enable_traefik | bool) or
+        portainer_traefik_hostname not in portainer_traefik_additional_hostnames
     fail_msg: >-
       Replace the Portainer password placeholder with a strong Ansible Vault
-      value and configure a hostname before enabling Traefik.
+      value and configure unique hostnames before enabling Traefik.
   no_log: true
 
 - name: Validate Docker service

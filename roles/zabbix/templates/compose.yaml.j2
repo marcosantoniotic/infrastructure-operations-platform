@@ -103,7 +103,10 @@ services:
       - traefik.enable={{ zabbix_enable_traefik | bool | lower }}
 {% if zabbix_enable_traefik %}
       - traefik.docker.network={{ zabbix_traefik_network }}
-      - traefik.http.routers.zabbix.rule=Host(`{{ zabbix_traefik_hostname }}`)
+      - >-
+        traefik.http.routers.zabbix.rule={{
+        ([zabbix_traefik_hostname] + zabbix_traefik_additional_hostnames) |
+        map('regex_replace', '^(.*)$', 'Host(`\\g<1>`)') | join(' || ') }}
       - traefik.http.routers.zabbix.entrypoints=websecure
       - traefik.http.routers.zabbix.tls=true
 {% if zabbix_traefik_middlewares | length > 0 %}

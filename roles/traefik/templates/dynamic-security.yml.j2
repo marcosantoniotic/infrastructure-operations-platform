@@ -3,7 +3,7 @@ http:
 {% if traefik_enable_cockpit %}
   routers:
     cockpit:
-      rule: "Host(`{{ traefik_cockpit_hostname }}`)"
+      rule: "{% for hostname in [traefik_cockpit_hostname] + traefik_cockpit_additional_hostnames %}{% if not loop.first %} || {% endif %}Host(`{{ hostname }}`){% endfor %}"
       entryPoints:
         - websecure
       middlewares:

@@ -24,9 +24,12 @@ Universal SSL não cobre automaticamente um segundo nível de subdomínio como
 nível como `app-ops.<BASE_DOMAIN>`.
 
 O hostname público pode ser diferente do hostname interno. Nesse cenário, a
-rota publicada deve usar o nome público no DNS, mas preservar em
-`httpHostHeader` e `originServerName` o hostname interno configurado no Traefik
-e coberto pelo certificado privado. Não habilite `noTLSVerify` como contorno.
+rota publicada usa o nome público no DNS e o roteador do Traefik deve incluí-lo
+em `*_traefik_additional_hostnames`. Omita `httpHostHeader` para preservar o
+hostname solicitado pelo navegador; use `originServerName` somente com o nome
+interno coberto pelo certificado privado. Sobrescrever o cabeçalho HTTP com o
+nome interno faz aplicações gerarem links e redirecionamentos inacessíveis ao
+cliente. Não habilite `noTLSVerify` como contorno.
 
 Se a quantidade de destinos exceder o limite vigente de uma aplicação Access,
 separe os serviços administrativos em outra aplicação com a mesma política de
