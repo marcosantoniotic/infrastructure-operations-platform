@@ -21,6 +21,11 @@ http:
       insecureSkipVerify: true
 {% endif %}
   middlewares:
+    dashboard-root-redirect:
+      redirectRegex:
+        regex: "^https?://([^/]+)/?$"
+        replacement: "{{ 'https' if traefik_enable_https else 'http' }}://${1}/dashboard/"
+        permanent: true
     dashboard-auth:
       basicAuth:
         users:
