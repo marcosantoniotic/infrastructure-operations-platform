@@ -20,6 +20,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Corrigido
 
+- imagens de tipos de dispositivo e anexos do NetBox restauradas ao publicar o
+  volume persistente `/media` pelo Granian e validar a rota em cada convergência;
 - publicação HTTPS interna agora documenta certificado privado, portas de
   validação por serviço, origem CSRF do NetBox e fallback por túnel SSH;
 - observabilidade pode provisionar o datasource Zabbix por rede externa e

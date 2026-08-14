@@ -74,6 +74,15 @@ services:
 
   netbox:
     <<: *netbox-common
+    command:
+      - /bin/bash
+      - -lc
+      - |
+        GRANIAN_EXTRA_ARGS=(
+          --static-path-route /media
+          --static-path-mount /opt/netbox/netbox/media
+        )
+        source /opt/netbox/launch-netbox.sh
     ports:
       - target: 8080
         published: "{{ netbox_http_port }}"

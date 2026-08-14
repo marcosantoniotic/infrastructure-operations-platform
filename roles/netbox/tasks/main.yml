@@ -205,6 +205,27 @@
   until: netbox_http_result.status in [200, 302]
   when: not ansible_check_mode
 
+- name: Validate NetBox media file serving
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ netbox_project_dir }}"
+      - exec
+      - -T
+      - netbox
+      - /bin/bash
+      - -lc
+      - >-
+        probe=/opt/netbox/netbox/media/.iop-media-probe;
+        trap 'rm -f "$probe"' EXIT;
+        printf '%s\n' iop-netbox-media-ok > "$probe";
+        test "$(curl -fsS http://127.0.0.1:8080/media/.iop-media-probe)"
+        = iop-netbox-media-ok
+  changed_when: false
+  when: not ansible_check_mode
+
 - name: Collect NetBox plugin static assets
   ansible.builtin.command:
     argv:

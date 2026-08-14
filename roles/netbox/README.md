@@ -2,6 +2,11 @@
 
 Implanta NetBox de forma independente com PostgreSQL, Valkey principal, Valkey de cache, worker e housekeeping.
 
+O serviço web estende o inicializador Granian da imagem para publicar tanto
+`/static` quanto o volume persistente `/media`. Assim, imagens de tipos de
+dispositivo e anexos continuam disponíveis após a restauração do banco e do
+volume de mídia.
+
 ## Dependências
 
 - RHEL compatível;
