@@ -181,7 +181,7 @@ Consulte também as provas de [stacks no Portainer](docs/evidence/portainer-stac
 - [Changelog](CHANGELOG.md)
 - [Baseline da release v1.0.0](docs/releases/v1.0.0.md)
 - [Roadmap](docs/roadmap.md)
-- [Fase futura: GLPI](docs/glpi-phase.md)
+- [Fase 4: GLPI](docs/glpi-phase.md)
 
 ## Repository structure
 
@@ -254,7 +254,7 @@ operacionais. Consulte a [baseline da release](docs/releases/v1.0.0.md) e o
 
 O GLPI será tratado como fase própria. Sua inclusão deverá respeitar o mesmo
 modelo de proxy, identidade, observabilidade, backup e isolamento de dados, sem
-sobrepor o papel do NetBox. Consulte [Fase futura: GLPI](docs/glpi-phase.md).
+sobrepor o papel do NetBox. Consulte [Fase 4: GLPI](docs/glpi-phase.md).
 
 As próximas evoluções concentram-se em integrações ITSM, exercícios periódicos
 de recuperação, módulos opcionais de telemetria de rede e resiliência

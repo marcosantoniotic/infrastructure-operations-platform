@@ -43,14 +43,14 @@
 
 ## Fase 4 — GLPI
 
-- [ ] definir requisitos funcionais;
-- [ ] escolher banco e estratégia de backup;
+- [x] definir requisitos funcionais;
+- [x] escolher banco e estratégia de backup;
 - [ ] publicar atrás do Traefik e Cloudflare Access;
 - [ ] integrar alertas do Zabbix com tickets;
 - [ ] integrar ativos sem duplicar o NetBox;
 - [ ] criar dashboards e runbooks.
 
-Consulte [Fase futura: GLPI](glpi-phase.md).
+Consulte [Fase 4: GLPI](glpi-phase.md).
 
 ## Fase 5 — Resiliência
 
