@@ -87,7 +87,17 @@ networks:
 
 volumes:
   mariadb_data:
+    name: {{ glpi_database_volume_name }}
+    external: true
   glpi_config:
+    name: {{ glpi_config_volume_name }}
+    external: true
   glpi_files:
+    name: {{ glpi_files_volume_name }}
+    external: true
   glpi_logs:
+    name: {{ glpi_logs_volume_name }}
+    external: true
   glpi_marketplace:
+    name: {{ glpi_marketplace_volume_name }}
+    external: true

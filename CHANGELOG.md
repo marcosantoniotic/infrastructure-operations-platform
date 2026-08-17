@@ -11,6 +11,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
   fronteiras de autoridade, segurança, integrações, RPO/RTO e gates de aceite;
 - role GLPI reproduzível com imagens fixadas, administrador dedicado, contas
   padrão desativadas, persistência separada e validação de schema e HTTPS;
+- runner de laboratório GLPI com segredos no Vault, publicação HTTPS local,
+  autenticação real, reinício de persistência e segunda convergência idempotente;
 - conta administrativa dedicada e governada por Vault para acesso ao Cockpit,
   mantendo a identidade de automação restrita a chave SSH;
 - instalação reproduzível e validação do NetBox Topology Views compatível com
@@ -26,6 +28,10 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Corrigido
 
+- ownership dos volumes persistentes do GLPI antes da inicialização do
+  container, evitando reinícios por falha ao criar cache e arquivos;
+- certificado da PKI de validação com SAN para `glpi.localhost`, permitindo SNI
+  estrito e validação HTTPS pelo Traefik;
 - raiz do hostname do Traefik redirecionada para `/dashboard/`, eliminando o
   `404` ao acessar o endereço público sem caminho;
 - autorização de origens HTTPS/WSS adicionais no Cockpit para aliases publicados

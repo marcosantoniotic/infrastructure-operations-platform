@@ -2,9 +2,14 @@
 
 ## Estado
 
-A baseline funcional e arquitetural está definida. A implantação, as
+A baseline funcional e arquitetural está definida, o módulo reproduzível foi
+implementado e a implantação isolada foi certificada com HTTPS, autenticação,
+reinício e segunda convergência sem mudanças. A publicação externa, as
 integrações e a evidência de restauração ainda estão pendentes e permanecem
 marcadas separadamente no [roadmap](roadmap.md).
+
+A execução sanitizada está registrada em
+[GLPI laboratory validation evidence](testing/glpi-validation-evidence.md).
 
 ## Objetivo
 

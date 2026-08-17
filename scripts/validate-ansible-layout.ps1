@@ -34,6 +34,7 @@ $requiredPaths = @(
     'automation/scripts/Run-ValidationZabbix.ps1',
     'automation/scripts/Run-ValidationZabbixBackup.ps1',
     'automation/scripts/Run-ValidationPortainer.ps1',
+    'automation/scripts/Run-ValidationGlpi.ps1',
     'automation/scripts/Run-ValidationObservability.ps1',
     'automation/scripts/Run-ValidationObservabilityBackup.ps1',
     'automation/scripts/Run-ValidationMaintenanceWindow.ps1',

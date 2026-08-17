@@ -13,6 +13,8 @@ Compose project.
 - automatic schema updates on container restart are always disabled;
 - the built-in scheduler runs in the official GLPI container;
 - configuration, files, logs, marketplace and database have separate volumes.
+- Ansible creates those volumes explicitly and assigns the application volumes
+  to the validated GLPI container UID/GID before Compose starts the service.
 
 ## Administrator bootstrap
 
