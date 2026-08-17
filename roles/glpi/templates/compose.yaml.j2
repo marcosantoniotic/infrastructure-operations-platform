@@ -1,0 +1,93 @@
+name: glpi
+
+services:
+  db:
+    image: {{ glpi_database_image }}
+    environment:
+      MARIADB_DATABASE: {{ glpi_database_name }}
+      MARIADB_USER: {{ glpi_database_user }}
+      MARIADB_PASSWORD_FILE: /run/secrets/glpi_database_password
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/glpi_database_root_password
+      TZ: {{ glpi_timezone }}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-allowed-packet=64M
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./secrets/glpi_database_password:/run/secrets/glpi_database_password:ro,Z
+      - ./secrets/glpi_database_root_password:/run/secrets/glpi_database_root_password:ro,Z
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - database
+
+  glpi:
+    image: {{ glpi_image }}
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - target: 80
+        published: "{{ glpi_http_port }}"
+        host_ip: "{{ glpi_bind_address }}"
+        protocol: tcp
+    volumes:
+      - glpi_config:/var/glpi/config
+      - glpi_files:/var/glpi/files
+      - glpi_logs:/var/glpi/logs
+      - glpi_marketplace:/var/glpi/marketplace
+      - ./custom-php.ini:/usr/local/etc/php/conf.d/zz-iop.ini:ro,Z
+    labels:
+      - traefik.enable={{ glpi_enable_traefik | bool | lower }}
+{% if glpi_enable_traefik %}
+      - traefik.docker.network={{ glpi_traefik_network }}
+      - >-
+        traefik.http.routers.glpi.rule={{
+        ([glpi_traefik_hostname] + glpi_traefik_additional_hostnames) |
+        map('regex_replace', '^(.*)$', 'Host(`\\g<1>`)') | join(' || ') }}
+      - traefik.http.routers.glpi.entrypoints=websecure
+      - traefik.http.routers.glpi.tls=true
+{% if glpi_traefik_middlewares | length > 0 %}
+      - traefik.http.routers.glpi.middlewares={{ glpi_traefik_middlewares | join(',') }}
+{% endif %}
+      - traefik.http.services.glpi.loadbalancer.server.port=80
+{% endif %}
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    stop_grace_period: 60s
+    networks:
+      - application
+      - database
+{% if glpi_enable_traefik %}
+      - proxy
+{% endif %}
+
+networks:
+  application:
+    driver: bridge
+  database:
+    driver: bridge
+    internal: true
+{% if glpi_enable_traefik %}
+  proxy:
+    name: {{ glpi_traefik_network }}
+    external: true
+{% endif %}
+
+volumes:
+  mariadb_data:
+  glpi_config:
+  glpi_files:
+  glpi_logs:
+  glpi_marketplace:

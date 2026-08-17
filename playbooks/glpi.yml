@@ -1,0 +1,8 @@
+---
+- name: Deploy GLPI service management
+  hosts: platform
+  gather_facts: true
+  become: true
+  roles:
+    - role: docker_engine
+    - role: glpi

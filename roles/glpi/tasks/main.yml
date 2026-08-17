@@ -1,0 +1,571 @@
+---
+- name: Evaluate GLPI secret requirements without exposing values
+  ansible.builtin.set_fact:
+    glpi_secret_validation:
+      - name: glpi_database_password
+        valid: >-
+          {{ glpi_database_password | default('') | string | length >= 24 and
+             not (glpi_database_password | default('') | string).startswith('<') }}
+        requirement: at least 24 characters and no placeholder
+      - name: glpi_database_root_password
+        valid: >-
+          {{ glpi_database_root_password | default('') | string | length >= 24 and
+             not (glpi_database_root_password | default('') | string).startswith('<') }}
+        requirement: at least 24 characters and no placeholder
+      - name: glpi_admin_password
+        valid: >-
+          {{ not (glpi_admin_managed | bool) or
+             (glpi_admin_password | default('') | string | length >= 16 and
+              not (glpi_admin_password | default('') | string).startswith('<')) }}
+        requirement: at least 16 characters and no placeholder
+  no_log: true
+
+- name: Validate GLPI secret requirements
+  ansible.builtin.assert:
+    that:
+      - item.valid | bool
+    fail_msg: "{{ item.name }} is invalid: {{ item.requirement }}."
+    quiet: true
+  loop: "{{ glpi_secret_validation }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Validate GLPI non-secret variables
+  ansible.builtin.assert:
+    that:
+      - glpi_project_dir.startswith('/')
+      - not glpi_image.endswith(':latest')
+      - not glpi_database_image.endswith(':latest')
+      - glpi_database_name is match('^[A-Za-z0-9_]+$')
+      - glpi_database_user is match('^[A-Za-z0-9_]+$')
+      - glpi_bind_address in ['127.0.0.1', '::1']
+      - glpi_http_port | int > 0
+      - glpi_http_port | int < 65536
+      - glpi_skip_auto_update | bool
+      - glpi_php_session_cookie_samesite in ['Lax', 'Strict']
+      - >-
+        not (glpi_admin_managed | bool) or
+        glpi_admin_user is match('^[A-Za-z0-9._-]+$')
+      - >-
+        not (glpi_admin_managed | bool) or
+        glpi_admin_user not in glpi_default_accounts
+      - >-
+        not (glpi_admin_managed | bool) or
+        glpi_admin_profile_id | int > 0
+      - glpi_default_accounts | unique | list | length == glpi_default_accounts | length
+      - >-
+        not (glpi_enable_traefik | bool) or
+        glpi_traefik_hostname | length > 0
+      - >-
+        not (glpi_enable_traefik | bool) or
+        not glpi_traefik_hostname.startswith('<')
+      - >-
+        not (glpi_enable_traefik | bool) or
+        glpi_traefik_additional_hostnames | unique | list | length ==
+        glpi_traefik_additional_hostnames | length
+      - >-
+        not (glpi_enable_traefik | bool) or
+        glpi_traefik_hostname not in glpi_traefik_additional_hostnames
+      - >-
+        not (glpi_enable_traefik | bool) or
+        glpi_php_session_cookie_secure | bool
+    fail_msg: >-
+      Review GLPI image pins, database identifiers, loopback binding,
+      administrator identity, session security and unique Traefik hostnames.
+      Automatic schema updates must remain disabled.
+
+- name: Validate Docker service
+  ansible.builtin.service_facts: {}
+
+- name: Assert Docker is running
+  ansible.builtin.assert:
+    that:
+      - "'docker.service' in ansible_facts.services"
+      - ansible_facts.services.get('docker.service', {}).get('state', '') == 'running'
+    fail_msg: "Docker must be installed and running before GLPI deployment."
+
+- name: Verify the external Traefik network exists
+  ansible.builtin.command:
+    argv:
+      - docker
+      - network
+      - inspect
+      - "{{ glpi_traefik_network }}"
+  changed_when: false
+  when:
+    - glpi_enable_traefik | bool
+    - not ansible_check_mode
+
+- name: Create GLPI project directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ glpi_project_dir }}"
+      mode: "0750"
+    - path: "{{ glpi_project_dir }}/secrets"
+      mode: "0700"
+
+- name: Install GLPI database secrets
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: "{{ glpi_project_dir }}/secrets/{{ item.name }}"
+    owner: root
+    group: root
+    mode: "0400"
+  loop:
+    - name: glpi_database_password
+      content: "{{ glpi_database_password }}"
+    - name: glpi_database_root_password
+      content: "{{ glpi_database_root_password }}"
+  no_log: true
+
+- name: Render GLPI environment
+  ansible.builtin.template:
+    src: glpi.env.j2
+    dest: "{{ glpi_project_dir }}/.env"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Render GLPI PHP hardening configuration
+  ansible.builtin.template:
+    src: custom-php.ini.j2
+    dest: "{{ glpi_project_dir }}/custom-php.ini"
+    owner: root
+    group: root
+    mode: "0640"
+
+- name: Render GLPI Compose project
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ glpi_project_dir }}/compose.yaml"
+    owner: root
+    group: root
+    mode: "0640"
+
+- name: Validate rendered GLPI Compose configuration
+  ansible.builtin.command:
+    cmd: docker compose --project-directory {{ glpi_project_dir }} config --quiet
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Deploy GLPI project
+  community.docker.docker_compose_v2:
+    project_src: "{{ glpi_project_dir }}"
+    files:
+      - compose.yaml
+    state: present
+    pull: missing
+    wait: true
+    wait_timeout: "{{ glpi_compose_wait_timeout }}"
+  when: not ansible_check_mode
+
+- name: Wait for GLPI HTTP endpoint
+  ansible.builtin.uri:
+    url: "http://{{ glpi_validation_host }}:{{ glpi_http_port }}/"
+    method: GET
+    status_code:
+      - 200
+      - 302
+    follow_redirects: none
+  register: glpi_http_result
+  retries: 60
+  delay: 5
+  until: glpi_http_result.status in [200, 302]
+  when: not ansible_check_mode
+
+- name: Validate GLPI runtime requirements
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - /var/www/glpi/bin/console
+      - glpi:system:check_requirements
+      - --no-interaction
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Wait for the GLPI database schema
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - db
+      - sh
+      - -lc
+      - >-
+        mariadb --user={{ glpi_database_user }}
+        --password="$(cat /run/secrets/glpi_database_password)"
+        --batch --skip-column-names
+        --execute="SELECT COUNT(*) FROM information_schema.tables
+        WHERE table_schema='{{ glpi_database_name }}'
+        AND table_name='glpi_users';"
+  register: glpi_schema_state
+  changed_when: false
+  retries: 60
+  delay: 5
+  until: glpi_schema_state.stdout | trim == '1'
+  no_log: true
+  when:
+    - glpi_auto_install | bool
+    - not ansible_check_mode
+
+- name: Grant GLPI read-only access to timezone names
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - db
+      - sh
+      - -lc
+      - >-
+        mariadb --user=root
+        --password="$(cat /run/secrets/glpi_database_root_password)"
+        --execute="GRANT SELECT ON mysql.time_zone_name TO
+        '{{ glpi_database_user }}'@'%'; FLUSH PRIVILEGES;"
+  changed_when: false
+  no_log: true
+  when:
+    - glpi_auto_install | bool
+    - not ansible_check_mode
+
+- name: Enable timezone support in GLPI
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - /var/www/glpi/bin/console
+      - database:enable_timezones
+      - --no-interaction
+  changed_when: false
+  when:
+    - glpi_auto_install | bool
+    - not ansible_check_mode
+
+- name: Inspect the managed GLPI administrator
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - db
+      - sh
+      - -lc
+      - >-
+        mariadb --user={{ glpi_database_user }}
+        --password="$(cat /run/secrets/glpi_database_password)"
+        {{ glpi_database_name }} --batch --skip-column-names
+        --execute="SELECT COALESCE(MAX(is_active), -1) FROM glpi_users
+        WHERE name='{{ glpi_admin_user }}';"
+  register: glpi_admin_state
+  changed_when: false
+  no_log: true
+  when:
+    - glpi_admin_managed | bool
+    - not ansible_check_mode
+
+- name: Create the managed GLPI administrator
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - /var/www/glpi/bin/console
+      - user:create
+      - --no-interaction
+      - --password
+      - "{{ glpi_admin_password }}"
+      - "{{ glpi_admin_user }}"
+  changed_when: true
+  no_log: true
+  when:
+    - glpi_admin_managed | bool
+    - glpi_admin_state.stdout | trim == '-1'
+    - not ansible_check_mode
+
+- name: Enable the managed GLPI administrator
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - /var/www/glpi/bin/console
+      - user:enable
+      - --no-interaction
+      - "{{ glpi_admin_user }}"
+  changed_when: true
+  when:
+    - glpi_admin_managed | bool
+    - glpi_admin_state.stdout | trim == '0'
+    - not ansible_check_mode
+
+- name: Rotate the managed GLPI administrator password when authorized
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - /var/www/glpi/bin/console
+      - user:reset_password
+      - --no-interaction
+      - --password
+      - "{{ glpi_admin_password }}"
+      - "{{ glpi_admin_user }}"
+  changed_when: true
+  no_log: true
+  when:
+    - glpi_admin_managed | bool
+    - glpi_admin_rotate_password | bool
+    - glpi_admin_state.stdout | trim != '-1'
+    - not ansible_check_mode
+
+- name: Inspect the managed GLPI administrator profile
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - db
+      - sh
+      - -lc
+      - >-
+        mariadb --user={{ glpi_database_user }}
+        --password="$(cat /run/secrets/glpi_database_password)"
+        {{ glpi_database_name }} --batch --skip-column-names
+        --execute="SELECT COUNT(*) FROM glpi_profiles_users pu
+        JOIN glpi_users u ON u.id=pu.users_id
+        WHERE u.name='{{ glpi_admin_user }}'
+        AND pu.profiles_id={{ glpi_admin_profile_id | int }}
+        AND pu.entities_id={{ glpi_admin_entity_id | int }}
+        AND pu.is_recursive={{ 1 if glpi_admin_recursive else 0 }};"
+  register: glpi_admin_profile_state
+  changed_when: false
+  no_log: true
+  when:
+    - glpi_admin_managed | bool
+    - not ansible_check_mode
+
+- name: Grant the managed GLPI administrator profile
+  ansible.builtin.command:
+    argv: >-
+      {{
+        [
+          'docker', 'compose', '--project-directory', glpi_project_dir,
+          'exec', '-T', 'glpi', '/var/www/glpi/bin/console',
+          'user:grant', '--no-interaction', '--profile',
+          glpi_admin_profile_id | string, '--entity',
+          glpi_admin_entity_id | string
+        ] +
+        (['--recursive'] if glpi_admin_recursive else []) +
+        [glpi_admin_user]
+      }}
+  changed_when: true
+  when:
+    - glpi_admin_managed | bool
+    - glpi_admin_profile_state.stdout | trim == '0'
+    - not ansible_check_mode
+
+- name: Inspect active default GLPI accounts
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - db
+      - sh
+      - -lc
+      - >-
+        mariadb --user={{ glpi_database_user }}
+        --password="$(cat /run/secrets/glpi_database_password)"
+        {{ glpi_database_name }} --batch --skip-column-names
+        --execute="SELECT COUNT(*) FROM glpi_users
+        WHERE name='{{ item }}' AND is_active=1;"
+  loop: "{{ glpi_default_accounts }}"
+  register: glpi_default_account_state
+  changed_when: false
+  no_log: true
+  when:
+    - glpi_admin_managed | bool
+    - glpi_disable_default_accounts | bool
+    - not ansible_check_mode
+
+- name: Disable active default GLPI accounts
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - /var/www/glpi/bin/console
+      - user:disable
+      - --no-interaction
+      - "{{ item.item }}"
+  loop: "{{ glpi_default_account_state.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  changed_when: true
+  when:
+    - glpi_admin_managed | bool
+    - glpi_disable_default_accounts | bool
+    - item.stdout | trim | int > 0
+    - not ansible_check_mode
+
+- name: Validate the managed administrator and profile
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - db
+      - sh
+      - -lc
+      - >-
+        mariadb --user={{ glpi_database_user }}
+        --password="$(cat /run/secrets/glpi_database_password)"
+        {{ glpi_database_name }} --batch --skip-column-names
+        --execute="SELECT COUNT(*) FROM glpi_profiles_users pu
+        JOIN glpi_users u ON u.id=pu.users_id
+        WHERE u.name='{{ glpi_admin_user }}' AND u.is_active=1
+        AND pu.profiles_id={{ glpi_admin_profile_id | int }}
+        AND pu.entities_id={{ glpi_admin_entity_id | int }}
+        AND pu.is_recursive={{ 1 if glpi_admin_recursive else 0 }};"
+  register: glpi_admin_validation
+  changed_when: false
+  failed_when: glpi_admin_validation.stdout | trim != '1'
+  no_log: true
+  when:
+    - glpi_admin_managed | bool
+    - not ansible_check_mode
+
+- name: Validate the GLPI encryption key
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - test
+      - -s
+      - /var/glpi/config/glpicrypt.key
+  changed_when: false
+  when:
+    - glpi_auto_install | bool
+    - not ansible_check_mode
+
+- name: Validate the GLPI database schema
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - /var/www/glpi/bin/console
+      - db:check_schema_integrity
+      - --no-interaction
+  changed_when: false
+  when:
+    - glpi_auto_install | bool
+    - not ansible_check_mode
+
+- name: Validate GLPI through Traefik HTTPS
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --silent
+      - --insecure
+      - --include
+      - --resolve
+      - "{{ glpi_traefik_hostname }}:{{ glpi_traefik_https_port }}:{{ glpi_traefik_validation_address }}"
+      - "https://{{ glpi_traefik_hostname }}:{{ glpi_traefik_https_port }}/"
+  register: glpi_traefik_response
+  changed_when: false
+  retries: 20
+  delay: 3
+  until: >-
+    'http/1.1 200' in glpi_traefik_response.stdout | lower or
+    'http/2 200' in glpi_traefik_response.stdout | lower or
+    'http/1.1 302' in glpi_traefik_response.stdout | lower or
+    'http/2 302' in glpi_traefik_response.stdout | lower
+  failed_when: >-
+    (
+      'http/1.1 200' not in glpi_traefik_response.stdout | lower and
+      'http/2 200' not in glpi_traefik_response.stdout | lower and
+      'http/1.1 302' not in glpi_traefik_response.stdout | lower and
+      'http/2 302' not in glpi_traefik_response.stdout | lower
+    ) or
+    'x-content-type-options: nosniff' not in
+    glpi_traefik_response.stdout | lower or
+    'strict-transport-security: max-age=31536000' not in
+    glpi_traefik_response.stdout | lower
+  when:
+    - glpi_enable_traefik | bool
+    - not ansible_check_mode
+
+- name: Report GLPI deployment
+  ansible.builtin.debug:
+    msg:
+      project_directory: "{{ glpi_project_dir }}"
+      validation_url: >-
+        http://{{ glpi_bind_address }}:{{ glpi_http_port }}
+      managed_administrator: >-
+        {{ glpi_admin_user if glpi_admin_managed else 'disabled' }}
+      automatic_schema_updates: false
+      traefik_enabled: "{{ glpi_enable_traefik | bool }}"
+      traefik_hostname: >-
+        {{ glpi_traefik_hostname if glpi_enable_traefik else 'disabled' }}

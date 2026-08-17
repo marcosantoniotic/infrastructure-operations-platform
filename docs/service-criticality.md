@@ -11,6 +11,7 @@ comercial isolada da ferramenta.
 | SRV01/RHEL | C1 | hipervisor, rede e armazenamento | reconstrução automatizada e segundo nó | restaurar plataforma dentro do RTO |
 | NetBox/PostgreSQL | C1 | proxy, banco e armazenamento | backup externo e restauração testada | RPO 24 h, RTO 4 h |
 | Zabbix/MySQL | C1 | proxy, banco e agentes | backup externo e restauração testada | RPO 24 h, RTO 4 h |
+| GLPI/MariaDB | C2 | proxy, banco, e-mail e armazenamento | backup externo e restauração testada | RPO 24 h, RTO 4 h |
 | Cloudflare Tunnel/Access | C2 | Internet, conector e origem | conectores redundantes e acesso local independente | preservar caminho externo quando possível |
 | Prometheus | C2 | exporters e armazenamento | backup da TSDB e restauração | RPO 24 h, RTO 8 h |
 | Grafana | C2 | Prometheus e estado local | dashboards em Git e backup do estado | RPO 24 h, RTO 4 h |

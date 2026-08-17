@@ -1,0 +1,49 @@
+---
+glpi_project_dir: /opt/glpi
+glpi_image: glpi/glpi:11.0.8
+glpi_database_image: mariadb:11.8.8
+
+glpi_database_name: glpi
+glpi_database_user: glpi
+glpi_database_password: "<GLPI_DATABASE_PASSWORD>"
+glpi_database_root_password: "<GLPI_DATABASE_ROOT_PASSWORD>"
+glpi_timezone: America/Sao_Paulo
+
+glpi_auto_install: true
+glpi_skip_auto_update: true
+glpi_crontab_enabled: true
+glpi_compose_wait_timeout: 600
+
+glpi_admin_managed: true
+glpi_admin_user: glpi-admin
+glpi_admin_password: "<GLPI_ADMIN_PASSWORD>"
+glpi_admin_profile_id: 4
+glpi_admin_entity_id: 0
+glpi_admin_recursive: true
+glpi_admin_rotate_password: false
+glpi_disable_default_accounts: true
+glpi_default_accounts:
+  - glpi
+  - tech
+  - normal
+  - post-only
+
+glpi_bind_address: 127.0.0.1
+glpi_http_port: 8083
+glpi_validation_host: 127.0.0.1
+
+glpi_enable_traefik: false
+glpi_traefik_hostname: "glpi.<BASE_DOMAIN>"
+glpi_traefik_additional_hostnames: []
+glpi_traefik_network: proxy
+glpi_traefik_middlewares:
+  - security-headers@file
+glpi_traefik_validation_address: 127.0.0.1
+glpi_traefik_https_port: 443
+
+glpi_php_memory_limit: 512M
+glpi_php_upload_max_filesize: 64M
+glpi_php_post_max_size: 64M
+glpi_php_session_cookie_secure: true
+glpi_php_session_cookie_httponly: true
+glpi_php_session_cookie_samesite: Lax
