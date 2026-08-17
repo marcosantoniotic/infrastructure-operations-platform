@@ -122,6 +122,14 @@ zabbix_database_root_password: "{{ vault_zabbix_database_root_password }}"
 zabbix_admin_password: "{{ vault_zabbix_admin_password }}"
 netbox_zabbix_sync_enabled: false
 netbox_zabbix_sync_api_token: "{{ vault_netbox_zabbix_sync_api_token }}"
+zabbix_glpi_bridge_enabled: false
+zabbix_glpi_bridge_zabbix_api_token: "{{ vault_zabbix_glpi_bridge_zabbix_api_token }}"
+zabbix_glpi_bridge_glpi_user_password: "{{ vault_zabbix_glpi_bridge_glpi_user_password }}"
+zabbix_glpi_bridge_glpi_oauth_secret: "{{ vault_zabbix_glpi_bridge_glpi_oauth_secret }}"
+zabbix_glpi_bridge_webhook_token: "{{ vault_zabbix_glpi_bridge_webhook_token }}"
+zabbix_glpi_bridge_zabbix_web_url: "https://zabbix.<BASE_DOMAIN>"
+zabbix_glpi_bridge_glpi_web_url: "https://glpi.<BASE_DOMAIN>"
+zabbix_glpi_bridge_netbox_url: "https://netbox.<BASE_DOMAIN>"
 zabbix_timezone: America/Sao_Paulo
 zabbix_web_bind_address: 127.0.0.1
 zabbix_web_port: 8081
