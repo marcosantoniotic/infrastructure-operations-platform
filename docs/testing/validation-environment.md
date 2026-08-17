@@ -617,7 +617,12 @@ an idempotent Ansible pass. The workflow never restores into active volumes.
 
 The workflow installs Cockpit natively, keeps SELinux enforcing, checks the
 dedicated `9091/tcp` socket, publishes `cockpit.localhost` through Traefik and
-confirms that the service remains enabled and healthy after a VM reload.
+confirms that the service remains enabled and healthy after a VM reload. It
+also creates the dedicated `cockpit-admin` account with a random password,
+stores only its SHA-512 hash in Ansible Vault and writes the initial local
+credential to `.validation/cockpit-initial-credentials.txt`. The automated
+checks require both the proxied `/ping` route and an authenticated Cockpit
+login to succeed; the validation origin explicitly includes port `8443`.
 
 ### 18. Execute an isolated disaster recovery drill
 
