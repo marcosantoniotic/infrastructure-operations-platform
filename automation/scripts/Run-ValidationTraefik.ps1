@@ -121,6 +121,7 @@ DNS.4 = zabbix.localhost
 DNS.5 = portainer.localhost
 DNS.6 = grafana.localhost
 DNS.7 = cockpit.localhost
+DNS.8 = glpi.localhost
 "@
 $opensslConfig = $opensslConfig -replace "`r`n", "`n"
 [IO.File]::WriteAllText($opensslConfigFile, $opensslConfig, $utf8WithoutBom)
@@ -146,7 +147,8 @@ if [ ! -s "`$pki/tls.key" ] || [ ! -s "`$pki/tls.crt" ] || \
    ! openssl x509 -in "`$pki/tls.crt" -noout -checkhost zabbix.localhost >/dev/null 2>&1 || \
    ! openssl x509 -in "`$pki/tls.crt" -noout -checkhost portainer.localhost >/dev/null 2>&1 || \
    ! openssl x509 -in "`$pki/tls.crt" -noout -checkhost grafana.localhost >/dev/null 2>&1 || \
-   ! openssl x509 -in "`$pki/tls.crt" -noout -checkhost cockpit.localhost >/dev/null 2>&1; then
+   ! openssl x509 -in "`$pki/tls.crt" -noout -checkhost cockpit.localhost >/dev/null 2>&1 || \
+   ! openssl x509 -in "`$pki/tls.crt" -noout -checkhost glpi.localhost >/dev/null 2>&1; then
   rm -f "`$pki/tls.key" "`$pki/tls.crt" "`$pki/tls.csr"
   openssl req -new -newkey rsa:3072 -nodes \
     -config /tmp/traefik-openssl.cnf \

@@ -531,6 +531,24 @@ Portainer is an operational interface. Changes intended to persist as platform
 configuration must be implemented in Ansible and Compose and promoted through
 the repository workflow.
 
+### 14.1 Deploy and publish GLPI
+
+Deploy GLPI through the existing validation controller, publish it through the
+local Traefik route, reload the platform VM and run a second convergence:
+
+```powershell
+.\automation\scripts\Run-ValidationGlpi.ps1 `
+  -EnableTraefik `
+  -VerifyPersistence `
+  -VerifyIdempotence
+```
+
+The runner stores the three GLPI secrets in the shared encrypted validation
+Vault. The initial `glpi-admin` credential is written only to the ignored
+`.validation/glpi-initial-credentials.txt` file with an ACL restricted to the
+current Windows user. The validated HTTPS endpoint is
+`https://glpi.localhost:8443/` through the standard SSH tunnel.
+
 ### 15. Deploy metrics and visualization
 
 Deploy Prometheus, Grafana, Node Exporter and cAdvisor, provision the datasource

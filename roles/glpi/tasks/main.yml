@@ -42,6 +42,13 @@
       - glpi_http_port | int > 0
       - glpi_http_port | int < 65536
       - glpi_skip_auto_update | bool
+      - glpi_container_uid | int >= 0
+      - glpi_container_gid | int >= 0
+      - glpi_database_volume_name is match('^[A-Za-z0-9][A-Za-z0-9_.-]+$')
+      - glpi_config_volume_name is match('^[A-Za-z0-9][A-Za-z0-9_.-]+$')
+      - glpi_files_volume_name is match('^[A-Za-z0-9][A-Za-z0-9_.-]+$')
+      - glpi_logs_volume_name is match('^[A-Za-z0-9][A-Za-z0-9_.-]+$')
+      - glpi_marketplace_volume_name is match('^[A-Za-z0-9][A-Za-z0-9_.-]+$')
       - glpi_php_session_cookie_samesite in ['Lax', 'Strict']
       - >-
         not (glpi_admin_managed | bool) or
@@ -108,6 +115,48 @@
       mode: "0750"
     - path: "{{ glpi_project_dir }}/secrets"
       mode: "0700"
+
+- name: Create persistent GLPI volumes
+  community.docker.docker_volume:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - "{{ glpi_database_volume_name }}"
+    - "{{ glpi_config_volume_name }}"
+    - "{{ glpi_files_volume_name }}"
+    - "{{ glpi_logs_volume_name }}"
+    - "{{ glpi_marketplace_volume_name }}"
+  when: not ansible_check_mode
+
+- name: Inspect persistent GLPI application volumes
+  ansible.builtin.command:
+    argv:
+      - docker
+      - volume
+      - inspect
+      - --format
+      - "{{ '{{ .Mountpoint }}' }}"
+      - "{{ item }}"
+  loop:
+    - "{{ glpi_config_volume_name }}"
+    - "{{ glpi_files_volume_name }}"
+    - "{{ glpi_logs_volume_name }}"
+    - "{{ glpi_marketplace_volume_name }}"
+  register: glpi_application_volume_inspection
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Set GLPI application volume ownership
+  ansible.builtin.file:
+    path: "{{ item.stdout | trim }}"
+    state: directory
+    owner: "{{ glpi_container_uid | string }}"
+    group: "{{ glpi_container_gid | string }}"
+    recurse: true
+  loop: "{{ glpi_application_volume_inspection.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: not ansible_check_mode
 
 - name: Install GLPI database secrets
   ansible.builtin.copy:

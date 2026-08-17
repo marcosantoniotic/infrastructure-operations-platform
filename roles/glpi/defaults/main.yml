@@ -14,6 +14,14 @@ glpi_skip_auto_update: true
 glpi_crontab_enabled: true
 glpi_compose_wait_timeout: 600
 
+glpi_container_uid: 33
+glpi_container_gid: 33
+glpi_database_volume_name: glpi_mariadb_data
+glpi_config_volume_name: glpi_glpi_config
+glpi_files_volume_name: glpi_glpi_files
+glpi_logs_volume_name: glpi_glpi_logs
+glpi_marketplace_volume_name: glpi_glpi_marketplace
+
 glpi_admin_managed: true
 glpi_admin_user: glpi-admin
 glpi_admin_password: "<GLPI_ADMIN_PASSWORD>"
