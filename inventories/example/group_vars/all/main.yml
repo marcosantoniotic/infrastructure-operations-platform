@@ -136,6 +136,28 @@ zabbix_traefik_https_port: 8443
 zabbix_platform_map_external_networks: []
 zabbix_agent_network_subnet: ""
 
+# GLPI service management
+glpi_project_dir: /opt/glpi
+glpi_image: glpi/glpi:11.0.8
+glpi_database_image: mariadb:11.8.8
+glpi_database_name: glpi
+glpi_database_user: glpi
+glpi_database_password: "{{ vault_glpi_database_password }}"
+glpi_database_root_password: "{{ vault_glpi_database_root_password }}"
+glpi_timezone: America/Sao_Paulo
+glpi_admin_managed: true
+glpi_admin_user: glpi-admin
+glpi_admin_password: "{{ vault_glpi_admin_password }}"
+glpi_admin_rotate_password: false
+glpi_bind_address: 127.0.0.1
+glpi_http_port: 8083
+glpi_enable_traefik: false
+glpi_traefik_hostname: "glpi.<BASE_DOMAIN>"
+glpi_traefik_additional_hostnames:
+  - "glpi-edge.<BASE_DOMAIN>"
+glpi_traefik_network: proxy
+glpi_traefik_https_port: 8443
+
 # Zabbix backup
 zabbix_backup_project_dir: /opt/zabbix
 zabbix_backup_root: /var/backups/infrastructure-platform/zabbix

@@ -10,6 +10,7 @@
 | NetBox | `/opt/netbox` | `docker-compose.yml`, `docker-compose.override.yml` |
 | Observabilidade | `/opt/observability` | `compose.yaml`, `prometheus/`, `alertmanager/`, `grafana/`, `blackbox/`, `secrets/` |
 | Portainer | `/opt/portainer` | `compose.yaml` |
+| GLPI | `/opt/glpi` | `compose.yaml`, `.env`, `secrets/` |
 
 ## Cockpit
 
@@ -165,6 +166,34 @@ convergir.
 - porta Edge não publicada enquanto o recurso não estiver em uso;
 - Ansible e Compose permanecem como fonte oficial da configuração.
 
+## GLPI
+
+- imagem oficial `glpi/glpi` e MariaDB dedicado em versões fixadas;
+- banco acessível apenas pela rede Docker interna do módulo;
+- instalação inicial automática e atualização de schema automática bloqueada;
+- administrador dedicado criado pela CLI com senha no Ansible Vault;
+- contas padrão desativadas depois da validação do novo administrador;
+- volumes separados para banco, configuração, arquivos, logs e marketplace;
+- scheduler oficial do container habilitado;
+- fallback HTTP em loopback somente para validação de saúde;
+- acesso autenticado pelo Traefik HTTPS e Cloudflare Access quando publicado.
+
+| Variável | Padrão | Finalidade |
+|---|---|---|
+| `glpi_image` | `glpi/glpi:11.0.8` | versão fixada da aplicação |
+| `glpi_database_image` | `mariadb:11.8.8` | versão fixada do banco dedicado |
+| `glpi_http_port` | `8083` | validação local limitada ao loopback |
+| `glpi_admin_user` | `glpi-admin` | administrador dedicado |
+| `glpi_admin_rotate_password` | `false` | autoriza rotação explícita por uma execução |
+| `glpi_skip_auto_update` | `true` | impede migração implícita de schema |
+| `glpi_enable_traefik` | `false` | publica o frontend no proxy |
+| `glpi_traefik_hostname` | `glpi.<BASE_DOMAIN>` | nome interno HTTPS |
+
+Os segredos `vault_glpi_database_password`,
+`vault_glpi_database_root_password` e `vault_glpi_admin_password` são
+obrigatórios. Consulte a [role GLPI](../roles/glpi/README.md) e a
+[baseline da fase](glpi-phase.md).
+
 ## Observabilidade
 
 Prometheus:
@@ -224,6 +253,7 @@ Consulte os exemplos de [Prometheus](../config/examples/prometheus.yml) e [Black
 | credencial UniFi somente leitura | Ansible Vault + arquivo read-only |
 | senha administrativa Portainer | Ansible Vault + arquivo read-only |
 | senha administrativa Grafana | Ansible Vault + arquivo read-only |
+| senhas do banco e administrador GLPI | Ansible Vault + arquivos restritos |
 | comunidade SNMP de leitura | Ansible Vault + arquivo read-only |
 
 O valor nunca é documentado ou versionado.

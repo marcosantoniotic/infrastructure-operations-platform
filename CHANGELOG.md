@@ -9,6 +9,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 - baseline funcional e arquitetural da Fase 4 GLPI, com MariaDB dedicado,
   fronteiras de autoridade, segurança, integrações, RPO/RTO e gates de aceite;
+- role GLPI reproduzível com imagens fixadas, administrador dedicado, contas
+  padrão desativadas, persistência separada e validação de schema e HTTPS;
 - conta administrativa dedicada e governada por Vault para acesso ao Cockpit,
   mantendo a identidade de automação restrita a chave SSH;
 - instalação reproduzível e validação do NetBox Topology Views compatível com

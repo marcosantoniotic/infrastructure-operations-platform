@@ -232,6 +232,9 @@ ansible-playbook -i inventories/validation/hosts.yml playbooks/zabbix-backup.yml
 # Somente Portainer
 ansible-playbook -i inventories/validation/hosts.yml playbooks/portainer.yml
 
+# Somente GLPI
+ansible-playbook -i inventories/validation/hosts.yml playbooks/glpi.yml
+
 # Prometheus, Grafana e exporters do host
 ansible-playbook -i inventories/validation/hosts.yml playbooks/observability.yml
 

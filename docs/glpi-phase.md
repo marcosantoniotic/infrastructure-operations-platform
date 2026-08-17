@@ -92,8 +92,9 @@ flowchart LR
 
 O banco não publica portas no host nem participa da rede do Traefik. Somente o
 GLPI acessa simultaneamente a rede de entrada e a rede interna de dados. A porta
-de contingência é ligada exclusivamente ao loopback e preserva acesso local
-por túnel SSH quando DNS, Cloudflare ou Traefik estiverem indisponíveis.
+HTTP ligada ao loopback serve para validação de saúde. O acesso autenticado
+local usa o Traefik HTTPS, inclusive por túnel SSH, e permanece independente do
+Cloudflare e do DNS externo.
 
 ## Persistência e banco
 

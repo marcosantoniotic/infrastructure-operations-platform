@@ -1,0 +1,7 @@
+expose_php = Off
+memory_limit = {{ glpi_php_memory_limit }}
+upload_max_filesize = {{ glpi_php_upload_max_filesize }}
+post_max_size = {{ glpi_php_post_max_size }}
+session.cookie_secure = {{ 'On' if glpi_php_session_cookie_secure else 'Off' }}
+session.cookie_httponly = {{ 'On' if glpi_php_session_cookie_httponly else 'Off' }}
+session.cookie_samesite = {{ glpi_php_session_cookie_samesite }}

@@ -24,6 +24,8 @@
         - netbox
         - netbox_zabbix_sync
         - portainer
+        - glpi
+        - glpi/secrets
         - observability
 
     - name: Load Traefik defaults
@@ -100,6 +102,32 @@
         src: ../../roles/portainer/templates/compose.yaml.j2
         dest: "{{ ci_output_dir }}/portainer/compose.yaml"
         mode: "0644"
+
+    - name: Load GLPI defaults
+      ansible.builtin.include_vars:
+        file: ../../roles/glpi/defaults/main.yml
+
+    - name: Render sanitized GLPI definitions
+      ansible.builtin.template:
+        src: "../../roles/glpi/templates/{{ item.source }}"
+        dest: "{{ ci_output_dir }}/glpi/{{ item.destination }}"
+        mode: "0644"
+      loop:
+        - source: compose.yaml.j2
+          destination: compose.yaml
+        - source: glpi.env.j2
+          destination: .env
+        - source: custom-php.ini.j2
+          destination: custom-php.ini
+
+    - name: Create sanitized GLPI secret fixtures
+      ansible.builtin.copy:
+        dest: "{{ ci_output_dir }}/glpi/secrets/{{ item }}"
+        mode: "0600"
+        content: "ci-only-placeholder"
+      loop:
+        - glpi_database_password
+        - glpi_database_root_password
 
     - name: Load observability defaults
       ansible.builtin.include_vars:
