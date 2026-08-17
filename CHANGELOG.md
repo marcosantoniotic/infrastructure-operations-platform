@@ -13,6 +13,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
   padrão desativadas, persistência separada e validação de schema e HTTPS;
 - runner de laboratório GLPI com segredos no Vault, publicação HTTPS local,
   autenticação real, reinício de persistência e segunda convergência idempotente;
+- backup consistente do GLPI com manutenção controlada, dump MariaDB, chave de
+  criptografia, documentos, marketplace, restauração isolada e métricas;
 - conta administrativa dedicada e governada por Vault para acesso ao Cockpit,
   mantendo a identidade de automação restrita a chave SSH;
 - instalação reproduzível e validação do NetBox Topology Views compatível com

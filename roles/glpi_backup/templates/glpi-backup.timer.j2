@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily GLPI backup schedule
+
+[Timer]
+OnCalendar={{ glpi_backup_schedule }}
+Persistent=true
+RandomizedDelaySec=15m
+Unit=glpi-backup.service
+
+[Install]
+WantedBy=timers.target

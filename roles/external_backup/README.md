@@ -1,8 +1,8 @@
 # Encrypted external backup role
 
-Replicates the validated NetBox and Zabbix backup sets into an encrypted Restic
-repository. The default transport is an rclone OneDrive remote named
-`onedrive`.
+Replicates the validated NetBox, Zabbix, observability and GLPI backup sets into
+an encrypted Restic repository. The default transport is an rclone OneDrive
+remote named `onedrive`.
 
 The role installs checksum-pinned Restic and rclone binaries, protects the
 repository password and OAuth configuration with mode `0600`, initializes the
