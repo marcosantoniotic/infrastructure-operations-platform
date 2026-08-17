@@ -18,7 +18,8 @@
 | Cockpit | `playbooks/cockpit.yml` | implementado e validado | RHEL 9; Traefik opcional |
 | Portainer | `playbooks/portainer.yml` | implementado e integrado ao Traefik | Docker; Traefik opcional |
 | Integrações | `playbooks/integrations.yml` | planejado | módulos correspondentes |
-| GLPI | `playbooks/glpi.yml` | implementado; validação de ambiente pendente | Docker; MariaDB dedicado; Traefik opcional |
+| GLPI | `playbooks/glpi.yml` | implementado e validado no laboratório | Docker; MariaDB dedicado; Traefik opcional |
+| Backup do GLPI | `playbooks/glpi-backup.yml` | implementado para banco, chave, arquivos e marketplace | systemd + Docker + GLPI |
 
 ## Contrato dos módulos
 

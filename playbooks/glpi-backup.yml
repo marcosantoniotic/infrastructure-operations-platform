@@ -1,0 +1,7 @@
+---
+- name: Configure and validate GLPI backups
+  hosts: platform
+  gather_facts: true
+  become: true
+  roles:
+    - role: glpi_backup

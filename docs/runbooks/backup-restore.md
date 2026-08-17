@@ -66,12 +66,44 @@ O modo `verify` confirma os checksums e o arquivo operacional, restaura o dump
 em um MySQL temporário e valida as tabelas essenciais `dbversion` e `hosts`.
 O banco ativo não é interrompido ou alterado.
 
+## GLPI
+
+O timer `glpi-backup.timer` executa diariamente e grava os conjuntos em:
+
+```text
+/var/backups/infrastructure-platform/glpi/<UTC_TIMESTAMP>/
+|-- database.sql
+|-- application-data.tar.gz
+|-- compose.yaml
+|-- custom-php.ini
+|-- metadata.txt
+`-- SHA256SUMS
+```
+
+O GLPI entra em manutenção apenas durante a captura consistente. O arquivo da
+aplicação protege `glpicrypt.key`, `config_db.php`, documentos, anexos,
+inventários, logs e marketplace; arquivos de segredo do Compose não são
+copiados.
+
+```bash
+sudo systemctl status glpi-backup.timer
+sudo systemctl start glpi-backup.service
+sudo journalctl -u glpi-backup.service
+sudo /usr/local/sbin/glpi-backup verify
+```
+
+O modo `verify` importa o banco em um MariaDB descartável, valida as tabelas
+essenciais e extrai os dados em um volume Docker temporário. A chave e a
+configuração precisam estar presentes e não vazias. Nenhum volume ativo é
+montado ou alterado durante a restauração de teste.
+
 ## Escopo da plataforma
 
 | Componente | Conteúdo |
 |---|---|
 | NetBox | PostgreSQL, mídia, configuração não secreta e metadados |
 | Zabbix | MySQL, configuração, mapa e scripts auxiliares |
+| GLPI | MariaDB, chave de criptografia, documentos, anexos, logs e marketplace |
 | Grafana | volume de dados e dashboards provisionados |
 | Prometheus | configuração; TSDB conforme política de criticidade |
 | Traefik | configuração dinâmica, estática e estado ACME |
@@ -125,7 +157,7 @@ Os objetivos formais e períodos de retenção estão definidos em
 
 ## Réplica externa criptografada
 
-Os conjuntos locais validados do NetBox e do Zabbix são replicados para um
+Os conjuntos locais validados do NetBox, Zabbix, observabilidade e GLPI são replicados para um
 repositório Restic criptografado, transportado pelo rclone para o OneDrive.
 A senha do repositório e a configuração OAuth são fornecidas exclusivamente
 por Ansible Vault.

@@ -158,6 +158,19 @@ glpi_traefik_additional_hostnames:
 glpi_traefik_network: proxy
 glpi_traefik_https_port: 8443
 
+# GLPI backup
+glpi_backup_project_dir: /opt/glpi
+glpi_backup_root: /var/backups/infrastructure-platform/glpi
+glpi_backup_retention_days: 14
+glpi_backup_schedule: "*-*-* 03:30:00"
+glpi_backup_database_service: db
+glpi_backup_application_service: glpi
+glpi_backup_database_name: glpi
+glpi_backup_database_image: mariadb:11.8.8
+glpi_backup_helper_image: alpine:3.23.3
+glpi_backup_run_now: false
+glpi_backup_verify_restore: false
+
 # Zabbix backup
 zabbix_backup_project_dir: /opt/zabbix
 zabbix_backup_root: /var/backups/infrastructure-platform/zabbix
@@ -196,6 +209,7 @@ external_backup_sources:
   - /var/backups/infrastructure-platform/netbox
   - /var/backups/infrastructure-platform/zabbix
   - /var/backups/infrastructure-platform/observability
+  - /var/backups/infrastructure-platform/glpi
 
 # Authorized maintenance window
 maintenance_authorized: false

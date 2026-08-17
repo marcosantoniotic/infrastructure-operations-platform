@@ -1,0 +1,213 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+umask 0077
+
+readonly PROJECT_DIR="{{ glpi_backup_project_dir }}"
+readonly BACKUP_ROOT="{{ glpi_backup_root }}"
+readonly RETENTION_DAYS="{{ glpi_backup_retention_days }}"
+readonly DATABASE_SERVICE="{{ glpi_backup_database_service }}"
+readonly APPLICATION_SERVICE="{{ glpi_backup_application_service }}"
+readonly DATABASE_NAME="{{ glpi_backup_database_name }}"
+readonly DATABASE_IMAGE="{{ glpi_backup_database_image }}"
+readonly HELPER_IMAGE="{{ glpi_backup_helper_image }}"
+readonly METRICS_DIR="{{ glpi_backup_metrics_dir }}"
+readonly METRICS_FILE="${METRICS_DIR}/glpi_backup.prom"
+
+write_metrics() {
+  local run_success="$1" success_timestamp="${2:-}"
+  local temporary="${METRICS_FILE}.$$"
+  install -d -m 0755 "$METRICS_DIR"
+  {
+    printf '# HELP infrastructure_backup_last_run_success Whether the last backup execution succeeded.\n'
+    printf '# TYPE infrastructure_backup_last_run_success gauge\n'
+    printf 'infrastructure_backup_last_run_success{service="glpi"} %s\n' "$run_success"
+    if [[ -n "$success_timestamp" ]]; then
+      printf '# HELP infrastructure_backup_last_success_timestamp_seconds Unix timestamp of the last successful backup.\n'
+      printf '# TYPE infrastructure_backup_last_success_timestamp_seconds gauge\n'
+      printf 'infrastructure_backup_last_success_timestamp_seconds{service="glpi"} %s\n' "$success_timestamp"
+    elif [[ -f "$METRICS_FILE" ]]; then
+      grep '^infrastructure_backup_last_success_timestamp_seconds' "$METRICS_FILE" || true
+    fi
+  } > "$temporary"
+  chmod 0644 "$temporary"
+  mv -f -- "$temporary" "$METRICS_FILE"
+}
+
+log() {
+  logger -t glpi-backup -- "$*"
+  printf '%s\n' "$*"
+}
+
+latest_backup() {
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' \
+    -printf '%f\n' | sort | tail -n 1
+}
+
+create_backup() {
+  local timestamp staging final maintenance_enabled=false
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  staging="${BACKUP_ROOT}/.${timestamp}.partial"
+  final="${BACKUP_ROOT}/${timestamp}"
+  install -d -m 0700 "$staging"
+
+  leave_maintenance() {
+    if [[ "$maintenance_enabled" == true ]]; then
+      cd "$PROJECT_DIR"
+      docker compose exec -T "$APPLICATION_SERVICE" \
+        php bin/console maintenance:disable >/dev/null 2>&1 || true
+      maintenance_enabled=false
+    fi
+  }
+  cleanup_partial() {
+    leave_maintenance
+    rm -rf -- "$staging"
+    write_metrics 0
+  }
+  trap cleanup_partial ERR INT TERM
+
+  cd "$PROJECT_DIR"
+  docker compose exec -T "$APPLICATION_SERVICE" \
+    php bin/console maintenance:enable >/dev/null
+  maintenance_enabled=true
+
+  docker compose exec -T "$DATABASE_SERVICE" sh -c \
+    'exec mariadb-dump --user=root --password="$(cat /run/secrets/glpi_database_root_password)" --single-transaction --quick --routines --triggers --events --hex-blob "$1"' \
+    _ "$DATABASE_NAME" > "${staging}/database.sql"
+
+  docker compose exec -T "$APPLICATION_SERVICE" \
+    tar -C /var/glpi -czf - config files logs marketplace \
+    > "${staging}/application-data.tar.gz"
+
+  install -m 0600 "${PROJECT_DIR}/compose.yaml" "${staging}/compose.yaml"
+  install -m 0600 "${PROJECT_DIR}/custom-php.ini" "${staging}/custom-php.ini"
+  {
+    printf 'created_utc=%s\n' "$timestamp"
+    printf 'database=%s\n' "$DATABASE_NAME"
+    printf 'database_image=%s\n' "$DATABASE_IMAGE"
+    printf 'helper_image=%s\n' "$HELPER_IMAGE"
+    printf 'format=glpi-platform-backup-v1\n'
+    docker compose images --format json | tr '\n' ' '
+    printf '\n'
+  } > "${staging}/metadata.txt"
+
+  (
+    cd "$staging"
+    sha256sum database.sql application-data.tar.gz compose.yaml \
+      custom-php.ini metadata.txt > SHA256SUMS
+  )
+  leave_maintenance
+  mv -- "$staging" "$final"
+  trap - ERR INT TERM
+  write_metrics 1 "$(date +%s)"
+
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '20*Z' \
+    -mtime "+${RETENTION_DAYS}" -exec rm -rf -- {} +
+  log "GLPI backup completed: ${final}"
+}
+
+verify_backup() {
+  local selected directory database_container data_container data_volume
+  local verify_password restore_database
+  selected="${1:-$(latest_backup)}"
+  if [[ -z "$selected" ]]; then
+    log "No GLPI backup is available for verification."
+    exit 1
+  fi
+  directory="${BACKUP_ROOT}/${selected}"
+  [[ -d "$directory" ]] || {
+    log "Backup directory does not exist: ${directory}"
+    exit 1
+  }
+
+  (
+    cd "$directory"
+    sha256sum --check SHA256SUMS
+  )
+  tar -tzf "${directory}/application-data.tar.gz" >/dev/null
+
+  database_container="glpi-restore-db-${RANDOM}-$$"
+  data_container="glpi-restore-data-${RANDOM}-$$"
+  data_volume="glpi-restore-data-${RANDOM}-$$"
+  restore_database=glpi_restore_validation
+  verify_password="$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
+  cleanup_resources() {
+    docker rm -f "$database_container" "$data_container" >/dev/null 2>&1 || true
+    docker volume rm -f "$data_volume" >/dev/null 2>&1 || true
+  }
+  trap cleanup_resources EXIT INT TERM
+
+  docker run --detach --rm --name "$database_container" \
+    --env "MARIADB_ROOT_PASSWORD=${verify_password}" \
+    --env "MARIADB_DATABASE=${restore_database}" \
+    "$DATABASE_IMAGE" >/dev/null
+
+  for _ in {1..60}; do
+    if docker exec \
+      --env "MYSQL_PWD=${verify_password}" \
+      "$database_container" mariadb-admin ping --silent --host=127.0.0.1 --user=root \
+      >/dev/null 2>&1; then
+      break
+    fi
+    sleep 2
+  done
+  docker exec \
+    --env "MYSQL_PWD=${verify_password}" \
+    "$database_container" mariadb-admin ping --silent --host=127.0.0.1 --user=root \
+    >/dev/null
+
+  docker cp "${directory}/database.sql" "${database_container}:/tmp/database.sql" >/dev/null
+  docker exec \
+    --env "MYSQL_PWD=${verify_password}" \
+    "$database_container" sh -c \
+    'exec mariadb --user=root "$1" < /tmp/database.sql' _ "$restore_database"
+
+  docker exec \
+    --env "MYSQL_PWD=${verify_password}" \
+    "$database_container" mariadb --batch --skip-column-names \
+    --user=root "$restore_database" --execute \
+    "SELECT COUNT(*) FROM information_schema.tables
+     WHERE table_schema='${restore_database}'
+       AND table_name IN ('glpi_configs','glpi_users','glpi_tickets');" \
+    | grep -qx '3'
+  docker exec \
+    --env "MYSQL_PWD=${verify_password}" \
+    "$database_container" mariadb --batch --skip-column-names \
+    --user=root "$restore_database" --execute \
+    'SELECT COUNT(*) FROM glpi_configs;' | grep -Eq '^[1-9][0-9]*$'
+  docker exec \
+    --env "MYSQL_PWD=${verify_password}" \
+    "$database_container" mariadb --batch --skip-column-names \
+    --user=root "$restore_database" --execute \
+    'SELECT COUNT(*) FROM glpi_users;' | grep -Eq '^[1-9][0-9]*$'
+
+  docker volume create "$data_volume" >/dev/null
+  docker run --detach --rm --name "$data_container" \
+    --volume "${data_volume}:/restore" \
+    "$HELPER_IMAGE" sleep 300 >/dev/null
+  docker cp "${directory}/application-data.tar.gz" \
+    "${data_container}:/tmp/application-data.tar.gz" >/dev/null
+  docker exec "$data_container" \
+    tar -C /restore -xzf /tmp/application-data.tar.gz
+  docker exec "$data_container" test -s /restore/config/glpicrypt.key
+  docker exec "$data_container" test -s /restore/config/config_db.php
+  docker exec "$data_container" test -d /restore/files
+  docker exec "$data_container" test -d /restore/logs
+  docker exec "$data_container" test -d /restore/marketplace
+
+  cleanup_resources
+  trap - EXIT INT TERM
+  log "GLPI isolated restore verified: ${directory}"
+}
+
+case "${1:-backup}" in
+  backup)
+    create_backup
+    ;;
+  verify)
+    verify_backup "${2:-}"
+    ;;
+  *)
+    printf 'Usage: %s {backup|verify [TIMESTAMP]}\n' "$0" >&2
+    exit 2
+    ;;
+esac

@@ -201,6 +201,9 @@ aplicação.
 | G5 — integrações | evento Zabbix idempotente e referência NetBox válidos |
 | G6 — operação | métricas, alertas, atualização, rollback e runbooks válidos |
 
+Estado de validação em 2026-08-17: G0 a G4 aprovados no laboratório isolado;
+G5 e G6 permanecem abertos.
+
 ## Critérios de aceite da fase
 
 - login protegido e conta administrativa individual;

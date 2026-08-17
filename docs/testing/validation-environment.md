@@ -607,6 +607,24 @@ archives into disposable Docker volumes, Prometheus readiness, Grafana database
 health, removal of temporary resources, timer persistence after VM reload and
 an idempotent Ansible pass. The workflow never restores into active volumes.
 
+### 16.2 Validate GLPI backup and isolated restore
+
+After GLPI has been deployed:
+
+```powershell
+.\automation\scripts\Run-ValidationGlpiBackup.ps1 `
+  -VerifyRestore `
+  -VerifyPersistence `
+  -VerifyIdempotence
+```
+
+Certification requires SHA-256 validation, a successful MariaDB import into a
+disposable container, essential table and record checks, restoration of
+`config`, `files`, `logs` and `marketplace` into a disposable volume, explicit
+validation of `glpicrypt.key`, timer persistence after VM reload and a final
+Ansible pass with `changed=0`. The workflow enables GLPI maintenance mode only
+while capturing the consistent point and always disables it during cleanup.
+
 ### 17. Validate Cockpit
 
 ```powershell

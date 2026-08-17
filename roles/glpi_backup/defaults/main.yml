@@ -1,0 +1,13 @@
+---
+glpi_backup_project_dir: /opt/glpi
+glpi_backup_root: /var/backups/infrastructure-platform/glpi
+glpi_backup_retention_days: 14
+glpi_backup_schedule: "*-*-* 03:30:00"
+glpi_backup_database_service: db
+glpi_backup_application_service: glpi
+glpi_backup_database_name: glpi
+glpi_backup_database_image: mariadb:11.8.8
+glpi_backup_helper_image: alpine:3.23.3
+glpi_backup_run_now: false
+glpi_backup_verify_restore: false
+glpi_backup_metrics_dir: /var/lib/node_exporter/textfile_collector

@@ -53,6 +53,8 @@ external_backup_schedule: "*-*-* 04:30:00"
 external_backup_sources:
   - /var/backups/infrastructure-platform/netbox
   - /var/backups/infrastructure-platform/zabbix
+  - /var/backups/infrastructure-platform/observability
+  - /var/backups/infrastructure-platform/glpi
 external_backup_keep_daily: 14
 external_backup_keep_weekly: 8
 external_backup_keep_monthly: 3

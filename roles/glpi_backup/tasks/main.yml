@@ -1,0 +1,102 @@
+---
+- name: Validate GLPI backup variables
+  ansible.builtin.assert:
+    that:
+      - glpi_backup_root.startswith("/")
+      - glpi_backup_project_dir.startswith("/")
+      - glpi_backup_retention_days | int >= 1
+      - glpi_backup_database_name | length > 0
+      - glpi_backup_database_service | length > 0
+      - glpi_backup_application_service | length > 0
+      - glpi_backup_database_image | length > 0
+      - glpi_backup_helper_image | length > 0
+      - glpi_backup_metrics_dir.startswith("/")
+
+- name: Check the GLPI Compose project
+  ansible.builtin.stat:
+    path: "{{ glpi_backup_project_dir }}/compose.yaml"
+  register: glpi_backup_compose
+
+- name: Require an existing GLPI deployment
+  ansible.builtin.assert:
+    that:
+      - glpi_backup_compose.stat.exists
+      - glpi_backup_compose.stat.isreg
+    fail_msg: >-
+      GLPI must be deployed before configuring its backup module.
+      Expected {{ glpi_backup_project_dir }}/compose.yaml.
+
+- name: Create protected GLPI backup directory
+  ansible.builtin.file:
+    path: "{{ glpi_backup_root }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Create Node Exporter textfile collector directory
+  ansible.builtin.file:
+    path: "{{ glpi_backup_metrics_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install GLPI backup utility
+  ansible.builtin.template:
+    src: glpi-backup.sh.j2
+    dest: /usr/local/sbin/glpi-backup
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install GLPI backup service
+  ansible.builtin.template:
+    src: glpi-backup.service.j2
+    dest: /etc/systemd/system/glpi-backup.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Install GLPI backup timer
+  ansible.builtin.template:
+    src: glpi-backup.timer.j2
+    dest: /etc/systemd/system/glpi-backup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Apply systemd unit changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start GLPI backup timer
+  ansible.builtin.systemd:
+    name: glpi-backup.timer
+    enabled: true
+    state: started
+
+- name: Create an immediate GLPI backup
+  ansible.builtin.command:
+    cmd: /usr/local/sbin/glpi-backup backup
+  changed_when: true
+  when:
+    - glpi_backup_run_now | bool
+    - not ansible_check_mode
+
+- name: Verify latest GLPI backup through an isolated restore
+  ansible.builtin.command:
+    cmd: /usr/local/sbin/glpi-backup verify
+  changed_when: false
+  when:
+    - glpi_backup_verify_restore | bool
+    - not ansible_check_mode
+
+- name: Report GLPI backup state
+  ansible.builtin.debug:
+    msg:
+      backup_root: "{{ glpi_backup_root }}"
+      timer: glpi-backup.timer
+      immediate_backup: "{{ glpi_backup_run_now | bool }}"
+      isolated_restore_verified: "{{ glpi_backup_verify_restore | bool }}"
