@@ -129,6 +129,7 @@ ansible-playbook -i inventories/operational/hosts.yml playbooks/docker.yml --lim
 ansible-playbook -i inventories/operational/hosts.yml playbooks/traefik.yml --limit iop-ops-platform-01 --ask-vault-pass
 ansible-playbook -i inventories/operational/hosts.yml playbooks/netbox.yml --limit iop-ops-platform-01 --ask-vault-pass
 ansible-playbook -i inventories/operational/hosts.yml playbooks/zabbix.yml --limit iop-ops-platform-01 --ask-vault-pass
+ansible-playbook -i inventories/operational/hosts.yml playbooks/glpi.yml --limit iop-ops-platform-01 --ask-vault-pass
 ansible-playbook -i inventories/operational/hosts.yml playbooks/portainer.yml --limit iop-ops-platform-01 --ask-vault-pass
 ansible-playbook -i inventories/operational/hosts.yml playbooks/observability.yml --limit iop-ops-platform-01 --ask-vault-pass
 ansible-playbook -i inventories/operational/hosts.yml playbooks/cockpit.yml --limit iop-ops-platform-01 --ask-vault-pass
@@ -137,6 +138,18 @@ ansible-playbook -i inventories/operational/hosts.yml playbooks/cockpit.yml --li
 Mantenha rotas públicas, Alertmanager, sincronizações e backups externos
 desativados até seus respectivos gates. Execute os playbooks uma segunda vez;
 mudanças inesperadas na segunda execução impedem o avanço.
+
+Depois da validação isolada dos três sistemas, crie tokens técnicos restritos,
+preencha o Vault, habilite cada integração separadamente e execute:
+
+```bash
+ansible-playbook -i inventories/operational/hosts.yml playbooks/netbox-zabbix-sync.yml --limit iop-ops-platform-01 --ask-vault-pass
+ansible-playbook -i inventories/operational/hosts.yml playbooks/zabbix-glpi-bridge.yml --limit iop-ops-platform-01 --ask-vault-pass
+```
+
+Não use a senha administrativa do Zabbix como credencial de integração. O Gate
+G5 exige um único ticket sintético, recuperação sem duplicidade, referência
+canônica ao NetBox e segunda convergência com `changed=0`.
 
 ## 7. Validar antes de migrar dados
 
@@ -148,14 +161,15 @@ Set-Location ".\automation\vagrant\operational"
 vagrant ssh iop-ops-platform-01 -- -N `
   -L 8000:127.0.0.1:8000 `
   -L 8081:127.0.0.1:8081 `
+  -L 8083:127.0.0.1:8083 `
   -L 9000:127.0.0.1:9000 `
   -L 3000:127.0.0.1:3000 `
   -L 9090:127.0.0.1:9090 `
   -L 9091:127.0.0.1:9091
 ```
 
-Valide `http://127.0.0.1:8000` (NetBox), `:8081` (Zabbix), `:9000`
-(Portainer), `:3000` (Grafana), `:9090` (Prometheus) e
+Valide `http://127.0.0.1:8000` (NetBox), `:8081` (Zabbix), `:8083` (GLPI),
+`:9000` (Portainer), `:3000` (Grafana), `:9090` (Prometheus) e
 `https://127.0.0.1:9091` (Cockpit). A porta `8000` do NetBox é HTTP; não
 permita que o navegador a converta para HTTPS.
 

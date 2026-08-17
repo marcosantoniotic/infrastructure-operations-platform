@@ -74,7 +74,7 @@ here.
 
 ## Remaining phase gates
 
-This evidence approves G4 protection in the isolated laboratory. It does not
-approve external publication, production data, Zabbix ticket creation, NetBox
-references or the final GLPI dashboards. Those gates remain independent items
-in the project roadmap.
+This evidence approves G4 protection in the isolated laboratory. Zabbix ticket
+creation and canonical NetBox references were subsequently approved in the
+[Gate G5 evidence](glpi-integrations-validation-evidence.md). Production data
+and the final GLPI operational dashboards remain independent concerns.

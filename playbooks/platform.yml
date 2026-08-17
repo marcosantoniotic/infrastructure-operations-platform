@@ -19,6 +19,9 @@
     - role: zabbix
     - role: zabbix_backup
     - role: netbox_zabbix_sync
+    - role: glpi
+    - role: glpi_backup
+    - role: zabbix_glpi_bridge
     - role: portainer
     - role: observability
     - role: observability_backup

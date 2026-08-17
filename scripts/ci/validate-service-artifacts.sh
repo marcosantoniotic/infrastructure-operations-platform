@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 readonly artifact_dir="${CI_ARTIFACT_DIR:?CI_ARTIFACT_DIR is required}"
 
-for service in traefik cloudflare_tunnel zabbix netbox netbox_zabbix_sync portainer glpi observability; do
+for service in traefik cloudflare_tunnel zabbix netbox netbox_zabbix_sync portainer glpi zabbix_glpi_bridge observability; do
   docker compose \
     --project-directory "${artifact_dir}/${service}" \
     --file "${artifact_dir}/${service}/compose.yaml" \

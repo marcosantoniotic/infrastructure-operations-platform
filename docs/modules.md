@@ -17,7 +17,8 @@
 | Janela de manutenção | `playbooks/maintenance-window.yml` | implementada com backup obrigatório e evidência | RHEL 9 + módulos da plataforma |
 | Cockpit | `playbooks/cockpit.yml` | implementado e validado | RHEL 9; Traefik opcional |
 | Portainer | `playbooks/portainer.yml` | implementado e integrado ao Traefik | Docker; Traefik opcional |
-| Integrações | `playbooks/integrations.yml` | planejado | módulos correspondentes |
+| Sincronização NetBox-Zabbix | `playbooks/netbox-zabbix-sync.yml` | implementada e validada | NetBox; Zabbix; token API restrito |
+| Integração Zabbix-GLPI | `playbooks/zabbix-glpi-bridge.yml` | implementada, idempotente e validada | NetBox; Zabbix; GLPI; tokens dedicados |
 | GLPI | `playbooks/glpi.yml` | implementado e validado no laboratório | Docker; MariaDB dedicado; Traefik opcional |
 | Backup do GLPI | `playbooks/glpi-backup.yml` | implementado para banco, chave, arquivos e marketplace | systemd + Docker + GLPI |
 

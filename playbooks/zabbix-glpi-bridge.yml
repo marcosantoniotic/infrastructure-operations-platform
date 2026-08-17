@@ -1,0 +1,7 @@
+---
+- name: Deploy the Zabbix to GLPI event bridge
+  hosts: platform
+  gather_facts: false
+  become: true
+  roles:
+    - role: zabbix_glpi_bridge

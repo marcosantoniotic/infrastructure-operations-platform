@@ -235,6 +235,9 @@ ansible-playbook -i inventories/validation/hosts.yml playbooks/portainer.yml
 # Somente GLPI
 ansible-playbook -i inventories/validation/hosts.yml playbooks/glpi.yml
 
+# Eventos qualificados do Zabbix em tickets idempotentes do GLPI
+ansible-playbook -i inventories/validation/hosts.yml playbooks/zabbix-glpi-bridge.yml
+
 # Prometheus, Grafana e exporters do host
 ansible-playbook -i inventories/validation/hosts.yml playbooks/observability.yml
 
@@ -255,9 +258,10 @@ de segurança, a observabilidade, os backups, a recuperação e as evidências
 operacionais. Consulte a [baseline da release](docs/releases/v1.0.0.md) e o
 [changelog](CHANGELOG.md).
 
-O GLPI será tratado como fase própria. Sua inclusão deverá respeitar o mesmo
-modelo de proxy, identidade, observabilidade, backup e isolamento de dados, sem
-sobrepor o papel do NetBox. Consulte [Fase 4: GLPI](docs/glpi-phase.md).
+O GLPI é tratado como fase própria e segue o mesmo modelo de proxy, identidade,
+backup e isolamento de dados. Eventos qualificados do Zabbix abrem tickets
+idempotentes, enquanto o NetBox permanece como fonte técnica de verdade.
+Consulte [Fase 4: GLPI](docs/glpi-phase.md).
 
 As próximas evoluções concentram-se em integrações ITSM, exercícios periódicos
 de recuperação, módulos opcionais de telemetria de rede e resiliência

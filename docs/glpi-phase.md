@@ -4,12 +4,14 @@
 
 A baseline funcional e arquitetural está definida, o módulo reproduzível foi
 implementado e a implantação isolada foi certificada com HTTPS, autenticação,
-reinício e segunda convergência sem mudanças. A publicação externa, as
-integrações e a evidência de restauração ainda estão pendentes e permanecem
-marcadas separadamente no [roadmap](roadmap.md).
+reinício, restauração e segunda convergência sem mudanças. A integração
+Zabbix-GLPI e a referência canônica ao NetBox também foram certificadas. A
+operação final de dashboards e runbooks permanece no Gate G6 e é acompanhada
+separadamente no [roadmap](roadmap.md).
 
 A execução sanitizada está registrada em
-[GLPI laboratory validation evidence](testing/glpi-validation-evidence.md).
+[GLPI laboratory validation evidence](testing/glpi-validation-evidence.md) e
+[GLPI integrations validation evidence](testing/glpi-integrations-validation-evidence.md).
 
 ## Objetivo
 
@@ -201,8 +203,8 @@ aplicação.
 | G5 — integrações | evento Zabbix idempotente e referência NetBox válidos |
 | G6 — operação | métricas, alertas, atualização, rollback e runbooks válidos |
 
-Estado de validação em 2026-08-17: G0 a G4 aprovados no laboratório isolado;
-G5 e G6 permanecem abertos.
+Estado de validação em 2026-08-17: G0 a G5 aprovados no laboratório isolado;
+G6 permanece aberto.
 
 ## Critérios de aceite da fase
 

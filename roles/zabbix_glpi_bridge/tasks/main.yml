@@ -1,0 +1,432 @@
+---
+- name: Validate Zabbix-GLPI bridge settings
+  ansible.builtin.assert:
+    that:
+      - zabbix_glpi_bridge_listen_port | int > 0
+      - zabbix_glpi_bridge_listen_port | int < 65536
+      - zabbix_glpi_bridge_min_severity | int >= 0
+      - zabbix_glpi_bridge_min_severity | int <= 5
+      - zabbix_glpi_bridge_glpi_profile_id | int > 0
+      - zabbix_glpi_bridge_glpi_recovery_status | int in [5, 6]
+      - zabbix_glpi_bridge_zabbix_api_token | string | length >= 16
+      - not (zabbix_glpi_bridge_zabbix_api_token | string).startswith('<')
+      - zabbix_glpi_bridge_glpi_user_password | string | length >= 16
+      - not (zabbix_glpi_bridge_glpi_user_password | string).startswith('<')
+      - zabbix_glpi_bridge_glpi_oauth_secret | string | length >= 32
+      - not (zabbix_glpi_bridge_glpi_oauth_secret | string).startswith('<')
+      - zabbix_glpi_bridge_webhook_token | string | length >= 32
+      - not (zabbix_glpi_bridge_webhook_token | string).startswith('<')
+    fail_msg: Review the bridge settings and its dedicated Vault secrets.
+    quiet: true
+  no_log: true
+  when: zabbix_glpi_bridge_enabled | bool
+
+- name: Verify required GLPI and Zabbix Compose projects
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ zabbix_glpi_bridge_glpi_project_dir }}/compose.yaml"
+    - "{{ zabbix_glpi_bridge_zabbix_project_dir }}/compose.yaml"
+  register: zabbix_glpi_bridge_required_projects
+  when: zabbix_glpi_bridge_enabled | bool
+
+- name: Require deployed GLPI and Zabbix projects
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+    fail_msg: "Required Compose file is missing: {{ item.item }}"
+    quiet: true
+  loop: "{{ zabbix_glpi_bridge_required_projects.results | default([]) }}"
+  when: zabbix_glpi_bridge_enabled | bool
+
+- name: Create Zabbix-GLPI bridge directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - {path: "{{ zabbix_glpi_bridge_project_dir }}", owner: root, group: root, mode: "0750"}
+    - {path: "{{ zabbix_glpi_bridge_project_dir }}/secrets", owner: root, group: root, mode: "0700"}
+    - {path: "{{ zabbix_glpi_bridge_state_dir }}", owner: "65532", group: "65532", mode: "0750"}
+  when: zabbix_glpi_bridge_enabled | bool
+
+- name: Store Zabbix-GLPI bridge secrets
+  ansible.builtin.copy:
+    content: "{{ item.content }}"
+    dest: "{{ zabbix_glpi_bridge_project_dir }}/secrets/{{ item.dest }}"
+    owner: root
+    group: "65532"
+    mode: "0440"
+  loop:
+    - {dest: bridge_webhook_token, content: "{{ zabbix_glpi_bridge_webhook_token }}"}
+    - {dest: glpi_user_password, content: "{{ zabbix_glpi_bridge_glpi_user_password }}"}
+    - {dest: glpi_oauth_secret, content: "{{ zabbix_glpi_bridge_glpi_oauth_secret }}"}
+    - {dest: zabbix_api_token, content: "{{ zabbix_glpi_bridge_zabbix_api_token }}"}
+  loop_control:
+    label: "{{ item.dest }}"
+  register: zabbix_glpi_bridge_secret_files
+  no_log: true
+  when: zabbix_glpi_bridge_enabled | bool
+
+- name: Render Zabbix-GLPI bridge artifacts
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ zabbix_glpi_bridge_project_dir }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - {src: compose.yaml.j2, dest: compose.yaml, mode: "0640"}
+    - {src: zabbix-glpi-bridge.py.j2, dest: zabbix-glpi-bridge.py, mode: "0755"}
+    - {src: provision-glpi-oauth.php.j2, dest: provision-glpi-oauth.php, mode: "0640"}
+  register: zabbix_glpi_bridge_artifacts
+  when: zabbix_glpi_bridge_enabled | bool
+
+- name: Inspect GLPI OAuth signing keys
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ zabbix_glpi_bridge_glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - test
+      - -s
+      - /var/glpi/config/oauth.pem
+  register: zabbix_glpi_bridge_oauth_key_state
+  changed_when: false
+  failed_when: false
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
+
+- name: Generate missing GLPI OAuth signing keys
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ zabbix_glpi_bridge_glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - /var/www/glpi/bin/console
+      - security:change_oauth_key
+      - --no-interaction
+  changed_when: true
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - zabbix_glpi_bridge_oauth_key_state.rc | int != 0
+    - not ansible_check_mode
+
+- name: Inspect the dedicated GLPI integration user
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ zabbix_glpi_bridge_glpi_project_dir }}"
+      - exec
+      - -T
+      - db
+      - sh
+      - -lc
+      - >-
+        mariadb --user={{ glpi_database_user }}
+        --password="$(cat /run/secrets/glpi_database_password)"
+        {{ glpi_database_name }} --batch --skip-column-names
+        --execute="SELECT COALESCE(MAX(is_active), -1) FROM glpi_users
+        WHERE name='{{ zabbix_glpi_bridge_glpi_user }}';"
+  register: zabbix_glpi_bridge_glpi_user_state
+  changed_when: false
+  no_log: true
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
+
+- name: Create the dedicated GLPI integration user
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ zabbix_glpi_bridge_glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - /var/www/glpi/bin/console
+      - user:create
+      - --no-interaction
+      - --password
+      - "{{ zabbix_glpi_bridge_glpi_user_password }}"
+      - "{{ zabbix_glpi_bridge_glpi_user }}"
+  changed_when: true
+  no_log: true
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - zabbix_glpi_bridge_glpi_user_state.stdout | trim == '-1'
+    - not ansible_check_mode
+
+- name: Enable the dedicated GLPI integration user
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ zabbix_glpi_bridge_glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - /var/www/glpi/bin/console
+      - user:enable
+      - --no-interaction
+      - "{{ zabbix_glpi_bridge_glpi_user }}"
+  changed_when: true
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - zabbix_glpi_bridge_glpi_user_state.stdout | trim == '0'
+    - not ansible_check_mode
+
+- name: Rotate the dedicated GLPI integration password when authorized
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ zabbix_glpi_bridge_glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - /var/www/glpi/bin/console
+      - user:reset_password
+      - --no-interaction
+      - --password
+      - "{{ zabbix_glpi_bridge_glpi_user_password }}"
+      - "{{ zabbix_glpi_bridge_glpi_user }}"
+  changed_when: true
+  no_log: true
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - zabbix_glpi_bridge_glpi_rotate_password | bool
+    - zabbix_glpi_bridge_glpi_user_state.stdout | trim != '-1'
+    - not ansible_check_mode
+
+- name: Inspect the dedicated GLPI integration profile
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ zabbix_glpi_bridge_glpi_project_dir }}"
+      - exec
+      - -T
+      - db
+      - sh
+      - -lc
+      - >-
+        mariadb --user={{ glpi_database_user }}
+        --password="$(cat /run/secrets/glpi_database_password)"
+        {{ glpi_database_name }} --batch --skip-column-names
+        --execute="SELECT COUNT(*) FROM glpi_profiles_users pu
+        JOIN glpi_users u ON u.id=pu.users_id
+        WHERE u.name='{{ zabbix_glpi_bridge_glpi_user }}'
+        AND pu.profiles_id={{ zabbix_glpi_bridge_glpi_profile_id | int }}
+        AND pu.entities_id={{ zabbix_glpi_bridge_glpi_entity_id | int }}
+        AND pu.is_recursive={{ 1 if zabbix_glpi_bridge_glpi_recursive else 0 }};"
+  register: zabbix_glpi_bridge_glpi_profile_state
+  changed_when: false
+  no_log: true
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
+
+- name: Grant the dedicated GLPI integration profile
+  ansible.builtin.command:
+    argv: >-
+      {{
+        [
+          'docker', 'compose', '--project-directory', zabbix_glpi_bridge_glpi_project_dir,
+          'exec', '-T', 'glpi', '/var/www/glpi/bin/console',
+          'user:grant', '--no-interaction', '--profile',
+          zabbix_glpi_bridge_glpi_profile_id | string, '--entity',
+          zabbix_glpi_bridge_glpi_entity_id | string
+        ] +
+        (['--recursive'] if zabbix_glpi_bridge_glpi_recursive else []) +
+        [zabbix_glpi_bridge_glpi_user]
+      }}
+  changed_when: true
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - zabbix_glpi_bridge_glpi_profile_state.stdout | trim == '0'
+    - not ansible_check_mode
+
+- name: Identify the GLPI application container
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ zabbix_glpi_bridge_glpi_project_dir }}"
+      - ps
+      - -q
+      - glpi
+  register: zabbix_glpi_bridge_glpi_container
+  changed_when: false
+  failed_when: zabbix_glpi_bridge_glpi_container.stdout | trim | length == 0
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
+
+- name: Copy OAuth provisioner and secret into the GLPI container
+  ansible.builtin.command:
+    argv:
+      - docker
+      - cp
+      - "{{ item.source }}"
+      - "{{ zabbix_glpi_bridge_glpi_container.stdout | trim }}:{{ item.destination }}"
+  loop:
+    - source: "{{ zabbix_glpi_bridge_project_dir }}/provision-glpi-oauth.php"
+      destination: /tmp/iop-provision-glpi-oauth.php
+    - source: "{{ zabbix_glpi_bridge_project_dir }}/secrets/glpi_oauth_secret"
+      destination: /tmp/iop-glpi-oauth-secret
+  loop_control:
+    label: "{{ item.destination }}"
+  changed_when: false
+  no_log: true
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
+
+- name: Restrict temporary OAuth material inside the GLPI container
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - --user
+      - "0"
+      - "{{ zabbix_glpi_bridge_glpi_container.stdout | trim }}"
+      - sh
+      - -c
+      - >-
+        chown root:65532 /tmp/iop-provision-glpi-oauth.php /tmp/iop-glpi-oauth-secret &&
+        chmod 0440 /tmp/iop-provision-glpi-oauth.php /tmp/iop-glpi-oauth-secret
+  changed_when: false
+  no_log: true
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
+
+- name: Reconcile the dedicated GLPI OAuth client
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - --user
+      - "33:65532"
+      - "{{ zabbix_glpi_bridge_glpi_container.stdout | trim }}"
+      - php
+      - /tmp/iop-provision-glpi-oauth.php
+      - "{{ zabbix_glpi_bridge_glpi_oauth_client_name }}"
+      - /tmp/iop-glpi-oauth-secret
+  register: zabbix_glpi_bridge_oauth_client
+  changed_when: false
+  no_log: true
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
+
+- name: Remove temporary OAuth material from the GLPI container
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - --user
+      - "0"
+      - "{{ zabbix_glpi_bridge_glpi_container.stdout | trim }}"
+      - rm
+      - -f
+      - /tmp/iop-provision-glpi-oauth.php
+      - /tmp/iop-glpi-oauth-secret
+  changed_when: false
+  no_log: true
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
+
+- name: Store the managed GLPI OAuth client ID
+  ansible.builtin.copy:
+    content: "{{ zabbix_glpi_bridge_oauth_client.stdout | trim }}"
+    dest: "{{ zabbix_glpi_bridge_project_dir }}/secrets/glpi_oauth_client_id"
+    owner: root
+    group: "65532"
+    mode: "0440"
+  register: zabbix_glpi_bridge_client_id_file
+  no_log: true
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
+
+- name: Validate the Zabbix-GLPI bridge Compose project
+  ansible.builtin.command:
+    cmd: docker compose --project-directory {{ zabbix_glpi_bridge_project_dir }} config --quiet
+  changed_when: false
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
+
+- name: Deploy the Zabbix-GLPI bridge
+  community.docker.docker_compose_v2:
+    project_src: "{{ zabbix_glpi_bridge_project_dir }}"
+    state: present
+    pull: missing
+    recreate: >-
+      {{ 'always' if (
+          zabbix_glpi_bridge_secret_files.changed | default(false) or
+          zabbix_glpi_bridge_artifacts.changed | default(false) or
+          zabbix_glpi_bridge_client_id_file.changed | default(false)
+        ) else 'auto' }}
+  when: zabbix_glpi_bridge_enabled | bool
+
+- name: Validate GLPI OAuth and Zabbix API connectivity
+  ansible.builtin.command:
+    cmd: >-
+      docker compose --project-directory {{ zabbix_glpi_bridge_project_dir }} run --rm
+      zabbix-glpi-bridge python /usr/local/libexec/zabbix-glpi-bridge.py self-test
+  changed_when: false
+  register: zabbix_glpi_bridge_self_test
+  retries: 6
+  delay: 10
+  until: zabbix_glpi_bridge_self_test.rc == 0
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
+
+- name: Reconcile Zabbix webhook media and action
+  ansible.builtin.command:
+    cmd: >-
+      docker compose --project-directory {{ zabbix_glpi_bridge_project_dir }} run --rm
+      zabbix-glpi-bridge python /usr/local/libexec/zabbix-glpi-bridge.py configure-zabbix
+  changed_when: false
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
+
+- name: Validate the running Zabbix-GLPI bridge
+  ansible.builtin.command:
+    cmd: >-
+      docker compose --project-directory {{ zabbix_glpi_bridge_project_dir }} exec -T
+      zabbix-glpi-bridge python -c
+      "import urllib.request; urllib.request.urlopen('http://127.0.0.1:{{ zabbix_glpi_bridge_listen_port }}/healthz', timeout=5).read()"
+  changed_when: false
+  register: zabbix_glpi_bridge_health
+  retries: 10
+  delay: 5
+  until: zabbix_glpi_bridge_health.rc == 0
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - not ansible_check_mode
