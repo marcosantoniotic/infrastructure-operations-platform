@@ -44,7 +44,9 @@ jobs:
     timeout-minutes: 20
     strategy:
       fail-fast: false
-      max-parallel: 6
+      # Each runner downloads the pinned Trivy action from codeload.github.com.
+      # Keep the fan-out low enough to avoid shared-runner HTTP 429 responses.
+      max-parallel: 2
       matrix:
         image: ${{ fromJSON(needs.inventory.outputs.images) }}
 
