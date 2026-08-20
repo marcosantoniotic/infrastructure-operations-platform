@@ -7,5 +7,6 @@ cloudflare_tunnel_origin_ca_source: ""
 cloudflare_tunnel_proxy_network: proxy
 cloudflare_tunnel_metrics_port: 20241
 cloudflare_tunnel_container_name: iop-cloudflared
+cloudflare_tunnel_validation_image: curlimages/curl:8.14.1
 cloudflare_tunnel_connection_retries: 30
 cloudflare_tunnel_connection_delay: 5
