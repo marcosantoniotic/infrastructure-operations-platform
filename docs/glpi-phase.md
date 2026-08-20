@@ -6,12 +6,14 @@ A baseline funcional e arquitetural está definida, o módulo reproduzível foi
 implementado e a implantação isolada foi certificada com HTTPS, autenticação,
 reinício, restauração e segunda convergência sem mudanças. A integração
 Zabbix-GLPI e a referência canônica ao NetBox também foram certificadas. A
-operação final de dashboards e runbooks permanece no Gate G6 e é acompanhada
-separadamente no [roadmap](roadmap.md).
+operação de métricas, alertas, dashboard e runbook foi aprovada no Gate G6. O
+módulo também foi publicado no ambiente operacional atrás do Traefik e de uma
+política dedicada do Cloudflare Access.
 
 A execução sanitizada está registrada em
 [GLPI laboratory validation evidence](testing/glpi-validation-evidence.md) e
-[GLPI integrations validation evidence](testing/glpi-integrations-validation-evidence.md).
+[GLPI integrations validation evidence](testing/glpi-integrations-validation-evidence.md) e
+[G6 observability evidence](testing/zabbix-glpi-observability-validation-evidence.md).
 
 ## Objetivo
 
@@ -203,8 +205,9 @@ aplicação.
 | G5 — integrações | evento Zabbix idempotente e referência NetBox válidos |
 | G6 — operação | métricas, alertas, atualização, rollback e runbooks válidos |
 
-Estado de validação em 2026-08-17: G0 a G5 aprovados no laboratório isolado;
-G6 permanece aberto.
+Estado de validação em 2026-08-20: G0 a G6 aprovados no laboratório isolado.
+A publicação operacional foi validada em `glpi-ops.marnep.com.br`, com DNS
+proxied, rota de túnel com validação JWT e política Access `Admins`.
 
 ## Critérios de aceite da fase
 

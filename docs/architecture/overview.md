@@ -55,7 +55,7 @@ O Cockpit e o Zabbix Agent 2 são serviços nativos do host.
 | Zabbix | disponibilidade, eventos e alertas | inventário mestre |
 | Prometheus | métricas e séries temporais | gestão de ativos |
 | Grafana | visualização e correlação | coleta primária |
-| GLPI, futuramente | chamados, atendimento e ativos de service desk | DCIM/IPAM do NetBox |
+| GLPI | chamados, atendimento e ativos de service desk | DCIM/IPAM do NetBox |
 
 ## Disponibilidade
 
