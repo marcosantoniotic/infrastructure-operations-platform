@@ -77,6 +77,9 @@ services:
     networks:
       - metrics
       - access
+{% if observability_zabbix_glpi_bridge_enabled | bool %}
+      - bridge_metrics
+{% endif %}
 {% if observability_enable_traefik %}
       - proxy
 {% endif %}
@@ -290,6 +293,11 @@ networks:
     internal: true
   access:
     driver: bridge
+{% if observability_zabbix_glpi_bridge_enabled | bool %}
+  bridge_metrics:
+    name: {{ observability_zabbix_glpi_bridge_network }}
+    external: true
+{% endif %}
 {% for network in observability_blackbox_external_networks %}
   blackbox_external_{{ loop.index }}:
     name: {{ network }}

@@ -62,6 +62,9 @@ services:
     networks:
       - zabbix
       - glpi
+{% if zabbix_glpi_bridge_metrics_enabled | bool %}
+      - metrics
+{% endif %}
 
 networks:
   zabbix:
@@ -70,3 +73,8 @@ networks:
   glpi:
     name: {{ zabbix_glpi_bridge_glpi_network }}
     external: true
+{% if zabbix_glpi_bridge_metrics_enabled | bool %}
+  metrics:
+    name: {{ zabbix_glpi_bridge_metrics_network }}
+    external: true
+{% endif %}

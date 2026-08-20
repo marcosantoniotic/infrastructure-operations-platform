@@ -73,6 +73,13 @@
           observability_alertmanager_warning_group_wait | length > 0 and
           observability_alertmanager_warning_repeat_interval | length > 0
         )
+      - >-
+        not (observability_zabbix_glpi_bridge_enabled | bool) or
+        (
+          observability_zabbix_glpi_bridge_network | length > 0 and
+          observability_zabbix_glpi_bridge_target | length > 0 and
+          observability_zabbix_glpi_bridge_stale_after | int > 0
+        )
     fail_msg: >-
       Replace the Grafana password placeholder with a strong Ansible Vault
       value and configure retention, unique ingress hostnames and an HTTPS
@@ -235,6 +242,8 @@
       dest: grafana/dashboards/backup-health.json
     - src: dns-service-health.json.j2
       dest: grafana/dashboards/dns-service-health.json
+    - src: zabbix-glpi-bridge.json.j2
+      dest: grafana/dashboards/zabbix-glpi-bridge.json
   register: observability_rendered_configuration
   when: >-
     item.src != 'alertmanager.yml.j2' or
@@ -709,6 +718,42 @@
   failed_when: observability_dns_dashboard.json.dashboard.uid != 'dns-service-health'
   no_log: true
   when: not ansible_check_mode
+
+- name: Validate provisioned Zabbix-GLPI bridge dashboard
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_grafana_validation_host }}:{{ observability_grafana_port }}/api/dashboards/uid/zabbix-glpi-bridge
+    method: GET
+    user: "{{ observability_grafana_admin_user }}"
+    password: "{{ observability_grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    return_content: true
+  register: observability_zabbix_glpi_dashboard
+  failed_when: >-
+    observability_zabbix_glpi_dashboard.json.dashboard.uid != 'zabbix-glpi-bridge'
+  no_log: true
+  when:
+    - not ansible_check_mode
+    - observability_zabbix_glpi_bridge_enabled | bool
+
+- name: Validate Zabbix-GLPI bridge metrics collection
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_prometheus_validation_host }}:{{ observability_prometheus_port }}/api/v1/query?query=up%7Bjob%3D%22zabbix-glpi-bridge%22%7D
+    method: GET
+    status_code: 200
+    return_content: true
+  register: observability_zabbix_glpi_metrics
+  retries: 20
+  delay: 5
+  until: >-
+    observability_zabbix_glpi_metrics.json.status == 'success' and
+    observability_zabbix_glpi_metrics.json.data.result | length == 1 and
+    observability_zabbix_glpi_metrics.json.data.result[0].value[1] == '1'
+  when:
+    - not ansible_check_mode
+    - observability_zabbix_glpi_bridge_enabled | bool
 
 - name: Validate Grafana through Traefik HTTPS
   ansible.builtin.command:

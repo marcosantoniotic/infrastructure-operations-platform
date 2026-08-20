@@ -71,6 +71,16 @@
   no_log: true
   when: zabbix_glpi_bridge_enabled | bool
 
+- name: Create private bridge metrics network
+  community.docker.docker_network:
+    name: "{{ zabbix_glpi_bridge_metrics_network }}"
+    internal: true
+    state: present
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - zabbix_glpi_bridge_metrics_enabled | bool
+    - not ansible_check_mode
+
 - name: Render Zabbix-GLPI bridge artifacts
   ansible.builtin.template:
     src: "{{ item.src }}"

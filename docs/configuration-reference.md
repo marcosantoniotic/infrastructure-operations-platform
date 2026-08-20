@@ -211,6 +211,8 @@ configuráveis.
 | `zabbix_glpi_bridge_event_tag_value` | `ticket` | valor da tag elegível |
 | `zabbix_glpi_bridge_min_severity` | `2` | severidade mínima do Zabbix |
 | `zabbix_glpi_bridge_glpi_recovery_status` | `5` | status Solved aplicado na recuperação |
+| `zabbix_glpi_bridge_metrics_enabled` | `false` | conecta o bridge à rede privada de métricas |
+| `zabbix_glpi_bridge_metrics_network` | `iop_integration_metrics` | rede interna compartilhada com Prometheus |
 
 Os quatro segredos `vault_zabbix_glpi_bridge_*` são obrigatórios quando o
 recurso está habilitado. O token Zabbix deve usar a allow-list documentada na
