@@ -47,6 +47,10 @@ observability_blackbox_targets:
 observability_blackbox_external_networks: []
 observability_dns_targets: []
 observability_adguard_metrics_enabled: false
+observability_zabbix_glpi_bridge_enabled: false
+observability_zabbix_glpi_bridge_network: iop_integration_metrics
+observability_zabbix_glpi_bridge_target: zabbix-glpi-bridge:8080
+observability_zabbix_glpi_bridge_stale_after: 86400
 observability_snmp_enabled: false
 observability_snmp_auth_name: iop_snmp_v2
 observability_snmp_community: "<SNMP_COMMUNITY>"

@@ -22,6 +22,10 @@ The bridge has no published host port. Its SQLite correlation database is
 stored in `/var/lib/zabbix-glpi-bridge`; `/healthz` and `/metrics` are available
 only on the GLPI and Zabbix Docker networks. The container runs as UID/GID
 `65532`, read-only, without Linux capabilities and with `no-new-privileges`.
+When metrics are enabled, the container also joins the private
+`zabbix_glpi_bridge_metrics_network`; Prometheus can scrape `/metrics` without
+exposing the listener on a host interface. See the
+[operations runbook](../../docs/runbooks/zabbix-glpi-bridge.md).
 
 ## Prerequisites
 

@@ -134,3 +134,46 @@ groups:
         annotations:
           summary: "Platform maintenance is overdue"
           description: "No successful maintenance window was recorded within 45 days."
+{% if observability_zabbix_glpi_bridge_enabled | bool %}
+
+  - name: zabbix-glpi-bridge
+    rules:
+      - alert: ZabbixGLPIBridgeUnavailable
+        expr: up{job="zabbix-glpi-bridge"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Zabbix to GLPI bridge is unavailable"
+          description: "Prometheus cannot collect the bridge metrics endpoint."
+
+      - alert: ZabbixGLPIBridgeProcessingFailure
+        expr: increase(zabbix_glpi_bridge_failures_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Zabbix to GLPI event processing failed"
+          description: "At least one bridge event failed during the last ten minutes."
+
+      - alert: ZabbixGLPIBridgeSuccessStale
+        expr: >-
+          zabbix_glpi_bridge_last_success_timestamp_seconds > 0 and
+          time() - zabbix_glpi_bridge_last_success_timestamp_seconds
+          > {{ observability_zabbix_glpi_bridge_stale_after }}
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Zabbix to GLPI bridge has no recent successful event"
+          description: "Review the Zabbix action and bridge logs; inactivity may be expected when no eligible event occurred."
+
+      - alert: ZabbixGLPIBridgeDuplicateBurst
+        expr: increase(zabbix_glpi_bridge_duplicates_total[15m]) >= 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Zabbix to GLPI duplicate events increased"
+          description: "The idempotency guard suppressed at least five repeated events in fifteen minutes."
+{% endif %}
