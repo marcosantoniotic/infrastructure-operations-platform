@@ -45,10 +45,10 @@
 
 - [x] definir requisitos funcionais;
 - [x] escolher banco e estratégia de backup;
-- [ ] publicar atrás do Traefik e Cloudflare Access;
+- [x] publicar atrás do Traefik e Cloudflare Access;
   - [x] integrar alertas do Zabbix com tickets;
   - [x] integrar ativos sem duplicar o NetBox;
-- [ ] criar dashboards e runbooks.
+- [x] criar dashboards e runbooks.
 
 Consulte [Fase 4: GLPI](glpi-phase.md).
 

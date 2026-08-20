@@ -19,7 +19,7 @@
 | Portainer | `playbooks/portainer.yml` | implementado e integrado ao Traefik | Docker; Traefik opcional |
 | Sincronização NetBox-Zabbix | `playbooks/netbox-zabbix-sync.yml` | implementada e validada | NetBox; Zabbix; token API restrito |
 | Integração Zabbix-GLPI | `playbooks/zabbix-glpi-bridge.yml` | implementada, idempotente e validada | NetBox; Zabbix; GLPI; tokens dedicados |
-| GLPI | `playbooks/glpi.yml` | implementado e validado no laboratório | Docker; MariaDB dedicado; Traefik opcional |
+| GLPI | `playbooks/glpi.yml` | implementado e validado no laboratório e no ambiente operacional | Docker; MariaDB dedicado; Traefik opcional |
 | Backup do GLPI | `playbooks/glpi-backup.yml` | implementado para banco, chave, arquivos e marketplace | systemd + Docker + GLPI |
 
 ## Contrato dos módulos
