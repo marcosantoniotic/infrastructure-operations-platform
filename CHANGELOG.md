@@ -5,6 +5,11 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Corrigido
+
+- validação do Cloudflare Tunnel baseada na métrica atual de conexões HA,
+  evitando falso negativo quando um conector saudável não produz logs recentes.
+
 ## [1.1.0] - 2026-08-20
 
 ### Adicionado
