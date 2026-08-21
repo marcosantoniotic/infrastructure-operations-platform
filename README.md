@@ -8,7 +8,7 @@
 ![Ingress](https://img.shields.io/badge/ingress-Traefik-24A1C1?logo=traefikproxy&logoColor=white)
 ![Security](https://img.shields.io/badge/security-Zero%20Trust-0F9D58)
 ![Evidence](https://img.shields.io/badge/portfolio_evidence-verified-2EA44F)
-![Release](https://img.shields.io/badge/release-v1.1.0-6f42c1)
+![Release](https://img.shields.io/badge/release-v1.1.1-6f42c1)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Validation](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml/badge.svg)](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml)
 
@@ -185,6 +185,7 @@ Consulte também as provas de [stacks no Portainer](docs/evidence/portainer-stac
 - [Módulo Cloudflare Tunnel](roles/cloudflare_tunnel/README.md)
 - [Publicação segura](docs/publishing-checklist.md)
 - [Changelog](CHANGELOG.md)
+- [Release corretiva v1.1.1](docs/releases/v1.1.1.md)
 - [Baseline da release v1.1.0](docs/releases/v1.1.0.md)
 - [Roadmap](docs/roadmap.md)
 - [Fase 4: GLPI](docs/glpi-phase.md)
@@ -263,6 +264,10 @@ O marco `v1.1.0` acrescenta à arquitetura de referência reproduzível o GLPI,
 suas integrações com Zabbix e NetBox, a proteção de dados correspondente e a
 telemetria opcional de rede. Consulte a [baseline da release](docs/releases/v1.1.0.md) e o
 [changelog](CHANGELOG.md).
+
+A versão corretiva `v1.1.1` fortalece a validação ativa do Cloudflare Tunnel,
+alinha a documentação à baseline GLPI já entregue e atualiza a ação de upload
+SARIF do CodeQL. Consulte as [notas da release](docs/releases/v1.1.1.md).
 
 O GLPI é tratado como fase própria e segue o mesmo modelo de proxy, identidade,
 backup e isolamento de dados. Eventos qualificados do Zabbix abrem tickets
