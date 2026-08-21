@@ -95,17 +95,23 @@
   ansible.builtin.command:
     argv:
       - docker
-      - logs
-      - --since
-      - 10m
-      - "{{ cloudflare_tunnel_container_name }}"
-  register: cloudflare_tunnel_logs
+      - run
+      - --rm
+      - --network
+      - "{{ cloudflare_tunnel_proxy_network }}"
+      - "{{ cloudflare_tunnel_validation_image }}"
+      - --fail
+      - --silent
+      - --show-error
+      - "http://{{ cloudflare_tunnel_container_name }}:{{ cloudflare_tunnel_metrics_port }}/metrics"
+  register: cloudflare_tunnel_metrics
   changed_when: false
   retries: "{{ cloudflare_tunnel_connection_retries }}"
   delay: "{{ cloudflare_tunnel_connection_delay }}"
   until: >-
-    'registered tunnel connection' in
-    (cloudflare_tunnel_logs.stdout ~ cloudflare_tunnel_logs.stderr) | lower
+    (cloudflare_tunnel_metrics.stdout |
+    regex_search('(?m)^cloudflared_tunnel_ha_connections [1-9][0-9]*(?:\\.0+)?$'))
+    is not none
   when: not ansible_check_mode
 
 - name: Assert the connector exposes no host ports

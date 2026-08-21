@@ -11,6 +11,7 @@
 | Observabilidade | `/opt/observability` | `compose.yaml`, `prometheus/`, `alertmanager/`, `grafana/`, `blackbox/`, `secrets/` |
 | Portainer | `/opt/portainer` | `compose.yaml` |
 | GLPI | `/opt/glpi` | `compose.yaml`, `.env`, `secrets/` |
+| Bridge Zabbix-GLPI | `/opt/zabbix-glpi-bridge` | `compose.yaml`, `secrets/`, estado SQLite externo |
 
 ## Cockpit
 
@@ -193,6 +194,35 @@ Os segredos `vault_glpi_database_password`,
 `vault_glpi_database_root_password` e `vault_glpi_admin_password` são
 obrigatórios. Consulte a [role GLPI](../roles/glpi/README.md) e a
 [baseline da fase](glpi-phase.md).
+
+### Integração Zabbix-GLPI
+
+`zabbix_glpi_bridge_enabled` ativa o bridge interno depois que Zabbix e GLPI
+estão implantados. O serviço não publica porta no host e participa somente das
+redes `zabbix_backend` e `glpi_application`. A ação gerenciada entrega eventos
+com severidade mínima Warning e tag `glpi=ticket`; ambos os critérios são
+configuráveis.
+
+| Variável | Padrão | Finalidade |
+|---|---|---|
+| `zabbix_glpi_bridge_enabled` | `false` | habilita a integração de forma explícita |
+| `zabbix_glpi_bridge_state_dir` | `/var/lib/zabbix-glpi-bridge` | correlação persistente e idempotente |
+| `zabbix_glpi_bridge_event_tag` | `glpi` | nome da tag elegível |
+| `zabbix_glpi_bridge_event_tag_value` | `ticket` | valor da tag elegível |
+| `zabbix_glpi_bridge_min_severity` | `2` | severidade mínima do Zabbix |
+| `zabbix_glpi_bridge_glpi_recovery_status` | `5` | status Solved aplicado na recuperação |
+| `zabbix_glpi_bridge_metrics_enabled` | `false` | conecta o bridge à rede privada de métricas |
+| `zabbix_glpi_bridge_metrics_network` | `iop_integration_metrics` | rede interna compartilhada com Prometheus |
+
+Os quatro segredos `vault_zabbix_glpi_bridge_*` são obrigatórios quando o
+recurso está habilitado. O token Zabbix deve usar a allow-list documentada na
+[role do bridge](../roles/zabbix_glpi_bridge/README.md). A conta e o cliente
+OAuth do GLPI são exclusivos da integração. O `eventid` é a chave de
+correlação; reentregas de problema e recuperação não geram duplicidades.
+
+O `netbox_zabbix_sync` mantém a tag de host `netbox_id`. Quando ela está
+presente no evento, o chamado recebe somente tipo, ID numérico e URL canônica
+do dispositivo. Dados técnicos continuam no NetBox.
 
 ## Observabilidade
 

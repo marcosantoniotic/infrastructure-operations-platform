@@ -5,6 +5,13 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Corrigido
+
+- validação do Cloudflare Tunnel baseada na métrica atual de conexões HA,
+  evitando falso negativo quando um conector saudável não produz logs recentes.
+
+## [1.1.0] - 2026-08-20
+
 ### Adicionado
 
 - baseline funcional e arquitetural da Fase 4 GLPI, com MariaDB dedicado,
@@ -27,6 +34,10 @@ versionamento segue [Semantic Versioning](https://semver.org/).
   todos os alvos configurados;
 - UniFi Poller opcional e reproduzível, com conta somente leitura, segredo no
   Vault, coleta Prometheus e validação obrigatória de telemetria real.
+- workflow operacional reproduzível com controller dedicado, implantação por
+  gates e documentação das correções descobertas durante o ensaio do zero;
+- bridge idempotente Zabbix–GLPI com identidade de API restrita, correlação de
+  eventos, referência canônica ao NetBox, métricas e dashboard dedicado.
 
 ### Corrigido
 
@@ -69,6 +80,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
   schema original;
 - recriação automática do sincronizador após rotação do token ou mudança dos
   artefatos implantados.
+- publicação operacional do GLPI atrás do Traefik e de política dedicada do
+  Cloudflare Access, validada sem incluir dados ou segredos reais no projeto.
 
 ## [1.0.0] - 2026-08-05
 
@@ -116,6 +129,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 - backup e restauração isolada do PostgreSQL;
 - primeira pipeline de validação e segurança de publicação.
 
+[Unreleased]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/marcosantoniotic/infrastructure-operations-platform/releases/tag/v0.1.0

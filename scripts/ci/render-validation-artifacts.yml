@@ -26,6 +26,8 @@
         - portainer
         - glpi
         - glpi/secrets
+        - zabbix_glpi_bridge
+        - zabbix_glpi_bridge/secrets
         - observability
 
     - name: Load Traefik defaults
@@ -128,6 +130,31 @@
       loop:
         - glpi_database_password
         - glpi_database_root_password
+
+    - name: Load Zabbix-GLPI bridge defaults
+      ansible.builtin.include_vars:
+        file: ../../roles/zabbix_glpi_bridge/defaults/main.yml
+
+    - name: Render Zabbix-GLPI bridge Compose definition
+      ansible.builtin.template:
+        src: ../../roles/zabbix_glpi_bridge/templates/compose.yaml.j2
+        dest: "{{ ci_output_dir }}/zabbix_glpi_bridge/compose.yaml"
+        mode: "0644"
+
+    - name: Create sanitized Zabbix-GLPI bridge fixtures
+      ansible.builtin.copy:
+        dest: "{{ ci_output_dir }}/zabbix_glpi_bridge/{{ item.path }}"
+        mode: "{{ item.mode }}"
+        content: "{{ item.content }}"
+      loop:
+        - {path: zabbix-glpi-bridge.py, mode: "0755", content: "# CI fixture"}
+        - {path: secrets/bridge_webhook_token, mode: "0600", content: "ci-only-placeholder"}
+        - {path: secrets/glpi_user_password, mode: "0600", content: "ci-only-placeholder"}
+        - {path: secrets/glpi_oauth_client_id, mode: "0600", content: "ci-client-id"}
+        - {path: secrets/glpi_oauth_secret, mode: "0600", content: "ci-only-placeholder"}
+        - {path: secrets/zabbix_api_token, mode: "0600", content: "ci-only-placeholder"}
+      loop_control:
+        label: "{{ item.path }}"
 
     - name: Load observability defaults
       ansible.builtin.include_vars:

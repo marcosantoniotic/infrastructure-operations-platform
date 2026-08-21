@@ -1,0 +1,36 @@
+---
+zabbix_glpi_bridge_enabled: false
+zabbix_glpi_bridge_project_dir: /opt/zabbix-glpi-bridge
+zabbix_glpi_bridge_image: python:3.13.11-alpine3.23
+zabbix_glpi_bridge_state_dir: /var/lib/zabbix-glpi-bridge
+zabbix_glpi_bridge_listen_port: 8080
+zabbix_glpi_bridge_metrics_enabled: false
+zabbix_glpi_bridge_metrics_network: iop_integration_metrics
+
+zabbix_glpi_bridge_zabbix_url: http://zabbix-web:8080/api_jsonrpc.php
+zabbix_glpi_bridge_zabbix_web_url: "https://zabbix.<BASE_DOMAIN>"
+zabbix_glpi_bridge_zabbix_api_token: "<ZABBIX_API_TOKEN>"
+zabbix_glpi_bridge_zabbix_network: zabbix_backend
+zabbix_glpi_bridge_zabbix_project_dir: /opt/zabbix
+zabbix_glpi_bridge_action_name: IOP - Open GLPI ticket
+zabbix_glpi_bridge_media_type_name: IOP GLPI bridge
+zabbix_glpi_bridge_event_tag: glpi
+zabbix_glpi_bridge_event_tag_value: ticket
+zabbix_glpi_bridge_min_severity: 2
+
+zabbix_glpi_bridge_glpi_project_dir: /opt/glpi
+zabbix_glpi_bridge_glpi_url: http://glpi/api.php
+zabbix_glpi_bridge_glpi_web_url: "https://glpi.<BASE_DOMAIN>"
+zabbix_glpi_bridge_glpi_network: glpi_application
+zabbix_glpi_bridge_glpi_user: zabbix-integration
+zabbix_glpi_bridge_glpi_user_password: "<GLPI_INTEGRATION_PASSWORD>"
+zabbix_glpi_bridge_glpi_profile_id: 6
+zabbix_glpi_bridge_glpi_entity_id: 0
+zabbix_glpi_bridge_glpi_recursive: true
+zabbix_glpi_bridge_glpi_rotate_password: false
+zabbix_glpi_bridge_glpi_oauth_client_name: IOP Zabbix integration
+zabbix_glpi_bridge_glpi_oauth_secret: "<GLPI_OAUTH_SECRET>"
+zabbix_glpi_bridge_glpi_recovery_status: 5
+
+zabbix_glpi_bridge_netbox_url: "https://netbox.<BASE_DOMAIN>"
+zabbix_glpi_bridge_webhook_token: "<BRIDGE_WEBHOOK_TOKEN>"

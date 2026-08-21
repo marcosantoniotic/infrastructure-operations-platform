@@ -549,6 +549,34 @@ Vault. The initial `glpi-admin` credential is written only to the ignored
 current Windows user. The validated HTTPS endpoint is
 `https://glpi.localhost:8443/` through the standard SSH tunnel.
 
+### 14.2 Validate the Zabbix-GLPI event bridge
+
+After NetBox-Zabbix synchronization, Zabbix and GLPI are healthy, create a
+dedicated restricted Zabbix API token, store the four bridge credentials in the
+encrypted validation Vault and enable `zabbix_glpi_bridge_enabled`.
+
+Deploy the managed media type, action, OAuth client and internal bridge:
+
+```powershell
+ssh -i .validation\id_ed25519 automation@<CONTROLLER_IP> `
+  "cd /home/automation/infrastructure-operations-platform && ANSIBLE_ROLES_PATH=/home/automation/infrastructure-operations-platform/roles ansible-playbook --vault-password-file /home/automation/.ansible/vault-password -i inventories/validation/hosts.yml playbooks/zabbix-glpi-bridge.yml"
+```
+
+The acceptance command below creates one synthetic ticket, posts its problem
+and recovery twice, and fails if either state is duplicated:
+
+```bash
+sudo docker compose \
+  --project-directory /opt/zabbix-glpi-bridge \
+  run --rm zabbix-glpi-bridge \
+  python /usr/local/libexec/zabbix-glpi-bridge.py validate-event-flow
+```
+
+Certification requires one solved ticket, one recovery followup, a valid
+NetBox `type=device` ID/URL reference, HTTP 401 for an invalid webhook token,
+one enabled Zabbix action/media type and a second Ansible convergence with
+`changed=0`, `unreachable=0` and `failed=0`.
+
 ### 15. Deploy metrics and visualization
 
 Deploy Prometheus, Grafana, Node Exporter and cAdvisor, provision the datasource

@@ -1,0 +1,72 @@
+<?php
+
+declare(strict_types=1);
+
+require_once '/var/www/glpi/vendor/autoload.php';
+
+$kernel = new Glpi\Kernel\Kernel();
+$kernel->boot();
+register_shutdown_function(static fn() => $kernel->shutdown());
+
+if (!Config::isHlApiEnabled()) {
+    Config::setConfigurationValues('core', ['enable_hlapi' => '1']);
+}
+
+if ($argc !== 3) {
+    fwrite(STDERR, "usage: provision-glpi-oauth.php CLIENT_NAME SECRET_FILE\n");
+    exit(2);
+}
+
+$clientName = $argv[1];
+$secret = trim((string) file_get_contents($argv[2]));
+if ($secret === '') {
+    throw new RuntimeException('OAuth secret is empty');
+}
+
+$client = new OAuthClient();
+$rows = $client->find(['name' => $clientName]);
+if (count($rows) > 1) {
+    throw new RuntimeException('More than one OAuth client uses the managed name');
+}
+
+if ($rows === []) {
+    $id = $client->add([
+        'name' => $clientName,
+        'comment' => 'Managed by the Infrastructure Operations Platform',
+        'is_active' => 1,
+        'is_confidential' => 1,
+        'grants' => ['password'],
+        'scopes' => ['api'],
+        'allowed_ips' => '',
+    ]);
+    if (!$id) {
+        throw new RuntimeException('Unable to create the managed OAuth client');
+    }
+} else {
+    $id = (int) array_key_first($rows);
+}
+
+if (!$client->getFromDB($id)) {
+    throw new RuntimeException('Unable to load the managed OAuth client');
+}
+
+if (!$client->update([
+    'id' => $id,
+    'name' => $clientName,
+    'comment' => 'Managed by the Infrastructure Operations Platform',
+    'is_active' => 1,
+    'is_confidential' => 1,
+    'secret' => $secret,
+    'grants' => ['password'],
+    'scopes' => ['api'],
+    'redirect_uri' => [],
+    'allowed_ips' => '',
+])) {
+    throw new RuntimeException('Unable to reconcile the managed OAuth client');
+}
+
+if (!$client->getFromDB($id) || empty($client->fields['identifier'])) {
+    throw new RuntimeException('Managed OAuth client identifier is unavailable');
+}
+
+fwrite(STDOUT, $client->fields['identifier'] . PHP_EOL);

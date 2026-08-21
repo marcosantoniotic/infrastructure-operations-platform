@@ -122,6 +122,16 @@ zabbix_database_root_password: "{{ vault_zabbix_database_root_password }}"
 zabbix_admin_password: "{{ vault_zabbix_admin_password }}"
 netbox_zabbix_sync_enabled: false
 netbox_zabbix_sync_api_token: "{{ vault_netbox_zabbix_sync_api_token }}"
+zabbix_glpi_bridge_enabled: false
+zabbix_glpi_bridge_zabbix_api_token: "{{ vault_zabbix_glpi_bridge_zabbix_api_token }}"
+zabbix_glpi_bridge_glpi_user_password: "{{ vault_zabbix_glpi_bridge_glpi_user_password }}"
+zabbix_glpi_bridge_glpi_oauth_secret: "{{ vault_zabbix_glpi_bridge_glpi_oauth_secret }}"
+zabbix_glpi_bridge_webhook_token: "{{ vault_zabbix_glpi_bridge_webhook_token }}"
+zabbix_glpi_bridge_zabbix_web_url: "https://zabbix.<BASE_DOMAIN>"
+zabbix_glpi_bridge_glpi_web_url: "https://glpi.<BASE_DOMAIN>"
+zabbix_glpi_bridge_netbox_url: "https://netbox.<BASE_DOMAIN>"
+zabbix_glpi_bridge_metrics_enabled: false
+zabbix_glpi_bridge_metrics_network: iop_integration_metrics
 zabbix_timezone: America/Sao_Paulo
 zabbix_web_bind_address: 127.0.0.1
 zabbix_web_port: 8081
@@ -307,6 +317,10 @@ observability_dns_targets:
     query_name: example.com
     query_type: A
 observability_adguard_metrics_enabled: false
+observability_zabbix_glpi_bridge_enabled: false
+observability_zabbix_glpi_bridge_network: iop_integration_metrics
+observability_zabbix_glpi_bridge_target: zabbix-glpi-bridge:8080
+observability_zabbix_glpi_bridge_stale_after: 86400
 observability_snmp_enabled: false
 observability_snmp_auth_name: iop_snmp_v2
 observability_snmp_community: "{{ vault_observability_snmp_community }}"

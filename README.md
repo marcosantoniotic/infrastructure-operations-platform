@@ -8,7 +8,7 @@
 ![Ingress](https://img.shields.io/badge/ingress-Traefik-24A1C1?logo=traefikproxy&logoColor=white)
 ![Security](https://img.shields.io/badge/security-Zero%20Trust-0F9D58)
 ![Evidence](https://img.shields.io/badge/portfolio_evidence-verified-2EA44F)
-![Release](https://img.shields.io/badge/release-v1.0.0-6f42c1)
+![Release](https://img.shields.io/badge/release-v1.1.0-6f42c1)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Validation](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml/badge.svg)](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml)
 
@@ -48,6 +48,7 @@ O projeto resolve cinco desafios comuns de operações:
 - Zabbix, Prometheus, Grafana e exporters;
 - NetBox como fonte de verdade DCIM/IPAM;
 - integração NetBox–Zabbix;
+- gestão de serviços com GLPI e integração idempotente Zabbix–GLPI;
 - monitoração de UniFi/UDM e MikroTik;
 - hardening, gestão de segredos e segmentação;
 - backup, disaster recovery e resposta a incidentes;
@@ -63,6 +64,7 @@ O projeto resolve cinco desafios comuns de operações:
 | Borda | Cloudflare Tunnel + Access | Publicação e controle de identidade |
 | Inventário | NetBox | DCIM, IPAM e fonte de verdade |
 | Monitoramento | Zabbix + Agent 2 | Eventos, triggers, mapas e disponibilidade |
+| ITSM | GLPI | Incidentes, atendimento e rastreabilidade operacional |
 | Métricas | Prometheus | Coleta e retenção de séries temporais |
 | Visualização | Grafana | Dashboards consolidados |
 | Administração | Portainer + Cockpit | Containers e sistema operacional |
@@ -93,6 +95,8 @@ flowchart LR
     Proxy --> Portainer["Portainer"]
     Proxy --> Cockpit["Cockpit"]
     NetBox -. "sincronização" .-> Zabbix
+    Zabbix -. "eventos qualificados" .-> GLPI["GLPI"]
+    NetBox -. "referência canônica" .-> GLPI
 ```
 
 ## Engineering principles
@@ -109,8 +113,8 @@ flowchart LR
 
 ## Technical highlights
 
-- cinco projetos Compose independentes por domínio funcional;
-- 19 containers em execução na baseline documentada;
+- projetos Compose independentes por domínio funcional;
+- workloads containerizados isolados por redes e responsabilidades;
 - entrada HTTP/HTTPS centralizada no Traefik;
 - Docker Socket protegido por proxy restrito;
 - acesso externo condicionado por identidade;
@@ -120,6 +124,7 @@ flowchart LR
 - mapa Zabbix completo com triggers reais;
 - dashboard executivo do ecossistema no Grafana;
 - sincronização controlada entre NetBox e Zabbix;
+- incidentes idempotentes entre Zabbix e GLPI, com correlação de recuperação;
 - exemplos públicos completamente sanitizados.
 
 ## Resultados e evidências
@@ -129,6 +134,7 @@ flowchart LR
 | ambiente reproduzível | Packer, Vagrant e Ansible | [automação](automation/) e [guia do ambiente](docs/testing/validation-environment.md) |
 | exposição segura | Traefik, TLS, middlewares e Docker Socket Proxy | [arquitetura](docs/architecture/overview.md) e [segurança](docs/security.md) |
 | observabilidade integrada | Zabbix, Prometheus, Grafana e Alertmanager | [documentação](docs/observability.md) e [role versionada](roles/observability/) |
+| fluxo de incidentes | GLPI e bridge idempotente Zabbix–GLPI | [fase GLPI](docs/glpi-phase.md) e [evidências de integração](docs/testing/glpi-integrations-validation-evidence.md) |
 | continuidade validada | backups consistentes, réplica criptografada e restauração isolada | [runbook](docs/runbooks/backup-restore.md) |
 | qualidade automatizada | validações de código, configuração, imagens e segurança | [GitHub Actions](.github/workflows/validation.yml) |
 | governança técnica | ADRs, runbooks, inventário e catálogo de credenciais | [decisões](docs/decisions/) e [matriz de provas](docs/evidence/evidence-matrix.md) |
@@ -179,7 +185,7 @@ Consulte também as provas de [stacks no Portainer](docs/evidence/portainer-stac
 - [Módulo Cloudflare Tunnel](roles/cloudflare_tunnel/README.md)
 - [Publicação segura](docs/publishing-checklist.md)
 - [Changelog](CHANGELOG.md)
-- [Baseline da release v1.0.0](docs/releases/v1.0.0.md)
+- [Baseline da release v1.1.0](docs/releases/v1.1.0.md)
 - [Roadmap](docs/roadmap.md)
 - [Fase 4: GLPI](docs/glpi-phase.md)
 
@@ -235,6 +241,9 @@ ansible-playbook -i inventories/validation/hosts.yml playbooks/portainer.yml
 # Somente GLPI
 ansible-playbook -i inventories/validation/hosts.yml playbooks/glpi.yml
 
+# Eventos qualificados do Zabbix em tickets idempotentes do GLPI
+ansible-playbook -i inventories/validation/hosts.yml playbooks/zabbix-glpi-bridge.yml
+
 # Prometheus, Grafana e exporters do host
 ansible-playbook -i inventories/validation/hosts.yml playbooks/observability.yml
 
@@ -250,18 +259,19 @@ Consulte o [catálogo de módulos](docs/modules.md), o [guia do módulo NetBox](
 
 ## Project evolution
 
-O marco `v1.0.0` consolida a arquitetura de referência reproduzível, os controles
-de segurança, a observabilidade, os backups, a recuperação e as evidências
-operacionais. Consulte a [baseline da release](docs/releases/v1.0.0.md) e o
+O marco `v1.1.0` acrescenta à arquitetura de referência reproduzível o GLPI,
+suas integrações com Zabbix e NetBox, a proteção de dados correspondente e a
+telemetria opcional de rede. Consulte a [baseline da release](docs/releases/v1.1.0.md) e o
 [changelog](CHANGELOG.md).
 
-O GLPI será tratado como fase própria. Sua inclusão deverá respeitar o mesmo
-modelo de proxy, identidade, observabilidade, backup e isolamento de dados, sem
-sobrepor o papel do NetBox. Consulte [Fase 4: GLPI](docs/glpi-phase.md).
+O GLPI é tratado como fase própria e segue o mesmo modelo de proxy, identidade,
+backup e isolamento de dados. Eventos qualificados do Zabbix abrem tickets
+idempotentes, enquanto o NetBox permanece como fonte técnica de verdade.
+Consulte [Fase 4: GLPI](docs/glpi-phase.md).
 
-As próximas evoluções concentram-se em integrações ITSM, exercícios periódicos
-de recuperação, módulos opcionais de telemetria de rede e resiliência
-multi-nó orientada por requisitos mensuráveis.
+As próximas evoluções concentram-se em exercícios periódicos de recuperação,
+ampliação controlada da telemetria e resiliência multi-nó orientada por
+requisitos mensuráveis.
 
 ## Professional positioning
 

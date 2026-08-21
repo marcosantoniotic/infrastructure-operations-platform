@@ -18,7 +18,7 @@ one requires periodic recovery evidence.
 |---|---:|---:|---|---|
 | NetBox database and media | 24 hours | 4 hours | encrypted external PostgreSQL dump and media archive | full application recovery validated |
 | Zabbix database and operational data | 24 hours | 4 hours | encrypted external MySQL dump and server data archive | full application recovery validated |
-| GLPI database and persistent application data | 24 hours | 4 hours | encrypted external MariaDB dump and application archive | planned; implementation pending |
+| GLPI database and persistent application data | 24 hours | 4 hours | encrypted external MariaDB dump and application archive | implemented and restore-tested in the isolated laboratory |
 | Grafana provisioned dashboards | per merged change | 2 hours | Git and Ansible | reproducible deployment validated |
 | Grafana runtime state | 24 hours | 4 hours | consistent persistent volume archive | isolated external recovery validated |
 | Prometheus TSDB | 24 hours | 8 hours | consistent persistent volume archive | isolated external recovery validated |
@@ -35,7 +35,7 @@ depends on host capacity, operator availability and access to required secrets.
 |---|---:|---:|---|
 | NetBox backup sets | 14 days | 14 daily, 8 weekly and 3 monthly externally | local and encrypted external backup roles |
 | Zabbix backup sets | 14 days | 14 daily, 8 weekly and 3 monthly externally | local and encrypted external backup roles |
-| GLPI backup sets | 14 days | 14 daily, 8 weekly and 3 monthly externally | planned local and encrypted external backup roles |
+| GLPI backup sets | 14 days | 14 daily, 8 weekly and 3 monthly externally | local and encrypted external workflows validated in the isolated laboratory |
 | Observability backup sets | 14 days | 14 daily, 8 weekly and 3 monthly externally | local and encrypted external backup roles |
 | Prometheus metrics | 30 days or 8 GB, whichever is reached first | none by default | Prometheus startup flags |
 | Zabbix history | 30 days | not applicable | item/template retention and housekeeping review |

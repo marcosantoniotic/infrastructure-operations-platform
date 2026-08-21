@@ -1,0 +1,657 @@
+{% raw %}#!/usr/bin/env python3
+"""Idempotent Zabbix event bridge for the GLPI 11 high-level API."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import html
+import json
+import logging
+import os
+import secrets
+import sqlite3
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+
+LOG = logging.getLogger("zabbix-glpi-bridge")
+METRICS_LOCK = threading.Lock()
+METRICS: dict[str, float] = {
+    "received_problem": 0,
+    "received_recovery": 0,
+    "duplicates": 0,
+    "failures": 0,
+    "glpi_requests": 0,
+    "last_success": 0,
+    "last_duration": 0,
+}
+
+
+def read_secret(variable: str) -> str:
+    value = Path(os.environ[variable]).read_text(encoding="utf-8").strip()
+    if not value:
+        raise RuntimeError(f"Secret file configured by {variable} is empty")
+    return value
+
+
+def json_request(
+    url: str,
+    *,
+    method: str = "GET",
+    payload: dict[str, Any] | None = None,
+    headers: dict[str, str] | None = None,
+    form: dict[str, str] | None = None,
+    timeout: int = 30,
+) -> Any:
+    body: bytes | None = None
+    request_headers = dict(headers or {})
+    if payload is not None:
+        body = json.dumps(payload).encode("utf-8")
+        request_headers["Content-Type"] = "application/json"
+    elif form is not None:
+        body = urllib.parse.urlencode(form).encode("utf-8")
+        request_headers["Content-Type"] = "application/x-www-form-urlencoded"
+    request = urllib.request.Request(url, data=body, headers=request_headers, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            content = response.read()
+    except urllib.error.HTTPError as error:
+        raw_error = error.read()
+        detail = ""
+        try:
+            error_payload = json.loads(raw_error)
+            if isinstance(error_payload, dict):
+                detail = str(
+                    error_payload.get("message")
+                    or error_payload.get("detail")
+                    or error_payload.get("title")
+                    or error_payload.get("error")
+                    or ""
+                )[:240]
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+        suffix = f": {detail}" if detail else ""
+        raise RuntimeError(f"HTTP {error.code} returned by {urllib.parse.urlsplit(url).path}{suffix}") from None
+    except urllib.error.URLError as error:
+        raise RuntimeError(f"Unable to reach {urllib.parse.urlsplit(url).hostname}") from error
+    if not content:
+        return {}
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as error:
+        raise RuntimeError("Remote endpoint returned invalid JSON") from error
+
+
+class GLPI:
+    def __init__(self) -> None:
+        self.base_url = os.environ["GLPI_URL"].rstrip("/")
+        self.web_url = os.environ["GLPI_WEB_URL"].rstrip("/")
+        self.username = os.environ["GLPI_USER"]
+        self.password = read_secret("GLPI_PASSWORD_FILE")
+        self.client_id = read_secret("GLPI_OAUTH_CLIENT_ID_FILE")
+        self.client_secret = read_secret("GLPI_OAUTH_SECRET_FILE")
+        self.token = ""
+        self.token_expires = 0.0
+
+    def authenticate(self) -> None:
+        response = json_request(
+            f"{self.base_url}/token",
+            method="POST",
+            form={
+                "grant_type": "password",
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "username": self.username,
+                "password": self.password,
+                "scope": "api",
+            },
+        )
+        self.token = str(response.get("access_token", ""))
+        if not self.token:
+            raise RuntimeError("GLPI OAuth response did not contain an access token")
+        self.token_expires = time.time() + max(30, int(response.get("expires_in", 3600)) - 30)
+
+    def request(self, path: str, *, method: str = "GET", payload: dict[str, Any] | None = None) -> Any:
+        if not self.token or time.time() >= self.token_expires:
+            self.authenticate()
+        with METRICS_LOCK:
+            METRICS["glpi_requests"] += 1
+        return json_request(
+            f"{self.base_url}{path}",
+            method=method,
+            payload=payload,
+            headers={
+                "Authorization": f"Bearer {self.token}",
+                "GLPI-Profile": os.environ["GLPI_PROFILE_ID"],
+                "GLPI-Entity": os.environ["GLPI_ENTITY_ID"],
+                "GLPI-Entity-Recursive": os.environ["GLPI_ENTITY_RECURSIVE"],
+            },
+        )
+
+    def create_ticket(self, event: dict[str, Any]) -> int:
+        response = self.request(
+            "/Assistance/Ticket",
+            method="POST",
+            payload={
+                "name": f"[ZBX#{event['event_id']}] {event['name']}",
+                "content": event_content(event, recovery=False),
+                "type": 1,
+                "urgency": severity_to_glpi(event["severity"]),
+                "impact": severity_to_glpi(event["severity"]),
+            },
+        )
+        ticket_id = response.get("id")
+        if not isinstance(ticket_id, int) or ticket_id <= 0:
+            raise RuntimeError("GLPI did not return a valid ticket ID")
+        return ticket_id
+
+    def add_followup(self, ticket_id: int, content: str) -> None:
+        self.request(
+            f"/Assistance/Ticket/{ticket_id}/Timeline/Followup",
+            method="POST",
+            payload={"content": content},
+        )
+
+    def recover_ticket(self, ticket_id: int, event: dict[str, Any]) -> None:
+        self.add_followup(ticket_id, event_content(event, recovery=True))
+        self.request(
+            f"/Assistance/Ticket/{ticket_id}",
+            method="PATCH",
+            payload={"status": {"id": int(os.environ.get("GLPI_RECOVERY_STATUS", "5"))}},
+        )
+
+
+def severity_to_glpi(value: str) -> int:
+    normalized = value.strip().lower()
+    names = {
+        "not classified": 1,
+        "information": 1,
+        "warning": 2,
+        "average": 3,
+        "high": 4,
+        "disaster": 5,
+    }
+    if normalized in names:
+        return names[normalized]
+    try:
+        return max(1, min(5, int(normalized)))
+    except ValueError:
+        return 3
+
+
+def clean_macro(value: Any) -> str:
+    result = str(value or "").strip()
+    if result.startswith("{") and result.endswith("}"):
+        return ""
+    return result
+
+
+def normalized_event(payload: dict[str, Any]) -> dict[str, Any]:
+    event_id = clean_macro(payload.get("event_id"))
+    if not event_id.isdigit():
+        raise ValueError("event_id must be numeric")
+    raw_value = clean_macro(payload.get("event_value")).lower()
+    state = "recovery" if raw_value in {"0", "ok", "recovery", "resolved"} else "problem"
+    netbox_id = clean_macro(payload.get("netbox_id"))
+    if netbox_id and not netbox_id.isdigit():
+        netbox_id = ""
+    event = {
+        "event_id": event_id,
+        "recovery_event_id": clean_macro(payload.get("recovery_event_id")),
+        "state": state,
+        "name": clean_macro(payload.get("event_name")) or "Zabbix event",
+        "severity": clean_macro(payload.get("event_severity")) or "Average",
+        "host": clean_macro(payload.get("host_name")) or clean_macro(payload.get("host")) or "unknown",
+        "host_technical": clean_macro(payload.get("host")),
+        "item": clean_macro(payload.get("item_name")),
+        "item_value": clean_macro(payload.get("item_value")),
+        "event_time": " ".join(filter(None, [clean_macro(payload.get("event_date")), clean_macro(payload.get("event_time"))])),
+        "zabbix_url": clean_macro(payload.get("zabbix_url")),
+        "netbox_id": netbox_id,
+    }
+    canonical = json.dumps(event, sort_keys=True, separators=(",", ":"))
+    event["fingerprint"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return event
+
+
+def event_content(event: dict[str, Any], *, recovery: bool) -> str:
+    title = "Zabbix recovery" if recovery else "Zabbix problem"
+    rows = [
+        ("State", "RECOVERED" if recovery else "PROBLEM"),
+        ("Event ID", event["event_id"]),
+        ("Recovery event ID", event.get("recovery_event_id", "")),
+        ("Severity", event["severity"]),
+        ("Host", event["host"]),
+        ("Technical host", event["host_technical"]),
+        ("Item", event["item"]),
+        ("Last value", event["item_value"]),
+        ("Event time", event["event_time"]),
+    ]
+    body = [f"<p><strong>{html.escape(title)}</strong></p>", "<dl>"]
+    for label, value in rows:
+        if value:
+            body.append(f"<dt>{html.escape(label)}</dt><dd>{html.escape(str(value))}</dd>")
+    body.append("</dl>")
+    if event["zabbix_url"]:
+        url = html.escape(event["zabbix_url"], quote=True)
+        body.append(f'<p>Zabbix: <a href="{url}">{url}</a></p>')
+    if event["netbox_id"]:
+        base = os.environ["NETBOX_URL"].rstrip("/")
+        url = f"{base}/dcim/devices/{event['netbox_id']}/"
+        safe_url = html.escape(url, quote=True)
+        body.append(
+            f'<p>NetBox canonical reference: type=device; id={event["netbox_id"]}; '
+            f'<a href="{safe_url}">{safe_url}</a></p>'
+        )
+    return "".join(body)
+
+
+def connect_db() -> sqlite3.Connection:
+    path = Path(os.environ["BRIDGE_STATE_DB"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(path, timeout=30, isolation_level=None)
+    connection.execute("PRAGMA journal_mode=WAL")
+    connection.execute("PRAGMA synchronous=FULL")
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS correlations (
+            event_id TEXT PRIMARY KEY,
+            ticket_id INTEGER NOT NULL,
+            state TEXT NOT NULL,
+            fingerprint TEXT NOT NULL,
+            recovery_event_id TEXT NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        )
+        """
+    )
+    return connection
+
+
+def process_event(payload: dict[str, Any]) -> tuple[int, bool, str]:
+    started = time.monotonic()
+    event = normalized_event(payload)
+    metric_key = "received_recovery" if event["state"] == "recovery" else "received_problem"
+    with METRICS_LOCK:
+        METRICS[metric_key] += 1
+    connection = connect_db()
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        row = connection.execute(
+            "SELECT ticket_id, state, fingerprint FROM correlations WHERE event_id = ?",
+            (event["event_id"],),
+        ).fetchone()
+        glpi = GLPI()
+        duplicate = False
+        result = "created"
+        if row is None:
+            if event["state"] == "recovery":
+                raise ValueError("recovery received before its problem event")
+            ticket_id = glpi.create_ticket(event)
+            now = int(time.time())
+            connection.execute(
+                "INSERT INTO correlations(event_id,ticket_id,state,fingerprint,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+                (event["event_id"], ticket_id, "problem", event["fingerprint"], now, now),
+            )
+        else:
+            ticket_id, current_state, previous_fingerprint = int(row[0]), str(row[1]), str(row[2])
+            if event["state"] == "recovery":
+                if current_state == "recovered":
+                    duplicate = True
+                    result = "duplicate-recovery"
+                else:
+                    glpi.recover_ticket(ticket_id, event)
+                    connection.execute(
+                        "UPDATE correlations SET state='recovered', fingerprint=?, recovery_event_id=?, updated_at=? WHERE event_id=?",
+                        (event["fingerprint"], event["recovery_event_id"], int(time.time()), event["event_id"]),
+                    )
+                    result = "recovered"
+            elif current_state == "recovered" or previous_fingerprint == event["fingerprint"]:
+                duplicate = True
+                result = "duplicate-problem"
+            else:
+                glpi.add_followup(ticket_id, event_content(event, recovery=False))
+                connection.execute(
+                    "UPDATE correlations SET fingerprint=?, updated_at=? WHERE event_id=?",
+                    (event["fingerprint"], int(time.time()), event["event_id"]),
+                )
+                result = "updated"
+        connection.execute("COMMIT")
+        with METRICS_LOCK:
+            METRICS["duplicates"] += int(duplicate)
+            METRICS["last_success"] = time.time()
+            METRICS["last_duration"] = time.monotonic() - started
+        LOG.info("event=%s state=%s result=%s ticket=%s", event["event_id"], event["state"], result, ticket_id)
+        return ticket_id, duplicate, result
+    except Exception:
+        connection.execute("ROLLBACK")
+        with METRICS_LOCK:
+            METRICS["failures"] += 1
+            METRICS["last_duration"] = time.monotonic() - started
+        raise
+    finally:
+        connection.close()
+
+
+def metrics_text() -> str:
+    with METRICS_LOCK:
+        values = dict(METRICS)
+    return "\n".join([
+        "# HELP zabbix_glpi_bridge_events_total Events received by state.",
+        "# TYPE zabbix_glpi_bridge_events_total counter",
+        f'zabbix_glpi_bridge_events_total{{state="problem"}} {values["received_problem"]:.0f}',
+        f'zabbix_glpi_bridge_events_total{{state="recovery"}} {values["received_recovery"]:.0f}',
+        "# TYPE zabbix_glpi_bridge_duplicates_total counter",
+        f'zabbix_glpi_bridge_duplicates_total {values["duplicates"]:.0f}',
+        "# TYPE zabbix_glpi_bridge_failures_total counter",
+        f'zabbix_glpi_bridge_failures_total {values["failures"]:.0f}',
+        "# TYPE zabbix_glpi_bridge_glpi_requests_total counter",
+        f'zabbix_glpi_bridge_glpi_requests_total {values["glpi_requests"]:.0f}',
+        "# TYPE zabbix_glpi_bridge_last_success_timestamp_seconds gauge",
+        f'zabbix_glpi_bridge_last_success_timestamp_seconds {values["last_success"]:.3f}',
+        "# TYPE zabbix_glpi_bridge_processing_duration_seconds gauge",
+        f'zabbix_glpi_bridge_processing_duration_seconds {values["last_duration"]:.6f}',
+        "",
+    ])
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "IOPBridge/1"
+
+    def send_bytes(self, status: int, body: bytes, content_type: str) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/healthz":
+            connection = connect_db()
+            connection.execute("SELECT 1").fetchone()
+            connection.close()
+            self.send_bytes(HTTPStatus.OK, b'{"status":"ok"}\n', "application/json")
+        elif self.path == "/metrics":
+            self.send_bytes(HTTPStatus.OK, metrics_text().encode(), "text/plain; version=0.0.4")
+        else:
+            self.send_bytes(HTTPStatus.NOT_FOUND, b'{"error":"not found"}\n', "application/json")
+
+    def do_POST(self) -> None:  # noqa: N802
+        if self.path != "/events":
+            self.send_bytes(HTTPStatus.NOT_FOUND, b'{"error":"not found"}\n', "application/json")
+            return
+        expected = read_secret("BRIDGE_WEBHOOK_TOKEN_FILE")
+        supplied = self.headers.get("X-IOP-Token", "")
+        if not secrets.compare_digest(supplied, expected):
+            self.send_bytes(HTTPStatus.UNAUTHORIZED, b'{"error":"unauthorized"}\n', "application/json")
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0 or length > 65536:
+                raise ValueError("invalid payload length")
+            payload = json.loads(self.rfile.read(length))
+            if not isinstance(payload, dict):
+                raise ValueError("payload must be an object")
+            ticket_id, duplicate, result = process_event(payload)
+            body = json.dumps({"ok": True, "ticket_id": ticket_id, "duplicate": duplicate, "result": result}).encode()
+            self.send_bytes(HTTPStatus.OK, body, "application/json")
+        except ValueError as error:
+            LOG.warning("Rejected event: %s", error)
+            self.send_bytes(HTTPStatus.UNPROCESSABLE_ENTITY, b'{"error":"invalid event"}\n', "application/json")
+        except Exception as error:
+            LOG.error("Event processing failed: %s", error)
+            self.send_bytes(HTTPStatus.BAD_GATEWAY, b'{"error":"integration failure"}\n', "application/json")
+
+    def log_message(self, message: str, *args: Any) -> None:
+        LOG.info("http_client=%s " + message, self.client_address[0], *args)
+
+
+class ZabbixAPI:
+    def __init__(self) -> None:
+        self.url = os.environ["ZABBIX_URL"]
+        self.token = read_secret("ZABBIX_API_TOKEN_FILE")
+        self.request_id = 0
+
+    def call(self, method: str, params: dict[str, Any]) -> Any:
+        self.request_id += 1
+        headers = {} if method == "apiinfo.version" else {"Authorization": f"Bearer {self.token}"}
+        response = json_request(
+            self.url,
+            method="POST",
+            payload={"jsonrpc": "2.0", "method": method, "params": params, "id": self.request_id},
+            headers=headers,
+        )
+        if "error" in response:
+            error = response["error"]
+            raise RuntimeError(f"Zabbix {method} failed: {error.get('message')}: {error.get('data')}")
+        return response["result"]
+
+
+def one_by_name(api: ZabbixAPI, method: str, id_field: str, name: str) -> dict[str, Any] | None:
+    result = api.call(method, {"output": "extend", "filter": {"name": [name]}})
+    if len(result) > 1:
+        raise RuntimeError(f"Multiple Zabbix objects use managed name {name!r}")
+    return result[0] if result else None
+
+
+def configure_zabbix() -> None:
+    api = ZabbixAPI()
+    media_name = os.environ["ZABBIX_MEDIA_TYPE_NAME"]
+    bridge_url = f"http://zabbix-glpi-bridge:{os.environ['BRIDGE_LISTEN_PORT']}/events"
+    script = r"""
+try {
+    var params = JSON.parse(value), request = new HttpRequest(), response, parsed;
+    request.addHeader('Content-Type: application/json');
+    request.addHeader('X-IOP-Token: ' + params.bridge_token);
+    delete params.bridge_token;
+    response = request.post(params.bridge_url, JSON.stringify(params));
+    if (request.getStatus() < 200 || request.getStatus() >= 300) {
+        throw 'bridge returned HTTP ' + request.getStatus();
+    }
+    parsed = JSON.parse(response);
+    if (!parsed.ok) {
+        throw 'bridge rejected event';
+    }
+    return JSON.stringify({tags: {glpi_ticket_id: String(parsed.ticket_id)}});
+} catch (error) {
+    Zabbix.log(3, '[ IOP GLPI bridge ] ' + error);
+    throw 'IOP GLPI bridge delivery failed: ' + error;
+}
+""".strip()
+    parameters = [
+        {"name": "bridge_url", "value": bridge_url},
+        {"name": "bridge_token", "value": read_secret("BRIDGE_WEBHOOK_TOKEN_FILE")},
+        {"name": "event_id", "value": "{EVENT.ID}"},
+        {"name": "recovery_event_id", "value": "{EVENT.RECOVERY.ID}"},
+        {"name": "event_value", "value": "{EVENT.VALUE}"},
+        {"name": "event_name", "value": "{EVENT.NAME}"},
+        {"name": "event_severity", "value": "{EVENT.SEVERITY}"},
+        {"name": "event_date", "value": "{EVENT.DATE}"},
+        {"name": "event_time", "value": "{EVENT.TIME}"},
+        {"name": "host", "value": "{HOST.HOST}"},
+        {"name": "host_name", "value": "{HOST.NAME}"},
+        {"name": "item_name", "value": "{ITEM.NAME1}"},
+        {"name": "item_value", "value": "{ITEM.LASTVALUE1}"},
+        {"name": "netbox_id", "value": "{EVENT.TAGS.netbox_id}"},
+        {
+            "name": "zabbix_url",
+            "value": os.environ["ZABBIX_WEB_URL"].rstrip("/") + "/tr_events.php?triggerid={TRIGGER.ID}&eventid={EVENT.ID}",
+        },
+    ]
+    media_payload: dict[str, Any] = {
+        "name": media_name,
+        "type": 4,
+        "status": 0,
+        "script": script,
+        "parameters": parameters,
+        "maxsessions": "1",
+        "maxattempts": "3",
+        "attempt_interval": "10s",
+        "process_tags": 1,
+        "show_event_menu": 1,
+        "event_menu_name": "Open GLPI ticket",
+        "event_menu_url": os.environ["GLPI_WEB_URL"].rstrip("/") + "/front/ticket.form.php?id={EVENT.TAGS.glpi_ticket_id}",
+        "description": "Managed by the Infrastructure Operations Platform",
+        "message_templates": [
+            {"eventsource": 0, "recovery": 0, "subject": "{EVENT.NAME}", "message": "{EVENT.OPDATA}"},
+            {"eventsource": 0, "recovery": 1, "subject": "Resolved: {EVENT.NAME}", "message": "{EVENT.RECOVERY.DATE} {EVENT.RECOVERY.TIME}"},
+        ],
+    }
+    media = one_by_name(api, "mediatype.get", "mediatypeid", media_name)
+    if media:
+        media_id = str(media["mediatypeid"])
+        media_payload["mediatypeid"] = media_id
+        api.call("mediatype.update", media_payload)
+    else:
+        media_id = str(api.call("mediatype.create", media_payload)["mediatypeids"][0])
+
+    group_name = "IOP integrations"
+    group = one_by_name(api, "usergroup.get", "usrgrpid", group_name)
+    group_id = str(group["usrgrpid"]) if group else str(api.call("usergroup.create", {"name": group_name})["usrgrpids"][0])
+    roles = api.call("role.get", {"output": ["roleid", "name", "type"], "filter": {"name": ["User role"]}})
+    if len(roles) != 1:
+        raise RuntimeError("Expected one Zabbix User role")
+    username = "iop-glpi-bridge"
+    users = api.call("user.get", {"output": ["userid", "username"], "filter": {"username": [username]}})
+    if len(users) > 1:
+        raise RuntimeError("Multiple managed Zabbix notification users found")
+    if users:
+        user_id = str(users[0]["userid"])
+    else:
+        user_id = str(api.call("user.create", {
+            "username": username,
+            "passwd": secrets.token_urlsafe(36),
+            "roleid": str(roles[0]["roleid"]),
+            "usrgrps": [{"usrgrpid": group_id}],
+        })["userids"][0])
+    api.call("user.update", {
+        "userid": user_id,
+        "roleid": str(roles[0]["roleid"]),
+        "usrgrps": [{"usrgrpid": group_id}],
+        "medias": [{
+            "mediatypeid": media_id,
+            "sendto": ["IOP GLPI bridge"],
+            "active": 0,
+            "severity": 63,
+            "period": "1-7,00:00-24:00",
+        }],
+    })
+
+    action_name = os.environ["ZABBIX_ACTION_NAME"]
+    action_payload: dict[str, Any] = {
+        "name": action_name,
+        "eventsource": 0,
+        "status": 0,
+        "esc_period": "1m",
+        "filter": {
+            "evaltype": 0,
+            "conditions": [
+                {"conditiontype": 4, "operator": 5, "value": os.environ["ZABBIX_MIN_SEVERITY"]},
+                {
+                    "conditiontype": 26,
+                    "operator": 0,
+                    "value": os.environ["ZABBIX_EVENT_TAG"],
+                    "value2": os.environ["ZABBIX_EVENT_TAG_VALUE"],
+                },
+            ],
+        },
+        "operations": [{
+            "operationtype": 0,
+            "esc_step_from": 1,
+            "esc_step_to": 1,
+            "opmessage_usr": [{"userid": user_id}],
+            "opmessage": {"default_msg": 1, "mediatypeid": media_id},
+        }],
+        "recovery_operations": [{"operationtype": 11, "opmessage": {"default_msg": 1}}],
+    }
+    actions = api.call("action.get", {"output": ["actionid", "name"], "filter": {"name": [action_name]}})
+    if len(actions) > 1:
+        raise RuntimeError("Multiple managed Zabbix actions found")
+    if actions:
+        action_payload["actionid"] = str(actions[0]["actionid"])
+        api.call("action.update", action_payload)
+    else:
+        api.call("action.create", action_payload)
+    LOG.info("Zabbix media type, notification user and action reconciled")
+
+
+def self_test() -> None:
+    connect_db().close()
+    glpi = GLPI()
+    glpi.authenticate()
+    zabbix = ZabbixAPI()
+    zabbix.call("role.get", {"output": ["roleid"], "limit": 1})
+    version = zabbix.call("apiinfo.version", {})
+    LOG.info("Self-test passed glpi_oauth=ok zabbix_api=%s", version)
+
+
+def validate_event_flow() -> None:
+    event_id = str(int(time.time()))
+    endpoint = f"http://zabbix-glpi-bridge:{os.environ['BRIDGE_LISTEN_PORT']}/events"
+    headers = {
+        "Content-Type": "application/json",
+        "X-IOP-Token": read_secret("BRIDGE_WEBHOOK_TOKEN_FILE"),
+    }
+    problem = {
+        "event_id": event_id,
+        "event_value": "1",
+        "event_name": "IOP bridge validation event",
+        "event_severity": "Average",
+        "event_date": time.strftime("%Y-%m-%d"),
+        "event_time": time.strftime("%H:%M:%S"),
+        "host": "iop-validation-host",
+        "host_name": "IOP Validation Host",
+        "item_name": "Gate G5 synthetic signal",
+        "item_value": "1",
+        "netbox_id": "1",
+        "zabbix_url": os.environ["ZABBIX_WEB_URL"].rstrip("/") + f"/tr_events.php?eventid={event_id}",
+    }
+    first = json_request(endpoint, method="POST", payload=problem, headers=headers)
+    duplicate_problem = json_request(endpoint, method="POST", payload=problem, headers=headers)
+    recovery = dict(problem)
+    recovery.update({"event_value": "0", "recovery_event_id": str(int(event_id) + 1), "item_value": "0"})
+    recovered = json_request(endpoint, method="POST", payload=recovery, headers=headers)
+    duplicate_recovery = json_request(endpoint, method="POST", payload=recovery, headers=headers)
+    ticket_ids = {response.get("ticket_id") for response in [first, duplicate_problem, recovered, duplicate_recovery]}
+    if len(ticket_ids) != 1 or None in ticket_ids:
+        raise RuntimeError("Event flow produced inconsistent ticket IDs")
+    if first.get("duplicate") or not duplicate_problem.get("duplicate"):
+        raise RuntimeError("Problem idempotency validation failed")
+    if recovered.get("duplicate") or not duplicate_recovery.get("duplicate"):
+        raise RuntimeError("Recovery idempotency validation failed")
+    LOG.info("Event flow passed event=%s ticket=%s", event_id, first["ticket_id"])
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("command", choices=["serve", "configure-zabbix", "self-test", "validate-event-flow"])
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    if args.command == "configure-zabbix":
+        configure_zabbix()
+    elif args.command == "self-test":
+        self_test()
+    elif args.command == "validate-event-flow":
+        validate_event_flow()
+    else:
+        connect_db().close()
+        port = int(os.environ["BRIDGE_LISTEN_PORT"])
+        LOG.info("Bridge listening on internal port %d", port)
+        ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except Exception as error:
+        LOG.error("Bridge command failed: %s", error)
+        raise SystemExit(1)
+{% endraw %}

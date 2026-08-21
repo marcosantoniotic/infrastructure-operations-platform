@@ -1,0 +1,80 @@
+name: zabbix-glpi-bridge
+
+services:
+  zabbix-glpi-bridge:
+    image: {{ zabbix_glpi_bridge_image }}
+    command:
+      - python
+      - /usr/local/libexec/zabbix-glpi-bridge.py
+      - serve
+    environment:
+      BRIDGE_LISTEN_PORT: {{ zabbix_glpi_bridge_listen_port | string | to_json }}
+      BRIDGE_STATE_DB: /var/lib/zabbix-glpi-bridge/correlation.sqlite3
+      BRIDGE_WEBHOOK_TOKEN_FILE: /run/secrets/bridge_webhook_token
+      GLPI_URL: {{ zabbix_glpi_bridge_glpi_url | to_json }}
+      GLPI_WEB_URL: {{ zabbix_glpi_bridge_glpi_web_url | to_json }}
+      GLPI_USER: {{ zabbix_glpi_bridge_glpi_user | to_json }}
+      GLPI_PROFILE_ID: {{ zabbix_glpi_bridge_glpi_profile_id | string | to_json }}
+      GLPI_ENTITY_ID: {{ zabbix_glpi_bridge_glpi_entity_id | string | to_json }}
+      GLPI_ENTITY_RECURSIVE: {{ zabbix_glpi_bridge_glpi_recursive | bool | lower | to_json }}
+      GLPI_PASSWORD_FILE: /run/secrets/glpi_user_password
+      GLPI_OAUTH_CLIENT_ID_FILE: /run/secrets/glpi_oauth_client_id
+      GLPI_OAUTH_SECRET_FILE: /run/secrets/glpi_oauth_secret
+      GLPI_RECOVERY_STATUS: {{ zabbix_glpi_bridge_glpi_recovery_status | string | to_json }}
+      NETBOX_URL: {{ zabbix_glpi_bridge_netbox_url | to_json }}
+      ZABBIX_URL: {{ zabbix_glpi_bridge_zabbix_url | to_json }}
+      ZABBIX_WEB_URL: {{ zabbix_glpi_bridge_zabbix_web_url | to_json }}
+      ZABBIX_API_TOKEN_FILE: /run/secrets/zabbix_api_token
+      ZABBIX_ACTION_NAME: {{ zabbix_glpi_bridge_action_name | to_json }}
+      ZABBIX_MEDIA_TYPE_NAME: {{ zabbix_glpi_bridge_media_type_name | to_json }}
+      ZABBIX_EVENT_TAG: {{ zabbix_glpi_bridge_event_tag | to_json }}
+      ZABBIX_EVENT_TAG_VALUE: {{ zabbix_glpi_bridge_event_tag_value | to_json }}
+      ZABBIX_MIN_SEVERITY: {{ zabbix_glpi_bridge_min_severity | string | to_json }}
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    user: "65532:65532"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    volumes:
+      - ./zabbix-glpi-bridge.py:/usr/local/libexec/zabbix-glpi-bridge.py:ro,Z
+      - {{ zabbix_glpi_bridge_state_dir }}:/var/lib/zabbix-glpi-bridge:Z
+      - ./secrets/bridge_webhook_token:/run/secrets/bridge_webhook_token:ro,Z
+      - ./secrets/glpi_user_password:/run/secrets/glpi_user_password:ro,Z
+      - ./secrets/glpi_oauth_client_id:/run/secrets/glpi_oauth_client_id:ro,Z
+      - ./secrets/glpi_oauth_secret:/run/secrets/glpi_oauth_secret:ro,Z
+      - ./secrets/zabbix_api_token:/run/secrets/zabbix_api_token:ro,Z
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:{{ zabbix_glpi_bridge_listen_port }}/healthz', timeout=3).read()
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - zabbix
+      - glpi
+{% if zabbix_glpi_bridge_metrics_enabled | bool %}
+      - metrics
+{% endif %}
+
+networks:
+  zabbix:
+    name: {{ zabbix_glpi_bridge_zabbix_network }}
+    external: true
+  glpi:
+    name: {{ zabbix_glpi_bridge_glpi_network }}
+    external: true
+{% if zabbix_glpi_bridge_metrics_enabled | bool %}
+  metrics:
+    name: {{ zabbix_glpi_bridge_metrics_network }}
+    external: true
+{% endif %}
