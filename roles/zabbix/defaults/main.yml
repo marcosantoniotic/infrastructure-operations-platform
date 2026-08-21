@@ -35,6 +35,7 @@ zabbix_platform_map_host: infrastructure-operations-platform
 zabbix_platform_display_name: "{{ platform_hostname | default(ansible_hostname) | upper }}"
 zabbix_platform_host_address: 127.0.0.1
 zabbix_platform_map_external_networks: []
+zabbix_platform_map_glpi_enabled: false
 zabbix_agent_network_subnet: ""
 
 zabbix_agent2_enabled: true

@@ -159,6 +159,7 @@ $requiredPaths = @(
     'roles/observability/templates/infrastructure-host-containers.json.j2',
     'roles/observability/templates/application-tls-health.json.j2',
     'roles/observability/templates/backup-health.json.j2',
+    'roles/observability/templates/glpi-itsm-health.json.j2',
     'roles/observability/templates/dns-service-health.json.j2',
     'roles/observability_backup/defaults/main.yml',
     'roles/observability_backup/handlers/main.yml',

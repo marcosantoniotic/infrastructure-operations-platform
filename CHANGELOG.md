@@ -5,6 +5,13 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Adicionado
+
+- visão consolidada `GLPI & ITSM Health` no Grafana, combinando disponibilidade,
+  latência, eventos, recuperações, falhas do bridge e idade do backup;
+- representação opcional de GLPI, MariaDB e bridge Zabbix–GLPI no mapa gerenciado
+  do Zabbix, com verificações e triggers reais.
+
 ## [1.1.1] - 2026-08-21
 
 ### Corrigido
