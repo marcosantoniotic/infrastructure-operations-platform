@@ -5,10 +5,18 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-08-21
+
 ### Corrigido
 
 - validação do Cloudflare Tunnel baseada na métrica atual de conexões HA,
   evitando falso negativo quando um conector saudável não produz logs recentes.
+- estudo de caso, README, roadmap e inventário histórico alinhados à conclusão
+  operacional da Fase 4 GLPI.
+
+### Alterado
+
+- ação de upload SARIF do CodeQL atualizada de `4.37.4` para `4.37.7`.
 
 ## [1.1.0] - 2026-08-20
 
@@ -129,7 +137,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 - backup e restauração isolada do PostgreSQL;
 - primeira pipeline de validação e segurança de publicação.
 
-[Unreleased]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v0.1.0...v0.2.0
