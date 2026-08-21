@@ -39,7 +39,13 @@ ansible-playbook \
 ```
 
 Provisioned dashboards include host and container resources, application and
-TLS health, backup health, and managed DNS service health.
+TLS health, backup health, managed DNS service health, the technical
+Zabbix-GLPI bridge view, and a consolidated GLPI/ITSM health view.
+
+When `observability_zabbix_glpi_bridge_enabled` is true, the GLPI/ITSM dashboard
+combines the GLPI Blackbox probe, cAdvisor container state, bridge event and
+recovery counters, processing failures, last successful event, and GLPI backup
+age. The existing bridge dashboard remains the focused troubleshooting view.
 
 Each item in `observability_blackbox_targets` creates an independent HTTP
 probe module. Optional fields include `host_header`, `valid_status_codes`, and

@@ -15,6 +15,7 @@ MAP_NAME = {{ zabbix_platform_map_name | to_json }}
 HOST_NAME = {{ zabbix_platform_map_host | to_json }}
 HOST_DISPLAY_NAME = {{ zabbix_platform_display_name | to_json }}
 AGENT_TEMPLATE_NAME = {{ zabbix_agent2_template_name | to_json }}
+GLPI_ENABLED = {{ 'True' if zabbix_platform_map_glpi_enabled | bool else 'False' }}
 
 
 class ZabbixAPI:
@@ -113,6 +114,12 @@ ITEMS = [
     ("service.cockpit.available", "Cockpit availability", "net.tcp.service[tcp,%s,9091]" % PLATFORM_ADDRESS),
     ("service.host.ssh.available", "RHEL host SSH availability", "net.tcp.service[tcp,%s,22]" % PLATFORM_ADDRESS),
 ]
+if GLPI_ENABLED:
+    ITEMS.extend([
+        ("service.glpi.available", "GLPI application availability", "net.tcp.service[http,glpi,80]"),
+        ("service.glpi.database.available", "GLPI MariaDB availability", "net.tcp.service[tcp,db,3306]"),
+        ("service.glpi.bridge.available", "Zabbix-GLPI bridge availability", "net.tcp.service[http,zabbix-glpi-bridge,8080]"),
+    ])
 
 
 def ensure_items(api, hostid):
@@ -153,6 +160,12 @@ TRIGGERS = [
     ("Cockpit is unavailable", ["service.cockpit.available"]),
     ("RHEL platform host is unavailable", ["service.host.ssh.available"]),
 ]
+if GLPI_ENABLED:
+    TRIGGERS.extend([
+        ("GLPI application is unavailable", ["service.glpi.available"]),
+        ("GLPI MariaDB is unavailable", ["service.glpi.database.available"]),
+        ("Zabbix to GLPI bridge is unavailable", ["service.glpi.bridge.available"]),
+    ])
 
 
 def ensure_triggers(api):
@@ -195,6 +208,12 @@ def desired_map(triggerids):
         ("7", "Portainer", 1000, 570, "Portainer is unavailable", "150"),
         ("8", "Cockpit", 1280, 570, "Cockpit is unavailable", "150"),
     ]
+    if GLPI_ENABLED:
+        nodes.extend([
+            ("9", "GLPI\nIT Service Management", 400, 720, "GLPI application is unavailable", "150"),
+            ("10", "GLPI MariaDB", 120, 720, "GLPI MariaDB is unavailable", "184"),
+            ("11", "Zabbix to GLPI\nEvent Bridge", 700, 720, "Zabbix to GLPI bridge is unavailable", "150"),
+        ])
     selements = []
     for sid, label, x, y, trigger, icon in nodes:
         element = {
@@ -217,10 +236,17 @@ def desired_map(triggerids):
     ]
     for sid in ("4", "5", "6", "7", "8"):
         links.append({"selementid1": "3", "selementid2": sid, "color": "6C8EAD", "drawtype": 0})
+    if GLPI_ENABLED:
+        links.extend([
+            {"selementid1": "3", "selementid2": "9", "color": "6C8EAD", "drawtype": 0},
+            {"selementid1": "9", "selementid2": "10", "color": "6C8EAD", "drawtype": 0},
+            {"selementid1": "4", "selementid2": "11", "color": "3C8DBC", "drawtype": 0},
+            {"selementid1": "11", "selementid2": "9", "color": "3C8DBC", "drawtype": 0},
+        ])
     return {
         "name": MAP_NAME,
         "width": 1600,
-        "height": 800,
+        "height": 950 if GLPI_ENABLED else 800,
         "label_type": 0,
         "label_location": 0,
         "highlight": 1,

@@ -340,8 +340,10 @@
   register: zabbix_platform_map_validation
   failed_when: >-
     zabbix_platform_map_validation.json.result | length != 1 or
-    zabbix_platform_map_validation.json.result[0].selements | length != 8 or
-    zabbix_platform_map_validation.json.result[0].links | length != 7
+    zabbix_platform_map_validation.json.result[0].selements | length !=
+    (11 if zabbix_platform_map_glpi_enabled | bool else 8) or
+    zabbix_platform_map_validation.json.result[0].links | length !=
+    (11 if zabbix_platform_map_glpi_enabled | bool else 7)
   no_log: true
   when:
     - zabbix_provision_platform_map | bool

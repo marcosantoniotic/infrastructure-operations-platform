@@ -93,11 +93,13 @@ O mapa de referência de produção contém:
 - Grafana e Prometheus;
 - Portainer;
 - Cockpit.
+- GLPI, MariaDB dedicado e bridge Zabbix–GLPI quando a fase ITSM está habilitada.
 
 No ambiente publicável de validação, dependências externas são consolidadas no
 elemento informativo `External Access — Internet / Zero Trust`, sem simular
 ativos que não pertencem ao laboratório. Os demais elementos são provisionados
-pela API e vinculados a sete triggers reais:
+pela API e vinculados a sete triggers reais na baseline, ou dez quando GLPI
+está habilitado:
 
 - Traefik;
 - host RHEL;
@@ -106,15 +108,19 @@ pela API e vinculados a sete triggers reais:
 - Grafana e Prometheus;
 - Portainer;
 - Cockpit.
+- aplicação GLPI;
+- MariaDB do GLPI;
+- bridge Zabbix–GLPI.
 
 O elemento do host usa `platform_hostname` como rótulo. Assim, o ambiente de
 validação exibe `SRV01-VALIDATION`, enquanto cada nova implantação recebe seu
 próprio nome sem alterar o código do mapa.
 
-Dez verificações simples são executadas pelo Zabbix Server a cada 60 segundos.
-O servidor participa da rede compartilhada do proxy apenas para iniciar essas
-checagens; nenhum listener adicional é publicado. A role valida oito elementos,
-sete vínculos e idempotência do mapa.
+Dez verificações simples são executadas pelo Zabbix Server a cada 60 segundos
+na baseline; a fase GLPI acrescenta três verificações.
+O servidor participa somente das redes de aplicação declaradas para iniciar
+essas checagens; nenhum listener adicional é publicado. A role valida as
+contagens esperadas para cada modo e a idempotência do mapa.
 
 O host gerenciado também recebe o template `Linux by Zabbix agent active`.
 O Agent 2 é instalado diretamente no RHEL e envia CPU, memória, filesystem,
@@ -133,6 +139,8 @@ a conclusão do playbook comprova coleta ativa e não apenas serviço iniciado.
 | Blackbox HTTP | disponibilidade e tempo de resposta |
 | SSL Certificate Monitor | validade dos certificados |
 | Application & TLS Health | disponibilidade, HTTP, latência e validade TLS |
+| GLPI & ITSM Health | aplicação, containers, eventos, recuperação, bridge e backup |
+| Zabbix to GLPI Bridge | diagnóstico técnico da integração de incidentes |
 | UniFi/UDM | gateway, clientes e dispositivos |
 | MikroTik | interfaces, CPU, memória e tráfego |
 

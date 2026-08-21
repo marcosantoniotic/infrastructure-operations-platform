@@ -244,6 +244,8 @@
       dest: grafana/dashboards/dns-service-health.json
     - src: zabbix-glpi-bridge.json.j2
       dest: grafana/dashboards/zabbix-glpi-bridge.json
+    - src: glpi-itsm-health.json.j2
+      dest: grafana/dashboards/glpi-itsm-health.json
   register: observability_rendered_configuration
   when: >-
     item.src != 'alertmanager.yml.j2' or
@@ -751,6 +753,23 @@
     observability_zabbix_glpi_metrics.json.status == 'success' and
     observability_zabbix_glpi_metrics.json.data.result | length == 1 and
     observability_zabbix_glpi_metrics.json.data.result[0].value[1] == '1'
+  when:
+    - not ansible_check_mode
+    - observability_zabbix_glpi_bridge_enabled | bool
+
+- name: Validate provisioned GLPI and ITSM health dashboard
+  ansible.builtin.uri:
+    url: >-
+      http://{{ observability_grafana_validation_host }}:{{ observability_grafana_port }}/api/dashboards/uid/glpi-itsm-health
+    method: GET
+    user: "{{ observability_grafana_admin_user }}"
+    password: "{{ observability_grafana_admin_password }}"
+    force_basic_auth: true
+    status_code: 200
+    return_content: true
+  register: observability_glpi_itsm_dashboard
+  failed_when: observability_glpi_itsm_dashboard.json.dashboard.uid != 'glpi-itsm-health'
+  no_log: true
   when:
     - not ansible_check_mode
     - observability_zabbix_glpi_bridge_enabled | bool
