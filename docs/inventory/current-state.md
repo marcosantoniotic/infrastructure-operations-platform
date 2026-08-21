@@ -1,6 +1,12 @@
-# Inventário atual
+# Inventário observado — baseline inicial
 
 Data de referência: 2026-07-27.
+
+> **Escopo histórico:** esta coleta registra o estado observado antes das
+> evoluções entregues nas releases `v1.0.0` e `v1.1.0`. As contagens, versões e
+> lacunas abaixo não representam a baseline vigente. Consulte a
+> [release v1.1.0](../releases/v1.1.0.md), o [catálogo de módulos](../modules.md)
+> e o [changelog](../../CHANGELOG.md) para o estado funcional atual.
 
 ## Host
 
