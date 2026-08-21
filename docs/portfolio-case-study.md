@@ -6,7 +6,7 @@ O projeto consolida ferramentas utilizadas em operações de infraestrutura em u
 
 ## Contexto
 
-Ferramentas como NetBox, Zabbix, Grafana, Prometheus, Traefik, Portainer e Cockpit resolvem problemas diferentes. Quando implantadas isoladamente, surgem desafios de identidade, exposição, inventário duplicado, monitoramento fragmentado, segredos dispersos e operação baseada em conhecimento informal.
+Ferramentas como NetBox, Zabbix, GLPI, Grafana, Prometheus, Traefik, Portainer e Cockpit resolvem problemas diferentes. Quando implantadas isoladamente, surgem desafios de identidade, exposição, inventário duplicado, monitoramento fragmentado, segredos dispersos e operação baseada em conhecimento informal.
 
 O objetivo foi tratá-las como uma única plataforma operacional, sem criar um monólito.
 
@@ -25,7 +25,7 @@ O objetivo foi tratá-las como uma única plataforma operacional, sem criar um m
 
 ### Arquitetura modular
 
-Cinco projetos Compose independentes organizam entrada, monitoramento, inventário, observabilidade e administração. Serviços nativos do RHEL complementam a plataforma.
+Projetos Compose independentes organizam entrada, monitoramento, inventário, ITSM, observabilidade, integrações e administração. Serviços nativos do RHEL complementam a plataforma.
 
 ### Segurança em camadas
 
@@ -39,6 +39,13 @@ Zabbix cuida de estado, triggers, mapas e eventos. Prometheus coleta métricas d
 
 NetBox mantém DCIM/IPAM e fornece contexto de ativos. Uma integração dedicada atualiza o Zabbix de forma controlada, evitando acoplamento direto ao banco.
 
+### Fluxo de incidentes
+
+Eventos qualificados do Zabbix abrem incidentes idempotentes no GLPI e atualizam
+o chamado correspondente quando o evento é recuperado. O GLPI mantém apenas a
+referência necessária ao atendimento; o NetBox continua sendo a fonte técnica
+de verdade dos ativos.
+
 ### Governança operacional
 
 ADRs, runbooks, inventário, política de segurança, roadmap e validação automatizada tornam as decisões rastreáveis e o conhecimento transferível.
@@ -46,7 +53,7 @@ ADRs, runbooks, inventário, política de segurança, roadmap e validação auto
 ## Resultados alcançados
 
 - plataforma funcional sobre RHEL;
-- 19 containers organizados por domínio;
+- workloads containerizados organizados por domínio e redes restritas;
 - publicação centralizada por hostname;
 - acesso externo protegido e acesso local preservado;
 - monitoramento completo do ecossistema;
@@ -58,7 +65,8 @@ ADRs, runbooks, inventário, política de segurança, roadmap e validação auto
 - CI para PowerShell, Ansible, Compose, Prometheus, inventário de imagens e segurança;
 - backups consistentes com réplica externa criptografada e restauração isolada;
 - alertas por severidade com Alertmanager e entrega de e-mail validada;
-- roadmap claro para GLPI e evolução da resiliência.
+- GLPI implantado com backup, validações e integração idempotente Zabbix–GLPI;
+- roadmap claro para exercícios periódicos e evolução da resiliência.
 
 ## Decisões relevantes
 
@@ -70,7 +78,7 @@ ADRs, runbooks, inventário, política de segurança, roadmap e validação auto
 | Zabbix + Prometheus | eventos e métricas com responsabilidades distintas |
 | NetBox como fonte de verdade | evitar inventário técnico fragmentado |
 | DNS dividido | manter o mesmo hostname dentro e fora |
-| GLPI em fase própria | preservar limites entre ITSM e DCIM/IPAM |
+| GLPI como fase própria concluída | preservar limites entre ITSM e DCIM/IPAM |
 
 ## Maturidade e transparência
 
@@ -80,8 +88,8 @@ O projeto registra também lacunas atuais. Backup, restauração, CI e alertas p
 
 1. executar exercícios periódicos de recuperação e registrar tendências de RTO;
 2. ampliar módulos opcionais de telemetria para equipamentos de rede;
-3. integrar alertas ao futuro fluxo ITSM;
-4. desenvolver a fase GLPI sem duplicar as responsabilidades do NetBox;
+3. ampliar, de forma controlada, os eventos elegíveis ao fluxo Zabbix–GLPI;
+4. exercitar periodicamente o ciclo completo de abertura e recuperação de incidentes;
 5. evoluir resiliência multi-nó somente quando os requisitos justificarem a complexidade.
 
 ## Evidências verificáveis
