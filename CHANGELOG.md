@@ -5,12 +5,24 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-07
+
 ### Adicionado
 
 - visão consolidada `GLPI & ITSM Health` no Grafana, combinando disponibilidade,
   latência, eventos, recuperações, falhas do bridge e idade do backup;
 - representação opcional de GLPI, MariaDB e bridge Zabbix–GLPI no mapa gerenciado
   do Zabbix, com verificações e triggers reais.
+
+### Corrigido
+
+- validação da integridade das imagens frontal e traseira dos tipos de
+  dispositivo do NetBox, interrompendo a convergência quando o banco referencia
+  um arquivo ausente no volume persistente de mídia.
+
+### Alterado
+
+- ação de upload SARIF do CodeQL atualizada de `4.37.7` para `4.37.9`.
 
 ## [1.1.1] - 2026-08-21
 

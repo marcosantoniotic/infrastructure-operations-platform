@@ -226,6 +226,35 @@
   changed_when: false
   when: not ansible_check_mode
 
+- name: Validate NetBox device type image references
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ netbox_project_dir }}"
+      - exec
+      - -T
+      - netbox
+      - /opt/netbox/venv/bin/python
+      - /opt/netbox/netbox/manage.py
+      - shell
+      - -c
+      - >-
+        from dcim.models import DeviceType;
+        import os, sys;
+        root = '/opt/netbox/netbox/media';
+        missing = [(dt.pk, dt.model, field, getattr(dt, field).name)
+        for dt in DeviceType.objects.all()
+        for field in ('front_image', 'rear_image')
+        if getattr(dt, field) and not os.path.isfile(
+        os.path.join(root, getattr(dt, field).name))];
+        print('\n'.join(f'{pk} | {model} | {field} | {path}'
+        for pk, model, field, path in missing));
+        sys.exit(1 if missing else 0)
+  changed_when: false
+  when: not ansible_check_mode
+
 - name: Collect NetBox plugin static assets
   ansible.builtin.command:
     argv:
