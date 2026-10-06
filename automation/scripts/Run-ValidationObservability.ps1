@@ -146,8 +146,8 @@ $groupVarsContent = [regex]::Replace($groupVarsContent, $sectionPattern, '')
 $observabilitySection = @"
 # BEGIN VALIDATION OBSERVABILITY
 observability_project_dir: /opt/observability
-observability_prometheus_image: prom/prometheus:v3.13.1
-observability_grafana_image: grafana/grafana:13.1.1
+observability_prometheus_image: prom/prometheus:v3.13.3
+observability_grafana_image: grafana/grafana:13.1.6
 observability_node_exporter_image: prom/node-exporter:v1.12.1
 observability_cadvisor_image: ghcr.io/google/cadvisor:v0.60.5
 observability_blackbox_image: prom/blackbox-exporter:v0.28.0

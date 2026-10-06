@@ -109,8 +109,8 @@ $groupVarsContent = [regex]::Replace($groupVarsContent, $zabbixSectionPattern, '
 $zabbixSection = @"
 # BEGIN VALIDATION ZABBIX
 zabbix_project_dir: /opt/zabbix
-zabbix_server_image: zabbix/zabbix-server-mysql:7.4.12-alpine
-zabbix_web_image: zabbix/zabbix-web-nginx-mysql:7.4.12-alpine
+zabbix_server_image: zabbix/zabbix-server-mysql:7.4.13-alpine
+zabbix_web_image: zabbix/zabbix-web-nginx-mysql:7.4.13-alpine
 zabbix_mysql_image: mysql:8.4.10-oraclelinux9
 zabbix_database_name: zabbix
 zabbix_database_user: zabbix

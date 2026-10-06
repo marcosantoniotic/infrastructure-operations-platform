@@ -8,4 +8,4 @@ recovery_drill_rclone_config: /etc/infrastructure-backup/rclone.conf
 recovery_drill_netbox_project_dir: /opt/netbox
 recovery_drill_zabbix_project_dir: /opt/zabbix
 recovery_drill_observability_project_dir: /opt/observability
-recovery_drill_helper_image: alpine:3.23.3
+recovery_drill_helper_image: alpine:3.23.4

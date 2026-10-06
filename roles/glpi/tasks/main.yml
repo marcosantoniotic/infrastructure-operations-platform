@@ -296,6 +296,25 @@
     - glpi_auto_install | bool
     - not ansible_check_mode
 
+- name: Apply pending GLPI database updates
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ glpi_project_dir }}"
+      - exec
+      - -T
+      - glpi
+      - /var/www/glpi/bin/console
+      - database:update
+      - --no-interaction
+  register: glpi_database_update_result
+  changed_when: "'No migration needed' not in glpi_database_update_result.stdout"
+  when:
+    - glpi_auto_install | bool
+    - not ansible_check_mode
+
 - name: Enable timezone support in GLPI
   ansible.builtin.command:
     argv:

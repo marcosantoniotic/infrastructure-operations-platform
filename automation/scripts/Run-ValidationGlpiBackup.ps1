@@ -66,7 +66,7 @@ glpi_backup_database_service: db
 glpi_backup_application_service: glpi
 glpi_backup_database_name: glpi
 glpi_backup_database_image: mariadb:11.8.8
-glpi_backup_helper_image: alpine:3.23.3
+glpi_backup_helper_image: alpine:3.23.4
 glpi_backup_run_now: false
 glpi_backup_verify_restore: false
 # END VALIDATION GLPI BACKUP

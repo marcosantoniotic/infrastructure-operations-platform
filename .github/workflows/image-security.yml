@@ -59,6 +59,7 @@ jobs:
           scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: true
+          limit-severities-for-sarif: true
           format: sarif
           output: trivy-results.sarif
           exit-code: "0"

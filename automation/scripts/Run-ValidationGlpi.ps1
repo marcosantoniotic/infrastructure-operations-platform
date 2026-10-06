@@ -137,7 +137,7 @@ $groupVarsContent = [regex]::Replace($groupVarsContent, $sectionPattern, '')
 $glpiSection = @"
 # BEGIN VALIDATION GLPI
 glpi_project_dir: /opt/glpi
-glpi_image: glpi/glpi:11.0.8
+glpi_image: glpi/glpi:11.0.11
 glpi_database_image: mariadb:11.8.8
 glpi_database_name: glpi
 glpi_database_user: glpi

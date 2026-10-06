@@ -1,7 +1,7 @@
 ---
 zabbix_glpi_bridge_enabled: false
 zabbix_glpi_bridge_project_dir: /opt/zabbix-glpi-bridge
-zabbix_glpi_bridge_image: python:3.13.11-alpine3.23
+zabbix_glpi_bridge_image: python:3.13.12-alpine3.23
 zabbix_glpi_bridge_state_dir: /var/lib/zabbix-glpi-bridge
 zabbix_glpi_bridge_listen_port: 8080
 zabbix_glpi_bridge_metrics_enabled: false

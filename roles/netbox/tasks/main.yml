@@ -189,6 +189,24 @@
     wait_timeout: "{{ netbox_compose_wait_timeout }}"
   register: netbox_compose_result
 
+- name: Apply pending NetBox database migrations
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ netbox_project_dir }}"
+      - exec
+      - -T
+      - netbox
+      - /opt/netbox/venv/bin/python
+      - /opt/netbox/netbox/manage.py
+      - migrate
+      - --noinput
+  register: netbox_migrate_result
+  changed_when: "'No migrations to apply' not in netbox_migrate_result.stdout"
+  when: not ansible_check_mode
+
 - name: Wait for NetBox HTTP endpoint
   ansible.builtin.uri:
     url: "http://{{ netbox_validation_host }}:{{ netbox_http_port }}/login/"

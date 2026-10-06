@@ -64,7 +64,7 @@ Consulte também a decisão
 
 | Componente | Decisão inicial |
 |---|---|
-| Aplicação | imagem oficial `glpi/glpi:11.0.8` |
+| Aplicação | imagem oficial `glpi/glpi:11.0.11` |
 | Banco | MariaDB `11.8.8`, instância dedicada |
 | Diretório remoto | `/opt/glpi` |
 | Porta local de contingência | `127.0.0.1:8083` |
