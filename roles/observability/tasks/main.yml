@@ -326,6 +326,7 @@
       - compose.yaml
     state: present
     pull: missing
+    remove_orphans: true
     wait: true
     wait_timeout: 420
   when: not ansible_check_mode

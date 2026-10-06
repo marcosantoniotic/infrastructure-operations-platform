@@ -14,7 +14,7 @@ docker run --rm \
   --entrypoint /bin/promtool \
   --volume "${artifact_dir}/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
   --volume "${artifact_dir}/observability/alerts.yml:/etc/prometheus/alerts.yml:ro" \
-  prom/prometheus:v3.13.1 \
+  prom/prometheus:v3.13.3 \
   check config /etc/prometheus/prometheus.yml
 
 docker run --rm \

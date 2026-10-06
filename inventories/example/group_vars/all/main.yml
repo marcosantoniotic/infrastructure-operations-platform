@@ -37,7 +37,7 @@ docker_daemon_config:
 
 # NetBox standalone
 netbox_project_dir: /opt/netbox
-netbox_image: netboxcommunity/netbox:v4.5.10-4.0.2
+netbox_image: netboxcommunity/netbox:v4.6.10-5.0.2
 netbox_postgres_image: postgres:18-alpine
 netbox_valkey_image: valkey/valkey:9.0-alpine
 netbox_bind_address: 127.0.0.1
@@ -79,7 +79,7 @@ netbox_backup_verify_restore: false
 
 # Traefik ingress
 traefik_project_dir: /opt/traefik
-traefik_image: traefik:v3.7.1
+traefik_image: traefik:v3.7.13
 traefik_socket_proxy_image: >-
   ghcr.io/tecnativa/docker-socket-proxy@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
 traefik_bind_address: 127.0.0.1
@@ -112,8 +112,8 @@ cloudflare_tunnel_metrics_port: 20241
 
 # Zabbix monitoring
 zabbix_project_dir: /opt/zabbix
-zabbix_server_image: zabbix/zabbix-server-mysql:7.4.12-alpine
-zabbix_web_image: zabbix/zabbix-web-nginx-mysql:7.4.12-alpine
+zabbix_server_image: zabbix/zabbix-server-mysql:7.4.13-alpine
+zabbix_web_image: zabbix/zabbix-web-nginx-mysql:7.4.13-alpine
 zabbix_mysql_image: mysql:8.4.10-oraclelinux9
 zabbix_database_name: zabbix
 zabbix_database_user: zabbix
@@ -148,7 +148,7 @@ zabbix_agent_network_subnet: ""
 
 # GLPI service management
 glpi_project_dir: /opt/glpi
-glpi_image: glpi/glpi:11.0.8
+glpi_image: glpi/glpi:11.0.11
 glpi_database_image: mariadb:11.8.8
 glpi_database_name: glpi
 glpi_database_user: glpi
@@ -177,7 +177,7 @@ glpi_backup_database_service: db
 glpi_backup_application_service: glpi
 glpi_backup_database_name: glpi
 glpi_backup_database_image: mariadb:11.8.8
-glpi_backup_helper_image: alpine:3.23.3
+glpi_backup_helper_image: alpine:3.23.4
 glpi_backup_run_now: false
 glpi_backup_verify_restore: false
 
@@ -198,9 +198,9 @@ observability_backup_project_dir: /opt/observability
 observability_backup_root: /var/backups/infrastructure-platform/observability
 observability_backup_retention_days: 14
 observability_backup_schedule: "*-*-* 03:45:00"
-observability_backup_prometheus_image: prom/prometheus:v3.13.1
-observability_backup_grafana_image: grafana/grafana:13.1.1
-observability_backup_helper_image: alpine:3.23.3
+observability_backup_prometheus_image: prom/prometheus:v3.13.3
+observability_backup_grafana_image: grafana/grafana:13.1.6
+observability_backup_helper_image: alpine:3.23.4
 observability_backup_run_now: false
 observability_backup_verify_restore: false
 
@@ -266,8 +266,8 @@ traefik_cockpit_backend_url: https://host.containers.internal:9091
 
 # Metrics and visualization
 observability_project_dir: /opt/observability
-observability_prometheus_image: prom/prometheus:v3.13.1
-observability_grafana_image: grafana/grafana:13.1.1
+observability_prometheus_image: prom/prometheus:v3.13.3
+observability_grafana_image: grafana/grafana:13.1.6
 observability_node_exporter_image: prom/node-exporter:v1.12.1
 observability_cadvisor_image: ghcr.io/google/cadvisor:v0.60.5
 observability_blackbox_image: prom/blackbox-exporter:v0.28.0

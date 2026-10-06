@@ -137,7 +137,7 @@ docker_daemon_config:
   live-restore: true
 
 netbox_project_dir: /opt/netbox
-netbox_image: netboxcommunity/netbox:v4.5.10-4.0.2
+netbox_image: netboxcommunity/netbox:v4.6.10-5.0.2
 netbox_postgres_image: postgres:18-alpine
 netbox_valkey_image: valkey/valkey:9.0-alpine
 netbox_bind_address: 127.0.0.1

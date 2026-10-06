@@ -217,7 +217,7 @@ $groupVarsContent = [regex]::Replace($groupVarsContent, $sectionPattern, '')
 $traefikSection = @"
 # BEGIN VALIDATION TRAEFIK
 traefik_project_dir: /opt/traefik
-traefik_image: traefik:v3.7.1
+traefik_image: traefik:v3.7.13
 traefik_socket_proxy_image: >-
   ghcr.io/tecnativa/docker-socket-proxy@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
 traefik_validation_image: traefik/whoami:v1.11.0

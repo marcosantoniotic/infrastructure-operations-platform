@@ -181,7 +181,7 @@ convergir.
 
 | Variável | Padrão | Finalidade |
 |---|---|---|
-| `glpi_image` | `glpi/glpi:11.0.8` | versão fixada da aplicação |
+| `glpi_image` | `glpi/glpi:11.0.11` | versão fixada da aplicação |
 | `glpi_database_image` | `mariadb:11.8.8` | versão fixada do banco dedicado |
 | `glpi_http_port` | `8083` | validação local limitada ao loopback |
 | `glpi_admin_user` | `glpi-admin` | administrador dedicado |
