@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Validation](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml/badge.svg)](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml)
 
-Plataforma profissional de operações de infraestrutura criada para demonstrar, validar e documentar práticas aplicáveis a ambientes corporativos. O projeto integra inventário técnico, proxy reverso, Zero Trust, observabilidade, monitoramento, gestão de containers, automação e governança operacional em uma arquitetura coesa.
+Plataforma profissional de operações de infraestrutura arquitetada e implementada para demonstrar, validar e documentar práticas aplicáveis a ambientes corporativos. O trabalho autoral não consiste em desenvolver novamente as ferramentas utilizadas: ele está na seleção, integração, automação, proteção e operação de tecnologias consolidadas — como NetBox, Zabbix, GLPI, Prometheus, Grafana e Traefik — como uma arquitetura coesa.
 
 A implementação autoral funciona como ambiente controlado de validação técnica contínua, inspirado em desafios e padrões encontrados ao longo da experiência profissional. O foco do projeto é a qualidade de engenharia: isolamento, segurança, rastreabilidade, recuperação, documentação e decisões arquiteturais reproduzíveis.
 
@@ -29,6 +29,20 @@ A implementação autoral funciona como ambiente controlado de validação técn
 5. Examine os procedimentos de [backup e restauração](docs/runbooks/backup-restore.md) e os [objetivos de confiabilidade](docs/reliability-objectives.md).
 
 As capturas operacionais foram revisadas e sanitizadas antes da inclusão. O repositório não utiliza imagens simuladas como evidência.
+
+## Estado validado da release v1.1.3
+
+A release `v1.1.3` foi homologada no ambiente IOP-LAB após implantação e reinicialização completa da VM de plataforma. A validação confirmou:
+
+- retorno automático dos projetos Compose e de seus dados persistentes;
+- disponibilidade de NetBox, Zabbix, GLPI, Grafana e Portainer;
+- geração reproduzível de etiquetas QR no NetBox;
+- abertura e recuperação correlacionada de incidente sintético no fluxo Zabbix–GLPI;
+- coleta da ponte Zabbix–GLPI pelo Prometheus e dashboard dedicado no Grafana;
+- criação de backups atuais de NetBox, Zabbix, GLPI e observabilidade;
+- restauração isolada bem-sucedida dos quatro conjuntos de backup.
+
+Os valores, endereços e registros específicos do ambiente permanecem fora do repositório público.
 
 ## Executive overview
 

@@ -2,7 +2,7 @@
 
 ## Resumo executivo
 
-O projeto consolida ferramentas utilizadas em operações de infraestrutura em uma plataforma integrada, segura e observável. Trata-se de uma implementação autoral e reproduzível em ambiente controlado de validação, baseada em desafios, padrões operacionais e necessidades observados ao longo da experiência profissional.
+O projeto consolida ferramentas utilizadas em operações de infraestrutura em uma plataforma integrada, segura e observável. A autoria está na arquitetura, integração, automação, proteção, validação e documentação do conjunto — não no desenvolvimento dos produtos que o compõem. A implementação é reproduzível em ambiente controlado de validação e foi orientada por desafios, padrões operacionais e necessidades observados ao longo da experiência profissional.
 
 ## Contexto
 
@@ -66,6 +66,8 @@ ADRs, runbooks, inventário, política de segurança, roadmap e validação auto
 - backups consistentes com réplica externa criptografada e restauração isolada;
 - alertas por severidade com Alertmanager e entrega de e-mail validada;
 - GLPI implantado com backup, validações e integração idempotente Zabbix–GLPI;
+- etiquetas QR do NetBox implantadas de forma reproduzível e homologadas após reinicialização;
+- recuperação isolada validada para NetBox, Zabbix, GLPI e observabilidade;
 - roadmap claro para exercícios periódicos e evolução da resiliência.
 
 ## Decisões relevantes
