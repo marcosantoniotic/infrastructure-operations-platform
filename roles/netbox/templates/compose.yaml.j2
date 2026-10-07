@@ -1,8 +1,8 @@
 name: netbox
 
 x-netbox-common: &netbox-common
-  image: {{ netbox_custom_image_name if netbox_topology_views_enabled else netbox_image }}
-{% if netbox_topology_views_enabled %}
+  image: {{ netbox_custom_image_name if (netbox_topology_views_enabled or netbox_qrcode_enabled) else netbox_image }}
+{% if netbox_topology_views_enabled or netbox_qrcode_enabled %}
   build:
     context: .
     dockerfile: Dockerfile

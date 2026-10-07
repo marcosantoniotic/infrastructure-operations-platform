@@ -151,7 +151,7 @@ convergir.
 - Valkey principal e cache;
 - worker em processo separado;
 - sincronização Zabbix em serviço separado;
-- plugins de topologia, QR code e cálculo IP;
+- plugins versionados de topologia e geração de etiquetas QR;
 - frontend publicado somente pelo Traefik.
 - inventário demonstrativo opcional e idempotente, limitado ao ambiente de
   validação e composto exclusivamente por nomes fictícios e prefixos RFC 5737.

@@ -1,1 +1,6 @@
+{% if netbox_topology_views_enabled %}
 netbox-topology-views=={{ netbox_topology_views_version }}
+{% endif %}
+{% if netbox_qrcode_enabled %}
+netbox-qrcode=={{ netbox_qrcode_version }}
+{% endif %}

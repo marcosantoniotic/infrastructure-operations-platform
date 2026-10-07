@@ -3,6 +3,22 @@ set -Eeuo pipefail
 
 readonly artifact_dir="${CI_ARTIFACT_DIR:?CI_ARTIFACT_DIR is required}"
 
+grep --fixed-strings --quiet \
+  "netbox-qrcode==0.0.21" \
+  "${artifact_dir}/netbox/plugin-requirements.txt"
+grep --fixed-strings --quiet \
+  '"netbox_qrcode"' \
+  "${artifact_dir}/netbox/plugins.py"
+grep --fixed-strings --quiet \
+  "COPY topology-role-unknown.svg" \
+  "${artifact_dir}/netbox/Dockerfile"
+if grep --fixed-strings --quiet \
+  "COPY topology-role-unknown.svg" \
+  "${artifact_dir}/netbox/Dockerfile.qrcode-only"; then
+  echo "QR-only NetBox Dockerfile must not copy the Topology Views fallback icon." >&2
+  exit 1
+fi
+
 for service in traefik cloudflare_tunnel zabbix netbox netbox_zabbix_sync portainer glpi zabbix_glpi_bridge observability; do
   docker compose \
     --project-directory "${artifact_dir}/${service}" \
