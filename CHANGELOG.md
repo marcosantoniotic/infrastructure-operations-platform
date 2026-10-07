@@ -5,6 +5,23 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Adicionado
+
+- plugin `netbox-qrcode` 0.0.21 na imagem customizada do NetBox, com suporte a
+  etiquetas QR nas páginas dos objetos e validação explícita de pacote e
+  registro em `PLUGINS`;
+- parâmetros independentes para habilitar e fixar a versão do QR Code sem
+  acoplá-lo ao NetBox Topology Views.
+
+### Alterado
+
+- imagens da plataforma atualizadas para a baseline validada com NetBox 4.6.10,
+  Traefik 3.7.13, Zabbix 7.4.13, GLPI 11.0.11, Prometheus 3.13.3 e Grafana
+  13.1.6;
+- tratamento de atualização do NetBox e do GLPI fortalecido com migrações
+  explícitas e validações pós-convergência;
+- documentação do NetBox alinhada aos plugins efetivamente instalados.
+
 ## [1.1.2] - 2026-09-07
 
 ### Adicionado
@@ -156,7 +173,8 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 - backup e restauração isolada do PostgreSQL;
 - primeira pipeline de validação e segurança de publicação.
 
-[Unreleased]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/marcosantoniotic/infrastructure-operations-platform/compare/v0.2.0...v1.0.0

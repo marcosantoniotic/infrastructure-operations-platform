@@ -1,10 +1,17 @@
 PLUGINS = [
+{% if netbox_topology_views_enabled %}
     "netbox_topology_views",
+{% endif %}
+{% if netbox_qrcode_enabled %}
+    "netbox_qrcode",
+{% endif %}
 ]
 
 PLUGINS_CONFIG = {
+{% if netbox_topology_views_enabled %}
     "netbox_topology_views": {
         "allow_coordinates_saving": True,
         "always_save_coordinates": True,
     },
+{% endif %}
 }

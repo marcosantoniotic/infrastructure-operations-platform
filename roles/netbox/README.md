@@ -80,6 +80,23 @@ associada, evitando nós invisíveis em topologias recém-implantadas.
 Após a implantação, a role coleta os arquivos estáticos do plugin e valida que
 seu JavaScript principal responde com HTTP 200 antes de concluir.
 
+## NetBox QR Code
+
+O plugin `netbox-qrcode` também é instalado por padrão na imagem derivada. Ele
+gera etiquetas QR diretamente nas páginas de dispositivos, módulos, racks,
+cabos, locais, painéis e alimentações elétricas, sem persistir imagens geradas
+no banco ou no volume de mídia.
+
+```yaml
+netbox_qrcode_enabled: true
+netbox_qrcode_version: "0.0.21"
+```
+
+A versão é fixada e validada durante cada convergência. Desabilite o recurso
+com `netbox_qrcode_enabled: false` quando a instalação não precisar gerar
+etiquetas. A imagem customizada é reconstruída automaticamente quando a lista
+ou a configuração dos plugins muda.
+
 ## Inventário demonstrativo
 
 `netbox_provision_demo_inventory` é desabilitado por padrão. Quando ativado
@@ -102,6 +119,7 @@ O cache não é tratado como dado crítico.
 - healthchecks;
 - endpoint `/login/` respondendo com HTTP 200 ou 302.
 - NetBox Topology Views instalado, habilitado e sem migrações pendentes;
+- NetBox QR Code instalado, habilitado e com versão compatível validada;
 - rota HTTPS do Traefik respondendo com HTTP 200;
 - HSTS e proteção contra content-type sniffing presentes;
 - segundo passe do Ansible sem alterações.

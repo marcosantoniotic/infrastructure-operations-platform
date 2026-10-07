@@ -64,11 +64,35 @@
       ansible.builtin.include_vars:
         file: ../../roles/netbox/defaults/main.yml
 
-    - name: Render NetBox Compose definition
+    - name: Render NetBox definitions
       ansible.builtin.template:
-        src: ../../roles/netbox/templates/compose.yaml.j2
-        dest: "{{ ci_output_dir }}/netbox/compose.yaml"
+        src: "../../roles/netbox/templates/{{ item.source }}"
+        dest: "{{ ci_output_dir }}/netbox/{{ item.destination }}"
         mode: "0644"
+      loop:
+        - source: compose.yaml.j2
+          destination: compose.yaml
+        - source: Dockerfile.j2
+          destination: Dockerfile
+        - source: plugin-requirements.txt.j2
+          destination: plugin-requirements.txt
+        - source: plugins.py.j2
+          destination: plugins.py
+
+    - name: Disable Topology Views for the NetBox QR-only fixture
+      ansible.builtin.set_fact:
+        ci_netbox_topology_views_enabled: "{{ netbox_topology_views_enabled }}"
+        netbox_topology_views_enabled: false
+
+    - name: Render NetBox QR-only Dockerfile fixture
+      ansible.builtin.template:
+        src: ../../roles/netbox/templates/Dockerfile.j2
+        dest: "{{ ci_output_dir }}/netbox/Dockerfile.qrcode-only"
+        mode: "0644"
+
+    - name: Restore the NetBox Topology Views setting
+      ansible.builtin.set_fact:
+        netbox_topology_views_enabled: "{{ ci_netbox_topology_views_enabled }}"
 
     - name: Create sanitized NetBox environment fixture
       ansible.builtin.copy:

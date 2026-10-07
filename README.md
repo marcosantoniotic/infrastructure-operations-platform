@@ -8,7 +8,7 @@
 ![Ingress](https://img.shields.io/badge/ingress-Traefik-24A1C1?logo=traefikproxy&logoColor=white)
 ![Security](https://img.shields.io/badge/security-Zero%20Trust-0F9D58)
 ![Evidence](https://img.shields.io/badge/portfolio_evidence-verified-2EA44F)
-![Release](https://img.shields.io/badge/release-v1.1.2-6f42c1)
+![Release](https://img.shields.io/badge/release-v1.1.3--candidate-6f42c1)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Validation](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml/badge.svg)](https://github.com/marcosantoniotic/infrastructure-operations-platform/actions/workflows/validation.yml)
 
@@ -124,6 +124,7 @@ flowchart LR
 - mapa Zabbix completo com triggers reais;
 - dashboard executivo do ecossistema no Grafana;
 - sincronização controlada entre NetBox e Zabbix;
+- etiquetas QR versionadas e reproduzíveis para objetos do NetBox;
 - incidentes idempotentes entre Zabbix e GLPI, com correlação de recuperação;
 - exemplos públicos completamente sanitizados.
 
@@ -185,6 +186,7 @@ Consulte também as provas de [stacks no Portainer](docs/evidence/portainer-stac
 - [Módulo Cloudflare Tunnel](roles/cloudflare_tunnel/README.md)
 - [Publicação segura](docs/publishing-checklist.md)
 - [Changelog](CHANGELOG.md)
+- [Candidata de manutenção v1.1.3](docs/releases/v1.1.3.md)
 - [Release corretiva v1.1.2](docs/releases/v1.1.2.md)
 - [Release corretiva v1.1.1](docs/releases/v1.1.1.md)
 - [Baseline da release v1.1.0](docs/releases/v1.1.0.md)
@@ -274,6 +276,10 @@ A versão corretiva `v1.1.2` consolida a visibilidade operacional do GLPI,
 valida a integridade dos arquivos de mídia referenciados pelo NetBox e atualiza
 a ação de upload SARIF do CodeQL. Consulte as
 [notas da release](docs/releases/v1.1.2.md).
+
+A candidata `v1.1.3` atualiza as imagens validadas da plataforma, fortalece o
+tratamento de upgrades e incorpora etiquetas QR reproduzíveis ao NetBox 4.6.
+Consulte as [notas da release](docs/releases/v1.1.3.md).
 
 O GLPI é tratado como fase própria e segue o mesmo modelo de proxy, identidade,
 backup e isolamento de dados. Eventos qualificados do Zabbix abrem tickets
