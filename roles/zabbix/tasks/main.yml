@@ -5,6 +5,13 @@
 - name: Protect installed HTTPS context
   ansible.builtin.import_tasks: installed-guard.yml
 
+- name: Require an explicit trusted HTTPS proxy CIDR before changes
+  ansible.builtin.assert:
+    that:
+      - zabbix_trusted_https_proxy_subnet | iop_trusted_proxy_cidr
+      - zabbix_enable_traefik | bool
+  when: zabbix_trusted_https_proxy_enabled | bool
+
 - name: Validate Zabbix variables
   ansible.builtin.assert:
     that:
@@ -151,13 +158,6 @@
     group: root
     mode: "0640"
     backup: true
-
-- name: Require an explicit trusted HTTPS proxy CIDR
-  ansible.builtin.assert:
-    that:
-      - zabbix_trusted_https_proxy_subnet | iop_trusted_proxy_cidr
-      - zabbix_enable_traefik | bool
-  when: zabbix_trusted_https_proxy_enabled | bool
 
 - name: Render restricted nginx HTTPS context for the pinned Alpine frontend
   ansible.builtin.template:

@@ -52,6 +52,11 @@ segmentação de redes, acesso HTTPS direto e por túnel, recuperação do MySQL
 correções de confiança TLS e cookies. O relato distingue o que foi validado no
 ambiente do que ainda precisa ser consolidado na automação pública.
 
+A [consolidação de automação](docs/testing/validation-automation-consolidation.md)
+publica as opções reutilizáveis e os bloqueios de preservação, com testes e
+defaults conservadores. O ingress completo e os pins privados não são
+reproduzidos automaticamente; nenhum deploy é realizado por essa publicação.
+
 Essa revisão documental não cria uma nova release, não altera o ambiente
 operacional e não substitui o inventário privado. Guias visuais didáticos e
 fichas pessoais de estudo permanecem locais; diagramas de arquitetura e
