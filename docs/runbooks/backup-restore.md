@@ -12,7 +12,29 @@ replicados para um repositório Restic criptografado no OneDrive. Uma recuperaç
 completa dos dados das aplicações foi comprovada em uma terceira VM isolada,
 reconstruída por Ansible, sem alterar o ambiente principal.
 
-## NetBox
+## Proteção de uma mudança pontual no laboratório
+
+Além das rotinas automatizadas da baseline, uma correção de infraestrutura ou
+segurança precisa de uma captura pré-mudança com escopo explícito. Confirmar
+snapshot concluído, dump consistente, arquivos da aplicação, configurações e
+inventário correspondentes. Conferir espaço na raiz e no destino antes de
+criar cópias; não iniciar outro dump em filesystem sem capacidade.
+
+Copiar o conjunto para destino privado externo à VM, comparar hashes e testar
+leitura dos arquivos. Checksum e `pg_restore --list` não equivalem a uma
+restauração completa. Registrar separadamente o que foi restaurado em isolamento
+e o que apenas passou por verificação de arquivo. Manter chaves e segredos sob
+permissões restritas; um arquivo de configuração pode conter dados sensíveis.
+
+Não executar limpeza genérica, excluir cadastros ou apagar volumes para liberar
+espaço. Dimensionamento de filesystem, reparo de Redis e descarte de arquivo
+incompleto exigem diagnóstico e escopo próprios, preservando os dados antes.
+
+Para corrupção do MySQL após queda de alimentação, seguir o
+[runbook de recuperação isolada](mysql-recovery.md). Um banco iniciado em modo
+de recuperação forçada não é um destino operacional válido.
+
+## Rotina de backup do NetBox
 
 O timer `netbox-backup.timer` executa diariamente e grava os conjuntos em:
 
