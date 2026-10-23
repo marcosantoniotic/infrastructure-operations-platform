@@ -51,7 +51,7 @@ grep --fixed-strings --quiet 'CSRF_COOKIE_SECURE = True' "${artifact_dir}/netbox
 grep --fixed-strings --quiet 'session.cookie_secure=On' "${artifact_dir}/glpi/php-security.https.ini"
 grep --fixed-strings --quiet '192.0.2.0/24' "${artifact_dir}/glpi/proxy-https.conf"
 grep --fixed-strings --quiet '"1:https" on;' "${artifact_dir}/zabbix/proxy-cookie-context.conf"
-grep --fixed-strings --quiet 'fastcgi_param HTTPS $iop_cookie_https;' "${artifact_dir}/zabbix/fastcgi-cookie-params"
+grep --extended-regexp --quiet 'fastcgi_param[[:space:]]+HTTPS[[:space:]]+\$iop_cookie_https if_not_empty;' "${artifact_dir}/zabbix/fastcgi-cookie-params"
 
 docker run --rm \
   --entrypoint /bin/promtool \
