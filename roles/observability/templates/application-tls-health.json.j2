@@ -48,7 +48,7 @@
         "justifyMode": "center",
         "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}
       },
-      "targets": [{"expr": "sum(probe_success{job=\"blackbox-http\"} == 0)", "refId": "A"}],
+      "targets": [{"expr": "sum(1 - probe_success{job=\"blackbox-http\"})", "refId": "A"}],
       "title": "Serviços com falha",
       "type": "stat"
     },

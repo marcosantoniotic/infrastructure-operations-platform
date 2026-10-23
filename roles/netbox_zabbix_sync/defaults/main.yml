@@ -12,3 +12,6 @@ netbox_zabbix_sync_hostid_field: zabbix_hostid
 netbox_zabbix_sync_netbox_env_file: /opt/netbox/.env
 netbox_zabbix_sync_netbox_network: netbox_backend
 netbox_zabbix_sync_zabbix_network: zabbix_backend
+
+iop_internal_api_tls_network: ""
+iop_internal_api_ca_certificate: ""

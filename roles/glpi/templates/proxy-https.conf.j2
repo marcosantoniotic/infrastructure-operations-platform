@@ -1,0 +1,2 @@
+# Trust HTTPS context only from the explicitly configured proxy network.
+SetEnvIfExpr "-R '{{ glpi_trusted_proxy_subnet }}' && req('X-Forwarded-Proto') == 'https'" HTTPS=on

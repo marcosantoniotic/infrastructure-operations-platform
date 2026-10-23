@@ -1,0 +1,9 @@
+---
+- name: Refuse silent removal of installed HTTPS proxy context
+  ansible.builtin.assert:
+    that:
+      - not installed.zabbix_https or zabbix_trusted_https_proxy_enabled | bool
+    fail_msg: Preserve the installed trusted proxy setting before deploying this frontend.
+  vars:
+    installed: "{{ (zabbix_mysql_existing_compose_content.content | b64decode | from_yaml) | iop_installed_features('zabbix-web') }}"
+  when: zabbix_mysql_existing_compose.stat.exists

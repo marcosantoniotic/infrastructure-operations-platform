@@ -56,9 +56,11 @@ if ($LASTEXITCODE -notin @(0, $null)) { throw 'Standby preflight failed.' }
 if ($LASTEXITCODE -notin @(0, $null)) { throw 'Platform preflight failed.' }
 
 $configuration = Get-Content -LiteralPath $configurationFile -Raw | ConvertFrom-Json
+. (Join-Path $PSScriptRoot 'ValidationConfiguration.ps1')
+$configuration.standby_ip = Get-ValidationServiceAddress -Configuration $configuration -Machine 'srv02-standby'
 $controller = "automation@$($configuration.controller_ip)"
 $remoteRoot = '/home/automation/infrastructure-operations-platform'
-$options = @('-i', $privateKey, '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=NUL', '-o', 'ConnectTimeout=10')
+$options = @('-i', $privateKey, '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=10')
 $utf8 = [Text.UTF8Encoding]::new($false)
 New-Item -ItemType Directory -Path $groupVarsRoot -Force | Out-Null
 

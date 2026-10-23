@@ -20,6 +20,30 @@ is exposed to the validation network.
 - the default Zabbix administrator password is replaced during first deployment;
 - persistent database and operational script data use named volumes.
 
+## Existing or recovered MySQL storage
+
+By default `zabbix_mysql_external_volume: ""` retains the original
+Compose-managed `mysql_data` behavior. To reuse a separately restored and
+validated volume, set its name **only in the intended environment's private
+inventory**:
+
+```yaml
+zabbix_mysql_external_volume: existing-validated-mysql-volume
+```
+
+The role requires that external volume to exist, even in check mode. It never
+creates an empty fallback, repairs data, or deletes the previous volume. Before
+any deployment changes, it also refuses to replace an external volume selected
+by the installed Compose definition with an empty/default or different name.
+Treat volume migration as a separate backup-and-restore operation. The previous
+Compose file is backed up when rendering changes.
+
+For local validation, keep this selection in the ignored
+`.validation/ansible/group_vars/all/20-storage.yml`, outside the generated
+Zabbix section of `main.yml`. `Run-ValidationZabbix.ps1` stages that file when
+present. Other inventories must not inherit it. These safeguards address storage
+selection only; review other private runtime customizations before a full deploy.
+
 ## Managed operational map
 
 The role provisions an idempotent `Infrastructure Operations Platform` map
@@ -66,3 +90,14 @@ SNMP and agentless checks are initiated outbound by Zabbix Server. A future
 requirement for remote passive agents must use a separately reviewed Zabbix
 Proxy or an explicit Docker forwarding policy; changing the bind address alone
 is intentionally rejected.
+
+## HTTPS cookies behind a trusted proxy
+
+`zabbix_trusted_https_proxy_enabled` defaults to false. For a tested Alpine nginx
+frontend, it mounts a restricted HTTPS map and FastCGI parameters so Zabbix can
+emit Secure cookies when TLS terminates at the proxy. Configure the explicit
+`zabbix_trusted_https_proxy_subnet`; never trust arbitrary forwarded headers.
+Test against the pinned image, its nginx include paths and both ingress paths
+before enabling. Only recreate the web frontend for this change; do not rebuild
+or replace database volumes. This does not add an explicit SameSite attribute
+to Zabbix's application-managed cookie.

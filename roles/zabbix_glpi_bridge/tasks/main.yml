@@ -1,4 +1,7 @@
 ---
+- name: Protect installed API TLS settings
+  ansible.builtin.import_tasks: installed-guard.yml
+  when: zabbix_glpi_bridge_enabled | bool
 - name: Validate Zabbix-GLPI bridge settings
   ansible.builtin.assert:
     that:
@@ -70,6 +73,30 @@
   register: zabbix_glpi_bridge_secret_files
   no_log: true
   when: zabbix_glpi_bridge_enabled | bool
+
+- name: Validate optional internal TLS transport
+  ansible.builtin.assert:
+    that:
+      - zabbix_glpi_bridge_glpi_url.startswith('https://')
+      - iop_internal_api_tls_network is match('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+      - zabbix_glpi_bridge_zabbix_url.startswith('https://')
+      - iop_internal_api_ca_certificate.startswith('-----BEGIN CERTIFICATE-----')
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - iop_internal_api_tls_network | length > 0
+
+- name: Store public CA for internal TLS clients
+  ansible.builtin.copy:
+    content: "{{ iop_internal_api_ca_certificate }}"
+    dest: "{{ zabbix_glpi_bridge_project_dir }}/internal-api-ca.crt"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  register: zabbix_glpi_bridge_tls_ca
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - iop_internal_api_tls_network | length > 0
 
 - name: Create private bridge metrics network
   community.docker.docker_network:
@@ -399,6 +426,7 @@
           zabbix_glpi_bridge_secret_files.changed | default(false) or
           zabbix_glpi_bridge_artifacts.changed | default(false) or
           zabbix_glpi_bridge_client_id_file.changed | default(false)
+          or zabbix_glpi_bridge_tls_ca.changed | default(false)
         ) else 'auto' }}
   when: zabbix_glpi_bridge_enabled | bool
 

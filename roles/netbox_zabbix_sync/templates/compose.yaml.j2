@@ -7,6 +7,10 @@ services:
       - {{ netbox_zabbix_sync_netbox_env_file }}
     environment:
       ZABBIX_URL: {{ netbox_zabbix_sync_zabbix_url }}
+{% if iop_internal_api_tls_network | length > 0 %}
+      SSL_CERT_FILE: /run/ca/internal-api-ca.crt
+      REQUESTS_CA_BUNDLE: /run/ca/internal-api-ca.crt
+{% endif %}
       ZABBIX_API_TOKEN_FILE: /run/secrets/zabbix_api_token
       ZABBIX_GROUP: {{ netbox_zabbix_sync_group | to_json }}
       ZABBIX_TEMPLATE: {{ netbox_zabbix_sync_template | to_json }}
@@ -25,11 +29,22 @@ services:
     volumes:
       - ./netbox-zabbix-sync.py:/usr/local/libexec/netbox-zabbix-sync.py:ro,Z
       - ./secrets/zabbix_api_token:/run/secrets/zabbix_api_token:ro,Z
+{% if iop_internal_api_tls_network | length > 0 %}
+      - ./internal-api-ca.crt:/run/ca/internal-api-ca.crt:ro,Z
+{% endif %}
     networks:
+{% if iop_internal_api_tls_network | length > 0 %}
+      - api-tls
+{% endif %}
       - netbox
       - zabbix
 
 networks:
+{% if iop_internal_api_tls_network | length > 0 %}
+  api-tls:
+    name: {{ iop_internal_api_tls_network }}
+    external: true
+{% endif %}
   netbox:
     name: {{ netbox_zabbix_sync_netbox_network }}
     external: true

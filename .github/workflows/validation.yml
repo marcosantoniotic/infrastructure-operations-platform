@@ -71,6 +71,22 @@ jobs:
             exit 1
           }
 
+      - name: Test private validation configuration staging
+        shell: pwsh
+        run: ./scripts/tests/Test-ValidationConfiguration.ps1
+
+      - name: Test optional network and installed-state safety filters
+        shell: bash
+        run: |
+          python scripts/tests/test_validation_safety.py
+          ruby scripts/tests/test_validation_network.rb
+          bash -n automation/scripts/Configure-ValidationInfrastructure.sh
+          bash automation/scripts/Configure-ValidationInfrastructure.sh --validate-only 192.0.2.20/24 192.0.2.1 192.0.2.10
+          if bash automation/scripts/Configure-ValidationInfrastructure.sh --validate-only 192.0.2.0/24 192.0.2.1 192.0.2.10; then
+            echo 'Network address was not rejected.' >&2
+            exit 1
+          fi
+
       - name: Reject whitespace errors
         shell: bash
         run: git diff --check HEAD^ HEAD
@@ -152,6 +168,12 @@ jobs:
           ansible-playbook
           --inventory localhost,
           scripts/ci/render-validation-artifacts.yml
+
+      - name: Test installed-state deployment refusal guards
+        run: >-
+          ansible-playbook
+          --inventory localhost,
+          scripts/ci/test-installed-guards.yml
 
       - name: Validate Compose and Prometheus artifacts
         run: ./scripts/ci/validate-service-artifacts.sh

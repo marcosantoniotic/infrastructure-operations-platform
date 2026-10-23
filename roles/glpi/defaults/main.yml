@@ -55,3 +55,8 @@ glpi_php_post_max_size: 64M
 glpi_php_session_cookie_secure: true
 glpi_php_session_cookie_httponly: true
 glpi_php_session_cookie_samesite: Lax
+# Opt in per environment alongside a patched PHP image; not a replacement for it.
+glpi_php_security_hardening: false
+glpi_https_cookie_hardening: false
+glpi_trusted_proxy_subnet: ""
+glpi_tls_ca_file: ""

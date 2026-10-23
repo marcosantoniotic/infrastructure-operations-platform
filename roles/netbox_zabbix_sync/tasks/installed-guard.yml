@@ -1,0 +1,20 @@
+---
+- ansible.builtin.stat:
+    path: "{{ netbox_zabbix_sync_project_dir }}/compose.yaml"
+  register: sync_installed_file
+- ansible.builtin.slurp:
+    src: "{{ netbox_zabbix_sync_project_dir }}/compose.yaml"
+  register: sync_installed_compose
+  when: sync_installed_file.stat.exists
+  no_log: true
+- name: Refuse to remove an installed TLS network or downgrade API transport
+  ansible.builtin.assert:
+    that:
+      - not data.get('networks', {}).get('api-tls') or data.networks['api-tls'].name == iop_internal_api_tls_network
+      - not old_url.startswith('https://') or netbox_zabbix_sync_zabbix_url.startswith('https://')
+    fail_msg: Preserve the installed TLS transport and network in private overrides before deploying.
+  vars:
+    data: "{{ sync_installed_compose.content | b64decode | from_yaml }}"
+    old_url: "{{ data.services['netbox-zabbix-sync'].get('environment', {}).get('ZABBIX_URL', '') }}"
+  when: sync_installed_file.stat.exists
+  no_log: true

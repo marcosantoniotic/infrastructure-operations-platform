@@ -3,6 +3,9 @@ zabbix_project_dir: /opt/zabbix
 zabbix_server_image: zabbix/zabbix-server-mysql:7.4.13-alpine
 zabbix_web_image: zabbix/zabbix-web-nginx-mysql:7.4.13-alpine
 zabbix_mysql_image: mysql:8.4.10-oraclelinux9
+# Empty preserves the original Compose-managed volume. Nonempty requires an
+# existing external volume; the role never creates a recovered database.
+zabbix_mysql_external_volume: ""
 
 zabbix_database_name: zabbix
 zabbix_database_user: zabbix
@@ -43,3 +46,7 @@ zabbix_agent2_release_package: >-
   https://repo.zabbix.com/zabbix/7.4/release/rhel/9/noarch/zabbix-release-latest-7.4.el9.noarch.rpm
 zabbix_agent2_server_active: 127.0.0.1:10051
 zabbix_agent2_template_name: Linux by Zabbix agent active
+
+# Alpine nginx frontend only; defaults leave all existing inventories unchanged.
+zabbix_trusted_https_proxy_enabled: false
+zabbix_trusted_https_proxy_subnet: ""

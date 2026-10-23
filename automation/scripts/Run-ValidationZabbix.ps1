@@ -14,6 +14,7 @@ $ansibleRoot = Join-Path $validationRoot 'ansible'
 $inventory = Join-Path $ansibleRoot 'hosts.yml'
 $groupVarsRoot = Join-Path $ansibleRoot 'group_vars\all'
 $groupVars = Join-Path $groupVarsRoot 'main.yml'
+. (Join-Path $PSScriptRoot 'ValidationConfiguration.ps1')
 $vaultFile = Join-Path $groupVarsRoot 'vault.yml'
 $vaultPasswordFile = Join-Path $ansibleRoot 'vault-password.txt'
 $credentialFile = Join-Path $validationRoot 'zabbix-initial-credentials.txt'
@@ -71,13 +72,13 @@ if ($LASTEXITCODE -notin @(0, $null)) {
 }
 
 $configuration = Get-Content -LiteralPath $vagrantConfig -Raw | ConvertFrom-Json
+$configuration.platform_ip = Get-ValidationServiceAddress -Configuration $configuration -Machine 'srv01-validation'
 $controller = "automation@$($configuration.controller_ip)"
 $remoteRoot = '/home/automation/infrastructure-operations-platform'
 $commonOptions = @(
     '-i', $privateKey,
     '-o', 'BatchMode=yes',
-    '-o', 'StrictHostKeyChecking=no',
-    '-o', 'UserKnownHostsFile=NUL',
+    '-o', 'StrictHostKeyChecking=yes',
     '-o', 'ConnectTimeout=10'
 )
 
@@ -232,6 +233,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Failed to stage the Zabbix playbook.' }
 if ($LASTEXITCODE -ne 0) { throw 'Failed to stage the validation inventory.' }
 & scp.exe @commonOptions $groupVars "${controller}:$remoteRoot/inventories/validation/group_vars/all/main.yml"
 if ($LASTEXITCODE -ne 0) { throw 'Failed to stage validation variables.' }
+Sync-ValidationOverrides -ProjectRoot $projectRoot -Controller $controller -RemoteRoot $remoteRoot -SshOptions $commonOptions
 foreach ($role in @($dockerRole, $zabbixRole)) {
     & scp.exe @commonOptions -r $role "${controller}:$remoteRoot/roles/"
     if ($LASTEXITCODE -ne 0) { throw "Failed to stage role: $role" }

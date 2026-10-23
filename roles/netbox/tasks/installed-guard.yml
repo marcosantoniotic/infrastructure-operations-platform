@@ -1,0 +1,19 @@
+---
+- name: Inspect installed NetBox Compose before changing anything
+  ansible.builtin.stat:
+    path: "{{ netbox_project_dir }}/compose.yaml"
+  register: netbox_installed_file
+- name: Read installed NetBox feature flags privately
+  ansible.builtin.slurp:
+    src: "{{ netbox_project_dir }}/compose.yaml"
+  register: netbox_installed_compose
+  when: netbox_installed_file.stat.exists
+  no_log: true
+- name: Refuse silent removal of installed secure cookies
+  ansible.builtin.assert:
+    that:
+      - not installed.netbox_cookies or netbox_secure_cookies | bool
+    fail_msg: Preserve the installed cookie protection in this environment's private overrides before deployment.
+  vars:
+    installed: "{{ (netbox_installed_compose.content | b64decode | from_yaml) | iop_installed_features('netbox') }}"
+  when: netbox_installed_file.stat.exists

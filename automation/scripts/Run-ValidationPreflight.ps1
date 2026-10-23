@@ -10,6 +10,7 @@ $validationRoot = Join-Path $projectRoot '.validation'
 $privateKey = Join-Path $validationRoot 'id_ed25519'
 $vagrantConfig = Join-Path $validationRoot 'vagrant.json'
 $ansibleRoot = Join-Path $validationRoot 'ansible'
+. (Join-Path $PSScriptRoot 'ValidationConfiguration.ps1')
 $inventory = Join-Path $ansibleRoot 'hosts.yml'
 $playbook = Join-Path $projectRoot 'playbooks\preflight.yml'
 
@@ -21,8 +22,8 @@ foreach ($path in @($privateKey, $vagrantConfig, $playbook)) {
 
 $configuration = Get-Content -LiteralPath $vagrantConfig -Raw | ConvertFrom-Json
 $controllerAddress = $configuration.controller_ip
-$platformAddress = $configuration.platform_ip
-$standbyAddress = $configuration.standby_ip
+$platformAddress = Get-ValidationServiceAddress -Configuration $configuration -Machine 'srv01-validation'
+$standbyAddress = Get-ValidationServiceAddress -Configuration $configuration -Machine 'srv02-standby'
 $adminUsername = 'automation'
 
 if ($TargetGroup -eq 'standby' -and -not $standbyAddress) {
@@ -73,15 +74,13 @@ $inventoryContent = $inventoryContent -replace "`r`n", "`n"
 $sshOptions = @(
     '-i', $privateKey,
     '-o', 'BatchMode=yes',
-    '-o', 'StrictHostKeyChecking=no',
-    '-o', 'UserKnownHostsFile=NUL',
+    '-o', 'StrictHostKeyChecking=yes',
     '-o', 'ConnectTimeout=10'
 )
 $scpOptions = @(
     '-i', $privateKey,
     '-o', 'BatchMode=yes',
-    '-o', 'StrictHostKeyChecking=no',
-    '-o', 'UserKnownHostsFile=NUL',
+    '-o', 'StrictHostKeyChecking=yes',
     '-o', 'ConnectTimeout=10'
 )
 $controller = "$adminUsername@$controllerAddress"
@@ -89,7 +88,7 @@ $remoteRoot = "/home/$adminUsername/infrastructure-operations-platform"
 
 Write-Host "Preparing Ansible controller: $controllerAddress"
 & ssh.exe @sshOptions $controller `
-    "install -d -m 0700 /home/$adminUsername/.ssh; install -d -m 0755 $remoteRoot/playbooks $remoteRoot/inventories/validation"
+    "install -d -m 0700 /home/$adminUsername/.ssh; install -d -m 0755 $remoteRoot/playbooks $remoteRoot/inventories/validation/group_vars/all"
 if ($LASTEXITCODE -ne 0) {
     throw 'Failed to prepare the automation controller.'
 }
@@ -107,13 +106,15 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Failed to stage the preflight playbook.'
 }
 
+Sync-ValidationOverrides -ProjectRoot $projectRoot -Controller $controller -RemoteRoot $remoteRoot -SshOptions $scpOptions
+
 $remotePreflight = @"
 set -e
 install -m 0600 /tmp/validation_id_ed25519 /home/$adminUsername/.ssh/id_ed25519
 rm -f /tmp/validation_id_ed25519
 touch /home/$adminUsername/.ssh/known_hosts
 ssh-keygen -F $targetAddress -f /home/$adminUsername/.ssh/known_hosts >/dev/null ||
-  ssh-keyscan -H $targetAddress >> /home/$adminUsername/.ssh/known_hosts
+  { echo 'Enroll the verified target host key on the controller before preflight.' >&2; exit 1; }
 cd $remoteRoot
 ansible $TargetGroup -i inventories/validation/hosts.yml --list-hosts |
   grep -q -- '$targetHostname'

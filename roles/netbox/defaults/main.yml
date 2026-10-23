@@ -46,3 +46,6 @@ netbox_validation_host: 127.0.0.1
 netbox_provision_demo_inventory: false
 netbox_demo_site_name: Validation Facility
 netbox_demo_cluster_name: Infrastructure Operations Validation
+
+# Enable only after both browser access paths use HTTPS.
+netbox_secure_cookies: false

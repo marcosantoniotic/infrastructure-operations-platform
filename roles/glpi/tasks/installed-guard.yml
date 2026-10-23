@@ -1,0 +1,20 @@
+---
+- name: Inspect installed GLPI Compose before changing anything
+  ansible.builtin.stat:
+    path: "{{ glpi_project_dir }}/compose.yaml"
+  register: glpi_installed_file
+- name: Read installed GLPI feature flags without exposing configuration
+  ansible.builtin.slurp:
+    src: "{{ glpi_project_dir }}/compose.yaml"
+  register: glpi_installed_compose
+  when: glpi_installed_file.stat.exists
+  no_log: true
+- name: Refuse silent removal of installed PHP or HTTPS protection
+  ansible.builtin.assert:
+    that:
+      - not installed.php_security or glpi_php_security_hardening | bool
+      - not installed.https_cookies or glpi_https_cookie_hardening | bool
+    fail_msg: Preserve the installed hardening flags in this environment's private overrides before deployment.
+  vars:
+    installed: "{{ (glpi_installed_compose.content | b64decode | from_yaml) | iop_installed_features('glpi') }}"
+  when: glpi_installed_file.stat.exists

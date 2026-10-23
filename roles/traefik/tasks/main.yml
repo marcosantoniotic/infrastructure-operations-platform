@@ -1,4 +1,6 @@
 ---
+- name: Protect unrepresented installed ingress settings
+  ansible.builtin.import_tasks: installed-guard.yml
 - name: Validate Traefik variables
   ansible.builtin.assert:
     that:
@@ -62,6 +64,40 @@
       mode: "0750"
     - path: "{{ traefik_project_dir }}/certs"
       mode: "0750"
+
+- name: Create optional private API TLS network
+  ansible.builtin.assert:
+    that:
+      - iop_internal_api_tls_network is match('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+      - iop_internal_api_tls_network not in [traefik_proxy_network, traefik_socket_network]
+      - iop_internal_api_tls_aliases | length > 0
+      - traefik_enable_https | bool
+  when: iop_internal_api_tls_network | length > 0
+
+- name: Inspect existing private API network without changing it
+  ansible.builtin.command:
+    argv: [docker, network, inspect, "{{ iop_internal_api_tls_network }}"]
+  changed_when: false
+  failed_when: false
+  register: traefik_existing_api_network
+  check_mode: false
+  when: iop_internal_api_tls_network | length > 0
+
+- name: Refuse automatic recreation of a non-internal API network
+  ansible.builtin.assert:
+    that:
+      - (traefik_existing_api_network.stdout | from_json | first).Internal | bool
+    fail_msg: Existing API network is not internal; migrate it separately instead of recreating a live network.
+  when:
+    - iop_internal_api_tls_network | length > 0
+    - traefik_existing_api_network.rc == 0
+
+- name: Create optional private API TLS network when absent
+  community.docker.docker_network:
+    name: "{{ iop_internal_api_tls_network }}"
+    internal: true
+    state: present
+  when: iop_internal_api_tls_network | length > 0
 
 - name: Install Traefik TLS certificate
   ansible.builtin.copy:

@@ -81,13 +81,14 @@ if ($EnableTraefik) {
 }
 
 $configuration = Get-Content -LiteralPath $vagrantConfig -Raw | ConvertFrom-Json
+. (Join-Path $PSScriptRoot 'ValidationConfiguration.ps1')
+$configuration.standby_ip = Get-ValidationServiceAddress -Configuration $configuration -Machine 'srv02-standby'
 $controller = "automation@$($configuration.controller_ip)"
 $remoteRoot = '/home/automation/infrastructure-operations-platform'
 $commonOptions = @(
     '-i', $privateKey,
     '-o', 'BatchMode=yes',
-    '-o', 'StrictHostKeyChecking=no',
-    '-o', 'UserKnownHostsFile=NUL',
+    '-o', 'StrictHostKeyChecking=yes',
     '-o', 'ConnectTimeout=10'
 )
 

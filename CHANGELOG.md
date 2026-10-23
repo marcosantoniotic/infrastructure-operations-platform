@@ -15,8 +15,19 @@ versionamento segue [Semantic Versioning](https://semver.org/).
   de inicialização, desligamento e espaço em disco;
 - exclusão explícita de guias didáticos pessoais do escopo de publicação.
 
-Esta atualização documenta validações locais; não publica os ajustes de
-automação ainda em revisão nem representa uma atualização das aplicações.
+### Automação de validação
+
+- consolidação opt-in dos cookies Secure, contexto HTTPS restrito e CA das APIs;
+- proteção da identidade do volume MySQL recuperado e recusa de downgrade das
+  proteções reconhecidas nas definições instaladas;
+- rede VMware de serviços opcional, preservando o caminho administrativo;
+- staging dos overrides privados e filtros, com verificação estrita de host keys;
+- testes de configuração, guards e templates com opções ligadas/desligadas;
+- bloqueio de deploy genérico do Traefik diante de customizações não representadas.
+
+Não houve deploy nesta consolidação nem atualização das imagens de aplicação.
+Os inventários e pins privados, assim como o ingress completo do laboratório,
+não são reproduzidos automaticamente pela baseline pública.
 
 ## [1.1.3] - 2026-10-07
 

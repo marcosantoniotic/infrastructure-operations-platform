@@ -1,0 +1,60 @@
+---
+- name: Validate the optional external MySQL volume name
+  ansible.builtin.assert:
+    that:
+      - zabbix_mysql_external_volume is string
+      - >-
+        zabbix_mysql_external_volume == '' or
+        zabbix_mysql_external_volume is match('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+    fail_msg: "Use an existing Docker volume name, not a path or a Compose expression."
+
+- name: Locate the existing Zabbix Compose definition
+  ansible.builtin.stat:
+    path: "{{ zabbix_project_dir }}/compose.yaml"
+  register: zabbix_mysql_existing_compose
+
+- name: Read the existing Zabbix volume selection
+  ansible.builtin.slurp:
+    src: "{{ zabbix_project_dir }}/compose.yaml"
+  register: zabbix_mysql_existing_compose_content
+  when: zabbix_mysql_existing_compose.stat.exists
+  no_log: true
+
+- name: Refuse silent replacement of an already external MySQL volume
+  ansible.builtin.assert:
+    that:
+      - >-
+        (current_volume | iop_external_volume_name) == '' or
+        (current_volume | iop_external_volume_name) == zabbix_mysql_external_volume
+    fail_msg: >-
+      The installed Compose definition selects an external MySQL volume.
+      Declare that same volume in this environment's private inventory before
+      deploying. An empty/default or different selection is blocked; no data
+      migration, volume creation or fallback is performed by this role.
+  vars:
+    current_volume: >-
+      {{ (zabbix_mysql_existing_compose_content.content | b64decode | from_yaml)
+         .get('volumes', {}).get('mysql_data') or {} }}
+  when: zabbix_mysql_existing_compose.stat.exists
+
+- name: Inspect the explicitly selected external MySQL volume without creating it
+  ansible.builtin.command:
+    argv:
+      - docker
+      - volume
+      - inspect
+      - "{{ zabbix_mysql_external_volume }}"
+  register: zabbix_mysql_external_volume_inspect
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: zabbix_mysql_external_volume | length > 0
+
+- name: Require the selected external MySQL volume to exist
+  ansible.builtin.assert:
+    that:
+      - zabbix_mysql_external_volume_inspect.rc == 0
+    fail_msg: >-
+      The selected external MySQL volume is unavailable. Restore and validate
+      it separately before deploying; do not initialize a new empty database.
+  when: zabbix_mysql_external_volume | length > 0

@@ -1,0 +1,32 @@
+---
+- name: Write sanitized installed Compose fixture
+  ansible.builtin.copy:
+    content: "{{ scenario.compose | to_nice_yaml }}"
+    dest: "{{ fixture_root }}/compose.yaml"
+    mode: '0600'
+- name: Reset case result
+  ansible.builtin.set_fact:
+    guard_rejected: false
+- name: Exercise the actual role guard without running the deployment
+  block:
+    - name: Read-only role precondition
+      ansible.builtin.include_tasks: "../../roles/{{ scenario.role }}/tasks/{{ scenario.task }}"
+      vars:
+        glpi_project_dir: "{{ fixture_root }}"
+        netbox_project_dir: "{{ fixture_root }}"
+        zabbix_project_dir: "{{ fixture_root }}"
+        traefik_project_dir: "{{ fixture_root }}"
+        glpi_php_security_hardening: "{{ scenario.php | default(false) }}"
+        glpi_https_cookie_hardening: false
+        netbox_secure_cookies: "{{ scenario.cookies | default(false) }}"
+        zabbix_mysql_external_volume: "{{ scenario.volume | default('') }}"
+        iop_internal_api_tls_network: ''
+  rescue:
+    - name: Record guard refusal
+      ansible.builtin.set_fact:
+        guard_rejected: true
+- name: Assert expected outcome
+  ansible.builtin.assert:
+    that:
+      - guard_rejected == scenario.reject
+    fail_msg: "Installed-state guard returned an unexpected outcome for {{ scenario.role }}."

@@ -9,6 +9,7 @@ $validationRoot = Join-Path $projectRoot '.validation'
 $privateKey = Join-Path $validationRoot 'id_ed25519'
 $vagrantConfig = Join-Path $validationRoot 'vagrant.json'
 $ansibleRoot = Join-Path $validationRoot 'ansible'
+. (Join-Path $PSScriptRoot 'ValidationConfiguration.ps1')
 $inventory = Join-Path $ansibleRoot 'hosts.yml'
 $groupVarsRoot = Join-Path $ansibleRoot 'group_vars\all'
 $groupVars = Join-Path $groupVarsRoot 'main.yml'
@@ -90,8 +91,7 @@ $remoteRoot = '/home/automation/infrastructure-operations-platform'
 $commonOptions = @(
     '-i', $privateKey,
     '-o', 'BatchMode=yes',
-    '-o', 'StrictHostKeyChecking=no',
-    '-o', 'UserKnownHostsFile=NUL',
+    '-o', 'StrictHostKeyChecking=yes',
     '-o', 'ConnectTimeout=10'
 )
 
@@ -137,11 +137,19 @@ $remotePkiScript = @"
 set -e
 pki=/home/automation/.ansible/validation-pki
 files=$remoteRoot/inventories/validation/files/traefik
-if [ ! -s "`$pki/ca.key" ] || [ ! -s "`$pki/ca.crt" ]; then
+if { [ -e "`$pki/ca.key" ] || [ -e "`$pki/ca.crt" ]; } &&
+   { [ ! -s "`$pki/ca.key" ] || [ ! -s "`$pki/ca.crt" ]; }; then
+  echo 'Incomplete existing CA; restore it explicitly before deployment.' >&2
+  exit 1
+fi
+if [ ! -e "`$pki/ca.key" ] && [ ! -e "`$pki/ca.crt" ]; then
   openssl req -x509 -newkey rsa:3072 -nodes -sha256 -days 3650 \
     -subj "/CN=Infrastructure-Operations-Validation-CA" \
+    -addext "basicConstraints=critical,CA:TRUE" \
+    -addext "keyUsage=critical,keyCertSign,cRLSign" \
     -keyout "`$pki/ca.key" -out "`$pki/ca.crt"
 fi
+openssl verify -x509_strict -CAfile "`$pki/ca.crt" "`$pki/ca.crt"
 if [ ! -s "`$pki/tls.key" ] || [ ! -s "`$pki/tls.crt" ] || \
    ! openssl x509 -in "`$pki/tls.crt" -noout -checkhost netbox.localhost >/dev/null 2>&1 || \
    ! openssl x509 -in "`$pki/tls.crt" -noout -checkhost zabbix.localhost >/dev/null 2>&1 || \
@@ -257,6 +265,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Failed to stage the Traefik playbook.' }
 if ($LASTEXITCODE -ne 0) { throw 'Failed to stage the validation inventory.' }
 & scp.exe @commonOptions $groupVars "${controller}:$remoteRoot/inventories/validation/group_vars/all/main.yml"
 if ($LASTEXITCODE -ne 0) { throw 'Failed to stage validation variables.' }
+
+Sync-ValidationOverrides -ProjectRoot $projectRoot -Controller $controller -RemoteRoot $remoteRoot -SshOptions $commonOptions
 
 $vaultArgument = ''
 if (

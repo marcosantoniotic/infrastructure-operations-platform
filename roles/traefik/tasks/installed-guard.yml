@@ -1,0 +1,25 @@
+---
+- name: Locate installed ingress definitions before changing anything
+  ansible.builtin.stat:
+    path: "{{ traefik_project_dir }}/{{ item }}"
+  loop: [compose.yaml, traefik.yml]
+  register: traefik_installed_files
+- name: Read installed ingress definitions privately
+  ansible.builtin.slurp:
+    src: "{{ item.stat.path }}"
+  loop: "{{ traefik_installed_files.results }}"
+  when: item.stat.exists
+  register: traefik_installed_content
+  no_log: true
+- name: Refuse to overwrite unrepresented ingress services or entrypoints
+  ansible.builtin.assert:
+    that:
+      - not data.get('services') or (data.services.keys() | difference(['traefik', 'docker-socket-proxy', 'whoami']) | length == 0)
+      - not data.get('entryPoints') or (data.entryPoints.keys() | difference(['web', 'websecure', 'metrics']) | length == 0)
+      - not data.get('networks', {}).get('api-tls') or data.networks['api-tls'].name == iop_internal_api_tls_network
+    fail_msg: Installed custom ingress/PKI must be reconciled into a reviewed design before a full Traefik deploy. No changes made.
+  vars:
+    data: "{{ item.content | b64decode | from_yaml }}"
+  loop: "{{ traefik_installed_content.results }}"
+  when: not item.skipped | default(false)
+  no_log: true

@@ -1,4 +1,7 @@
 ---
+- name: Protect installed API TLS settings
+  ansible.builtin.import_tasks: installed-guard.yml
+  when: netbox_zabbix_sync_enabled | bool
 - name: Validate NetBox-Zabbix synchronization settings
   ansible.builtin.assert:
     that:
@@ -36,6 +39,29 @@
   no_log: true
   when: netbox_zabbix_sync_enabled | bool
 
+- name: Validate optional internal TLS transport
+  ansible.builtin.assert:
+    that:
+      - netbox_zabbix_sync_zabbix_url.startswith('https://')
+      - iop_internal_api_tls_network is match('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+      - iop_internal_api_ca_certificate.startswith('-----BEGIN CERTIFICATE-----')
+  when:
+    - netbox_zabbix_sync_enabled | bool
+    - iop_internal_api_tls_network | length > 0
+
+- name: Store public CA for internal TLS clients
+  ansible.builtin.copy:
+    content: "{{ iop_internal_api_ca_certificate }}"
+    dest: "{{ netbox_zabbix_sync_project_dir }}/internal-api-ca.crt"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  register: netbox_zabbix_sync_tls_ca
+  when:
+    - netbox_zabbix_sync_enabled | bool
+    - iop_internal_api_tls_network | length > 0
+
 - name: Render NetBox-Zabbix synchronization artifacts
   ansible.builtin.template:
     src: "{{ item.src }}"
@@ -66,6 +92,7 @@
       {{ 'always' if (
           netbox_zabbix_sync_token_file.changed | default(false) or
           netbox_zabbix_sync_artifacts.changed | default(false)
+          or netbox_zabbix_sync_tls_ca.changed | default(false)
         ) else 'auto' }}
   when: netbox_zabbix_sync_enabled | bool
 
