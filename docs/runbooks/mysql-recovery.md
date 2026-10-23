@@ -54,8 +54,9 @@ Ela deve falhar se o volume recuperado estiver ausente ou se uma convergência
 tentasse substituir silenciosamente sua identidade. Não criar um volume vazio
 como fallback para uma seleção externa que não existe.
 
-Esse bloqueio foi validado na automação local do laboratório; sua consolidação
-na baseline pública permanece uma mudança de código separada desta publicação.
+Esse bloqueio passou pela [consolidação da automação de validação](../testing/validation-automation-consolidation.md).
+A identidade real do volume permanece no inventário privado; sua presença deve
+ser verificada antes de qualquer novo deploy.
 
 ## Encerramento e rollback
 

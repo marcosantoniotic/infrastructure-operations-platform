@@ -60,6 +60,14 @@
         dest: "{{ ci_output_dir }}/zabbix/compose.yaml"
         mode: "0644"
 
+    - name: Render Zabbix existing external MySQL volume fixture
+      ansible.builtin.template:
+        src: ../../roles/zabbix/templates/compose.yaml.j2
+        dest: "{{ ci_output_dir }}/zabbix/compose.external-volume.yaml"
+        mode: "0644"
+      vars:
+        zabbix_mysql_external_volume: ci-existing-mysql-volume
+
     - name: Load NetBox defaults
       ansible.builtin.include_vars:
         file: ../../roles/netbox/defaults/main.yml
@@ -145,6 +153,16 @@
           destination: .env
         - source: custom-php.ini.j2
           destination: custom-php.ini
+        - source: php-security.ini.j2
+          destination: php-security.ini
+
+    - name: Render opt-in GLPI PHP security fixture
+      ansible.builtin.template:
+        src: ../../roles/glpi/templates/compose.yaml.j2
+        dest: "{{ ci_output_dir }}/glpi/compose.php-security.yaml"
+        mode: "0644"
+      vars:
+        glpi_php_security_hardening: true
 
     - name: Create sanitized GLPI secret fixtures
       ansible.builtin.copy:
@@ -198,3 +216,35 @@
           destination: alerts.yml
         - source: blackbox.yml.j2
           destination: blackbox.yml
+
+    - name: Render opt-in HTTPS and cookie artifacts separately from defaults
+      ansible.builtin.template:
+        src: "../../roles/{{ item.role }}/templates/{{ item.source }}"
+        dest: "{{ ci_output_dir }}/{{ item.role }}/{{ item.destination }}"
+        mode: '0644'
+      vars:
+        glpi_php_security_hardening: true
+        glpi_https_cookie_hardening: true
+        glpi_trusted_proxy_subnet: 192.0.2.0/24
+        netbox_secure_cookies: true
+        zabbix_trusted_https_proxy_enabled: true
+        zabbix_trusted_https_proxy_subnet: 192.0.2.0/24
+        iop_internal_api_tls_network: ci-api-tls
+        iop_internal_api_tls_aliases: [glpi.localhost, zabbix.localhost]
+        iop_internal_api_ca_certificate: ci-public-certificate-placeholder
+        netbox_zabbix_sync_netbox_url: https://netbox.localhost
+        netbox_zabbix_sync_zabbix_url: https://zabbix.localhost/api_jsonrpc.php
+        zabbix_glpi_bridge_glpi_url: https://glpi.localhost
+        zabbix_glpi_bridge_zabbix_url: https://zabbix.localhost/api_jsonrpc.php
+      loop:
+        - {role: glpi, source: compose.yaml.j2, destination: compose.https.yaml}
+        - {role: glpi, source: php-security.ini.j2, destination: php-security.https.ini}
+        - {role: glpi, source: proxy-https.conf.j2, destination: proxy-https.conf}
+        - {role: netbox, source: compose.yaml.j2, destination: compose.https.yaml}
+        - {role: netbox, source: cookie-security.py.j2, destination: cookie-security.py}
+        - {role: zabbix, source: compose.yaml.j2, destination: compose.https.yaml}
+        - {role: zabbix, source: proxy-cookie-context.conf.j2, destination: proxy-cookie-context.conf}
+        - {role: zabbix, source: fastcgi-cookie-params.j2, destination: fastcgi-cookie-params}
+        - {role: traefik, source: compose.yaml.j2, destination: compose.https.yaml}
+        - {role: netbox_zabbix_sync, source: compose.yaml.j2, destination: compose.https.yaml}
+        - {role: zabbix_glpi_bridge, source: compose.yaml.j2, destination: compose.https.yaml}

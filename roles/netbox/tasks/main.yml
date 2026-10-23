@@ -1,4 +1,6 @@
 ---
+- name: Protect installed cookie settings
+  ansible.builtin.import_tasks: installed-guard.yml
 - name: Evaluate NetBox secret requirements without exposing values
   ansible.builtin.set_fact:
     netbox_secret_validation:
@@ -164,6 +166,17 @@
     group: root
     mode: "0640"
 
+- name: Render opt-in HTTPS-only browser cookies
+  ansible.builtin.template:
+    src: cookie-security.py.j2
+    dest: "{{ netbox_project_dir }}/cookie-security.py"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  register: netbox_cookie_security_result
+  when: netbox_secure_cookies | bool
+
 - name: Validate rendered Compose configuration
   ansible.builtin.command:
     cmd: docker compose --project-directory {{ netbox_project_dir }} config --quiet
@@ -188,6 +201,20 @@
     wait: true
     wait_timeout: "{{ netbox_compose_wait_timeout }}"
   register: netbox_compose_result
+
+- name: Reload changed cookie settings without recreating persistent services
+  community.docker.docker_compose_v2:
+    project_src: "{{ netbox_project_dir }}"
+    services: [netbox]
+    dependencies: false
+    state: present
+    recreate: always
+    pull: never
+    wait: true
+    wait_timeout: "{{ netbox_compose_wait_timeout }}"
+  when:
+    - not ansible_check_mode
+    - netbox_cookie_security_result.changed | default(false)
 
 - name: Apply pending NetBox database migrations
   ansible.builtin.command:

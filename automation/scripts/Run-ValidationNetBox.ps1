@@ -15,6 +15,7 @@ $validationRoot = Join-Path $projectRoot '.validation'
 $privateKey = Join-Path $validationRoot 'id_ed25519'
 $vagrantConfig = Join-Path $validationRoot 'vagrant.json'
 $ansibleRoot = Join-Path $validationRoot 'ansible'
+. (Join-Path $PSScriptRoot 'ValidationConfiguration.ps1')
 $groupVarsRoot = Join-Path $ansibleRoot 'group_vars\all'
 $groupVars = Join-Path $groupVarsRoot 'main.yml'
 $vaultFile = Join-Path $groupVarsRoot 'vault.yml'
@@ -72,6 +73,11 @@ if ($LASTEXITCODE -notin @(0, $null)) {
 }
 
 $configuration = Get-Content -LiteralPath $vagrantConfig -Raw | ConvertFrom-Json
+$provisionDemoInventory = $true
+if ($configuration.PSObject.Properties.Name -contains 'netbox_provision_demo_inventory') {
+    $provisionDemoInventory = [Convert]::ToBoolean($configuration.netbox_provision_demo_inventory)
+}
+$provisionDemoInventoryYaml = $provisionDemoInventory.ToString().ToLowerInvariant()
 $controllerAddress = $configuration.controller_ip
 $adminUsername = 'automation'
 $controller = "$adminUsername@$controllerAddress"
@@ -154,7 +160,7 @@ netbox_superuser_name: admin
 netbox_superuser_email: '$escapedAdminEmail'
 netbox_superuser_password: "{{ vault_netbox_superuser_password }}"
 netbox_enable_metrics: true
-netbox_provision_demo_inventory: true
+netbox_provision_demo_inventory: $provisionDemoInventoryYaml
 netbox_demo_site_name: Validation Facility
 netbox_demo_cluster_name: Infrastructure Operations Validation
 $netboxTraefikVariablesYaml
@@ -171,8 +177,7 @@ netbox_validation_host: 127.0.0.1
 $commonOptions = @(
     '-i', $privateKey,
     '-o', 'BatchMode=yes',
-    '-o', 'StrictHostKeyChecking=no',
-    '-o', 'UserKnownHostsFile=NUL',
+    '-o', 'StrictHostKeyChecking=yes',
     '-o', 'ConnectTimeout=10'
 )
 
@@ -253,6 +258,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Failed to stage the NetBox playbook.' }
 & scp.exe @commonOptions $groupVars `
     "${controller}:$remoteRoot/inventories/validation/group_vars/all/main.yml"
 if ($LASTEXITCODE -ne 0) { throw 'Failed to stage NetBox variables.' }
+Sync-ValidationOverrides -ProjectRoot $projectRoot -Controller $controller -RemoteRoot $remoteRoot -SshOptions $commonOptions
 foreach ($role in @($dockerRole, $netboxRole)) {
     & scp.exe @commonOptions -r $role "${controller}:$remoteRoot/roles/"
     if ($LASTEXITCODE -ne 0) { throw "Failed to stage role: $role" }

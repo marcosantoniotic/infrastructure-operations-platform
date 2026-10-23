@@ -92,8 +92,12 @@ services:
       retries: 10
     restart: unless-stopped
     networks:
-      - proxy
-      - socket-proxy
+      proxy: {}
+      socket-proxy: {}
+{% if iop_internal_api_tls_network | length > 0 %}
+      api-tls:
+        aliases: {{ iop_internal_api_tls_aliases | to_json }}
+{% endif %}
 
 {% if traefik_enable_validation_service %}
   whoami:
@@ -121,6 +125,11 @@ services:
 {% endif %}
 
 networks:
+{% if iop_internal_api_tls_network | length > 0 %}
+  api-tls:
+    name: {{ iop_internal_api_tls_network }}
+    external: true
+{% endif %}
   proxy:
     name: {{ traefik_proxy_network }}
     driver: bridge

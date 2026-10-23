@@ -90,6 +90,9 @@ services:
         protocol: tcp
     volumes:
       - media_data:/opt/netbox/netbox/media
+{% if netbox_secure_cookies | bool %}
+      - ./cookie-security.py:/etc/netbox/config/zz-iop-cookie-security.py:ro,Z
+{% endif %}
 {% if netbox_enable_traefik %}
     labels:
       - traefik.enable=true

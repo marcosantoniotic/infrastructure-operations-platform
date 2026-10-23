@@ -1,0 +1,9 @@
+# Trust HTTPS context only from the explicitly configured reverse proxy network.
+geo $iop_cookie_trusted_proxy {
+    default 0;
+    {{ zabbix_trusted_https_proxy_subnet }} 1;
+}
+map "$iop_cookie_trusted_proxy:$http_x_forwarded_proto" $iop_cookie_https {
+    default "";
+    "1:https" on;
+}

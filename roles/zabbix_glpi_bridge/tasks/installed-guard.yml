@@ -1,0 +1,21 @@
+---
+- ansible.builtin.stat:
+    path: "{{ zabbix_glpi_bridge_project_dir }}/compose.yaml"
+  register: bridge_installed_file
+- ansible.builtin.slurp:
+    src: "{{ zabbix_glpi_bridge_project_dir }}/compose.yaml"
+  register: bridge_installed_compose
+  when: bridge_installed_file.stat.exists
+  no_log: true
+- name: Refuse removal of installed TLS transport or network
+  ansible.builtin.assert:
+    that:
+      - not data.get('networks', {}).get('api-tls') or data.networks['api-tls'].name == iop_internal_api_tls_network
+      - not env.get('GLPI_URL', '').startswith('https://') or zabbix_glpi_bridge_glpi_url.startswith('https://')
+      - not env.get('ZABBIX_URL', '').startswith('https://') or zabbix_glpi_bridge_zabbix_url.startswith('https://')
+    fail_msg: Preserve installed API TLS settings in this environment's private overrides before deployment.
+  vars:
+    data: "{{ bridge_installed_compose.content | b64decode | from_yaml }}"
+    env: "{{ data.services['zabbix-glpi-bridge'].get('environment', {}) }}"
+  when: bridge_installed_file.stat.exists
+  no_log: true

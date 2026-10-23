@@ -47,6 +47,12 @@ services:
       - glpi_logs:/var/glpi/logs
       - glpi_marketplace:/var/glpi/marketplace
       - ./custom-php.ini:/usr/local/etc/php/conf.d/zz-iop.ini:ro,Z
+{% if glpi_php_security_hardening | bool %}
+      - ./php-security.ini:/usr/local/etc/php/conf.d/zzz-iop-security.ini:ro,Z
+{% endif %}
+{% if glpi_https_cookie_hardening | bool %}
+      - ./proxy-https.conf:/etc/apache2/conf-enabled/zz-iop-proxy-https.conf:ro,Z
+{% endif %}
     labels:
       - traefik.enable={{ glpi_enable_traefik | bool | lower }}
 {% if glpi_enable_traefik %}

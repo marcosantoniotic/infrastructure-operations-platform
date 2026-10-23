@@ -1,0 +1,9 @@
+; Complements, never substitutes, a patched PHP runtime.
+session.upload_progress.enabled=0
+fatal_error_backtraces=0
+{% if glpi_https_cookie_hardening | bool %}
+session.cookie_secure=On
+session.cookie_httponly=On
+session.cookie_samesite={{ glpi_php_session_cookie_samesite }}
+session.use_strict_mode=On
+{% endif %}

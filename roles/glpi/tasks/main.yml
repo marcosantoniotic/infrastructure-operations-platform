@@ -1,4 +1,6 @@
 ---
+- name: Protect installed GLPI security settings
+  ansible.builtin.import_tasks: installed-guard.yml
 - name: Evaluate GLPI secret requirements without exposing values
   ansible.builtin.set_fact:
     glpi_secret_validation:
@@ -83,6 +85,16 @@
 
 - name: Validate Docker service
   ansible.builtin.service_facts: {}
+
+- name: Require explicit HTTPS cookie prerequisites
+  ansible.builtin.assert:
+    that:
+      - glpi_php_security_hardening | bool
+      - glpi_enable_traefik | bool
+      - glpi_trusted_proxy_subnet | iop_trusted_proxy_cidr
+      - glpi_tls_ca_file.startswith('/')
+    fail_msg: HTTPS-only cookies require a trusted proxy CIDR and CA file; migrate API clients to TLS first.
+  when: glpi_https_cookie_hardening | bool
 
 - name: Assert Docker is running
   ansible.builtin.assert:
@@ -188,6 +200,18 @@
     owner: root
     group: root
     mode: "0640"
+    backup: true
+
+- name: Render isolated PHP security advisory settings
+  ansible.builtin.template:
+    src: php-security.ini.j2
+    dest: "{{ glpi_project_dir }}/php-security.ini"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  register: glpi_security_ini_result
+  when: glpi_php_security_hardening | bool
 
 - name: Render GLPI Compose project
   ansible.builtin.template:
@@ -196,6 +220,17 @@
     owner: root
     group: root
     mode: "0640"
+
+- name: Render restricted proxy HTTPS context
+  ansible.builtin.template:
+    src: proxy-https.conf.j2
+    dest: "{{ glpi_project_dir }}/proxy-https.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  register: glpi_proxy_https_result
+  when: glpi_https_cookie_hardening | bool
 
 - name: Validate rendered GLPI Compose configuration
   ansible.builtin.command:
@@ -214,18 +249,30 @@
     wait_timeout: "{{ glpi_compose_wait_timeout }}"
   when: not ansible_check_mode
 
+- name: Reload changed read-only security mounts without recreating the database
+  community.docker.docker_compose_v2:
+    project_src: "{{ glpi_project_dir }}"
+    services: [glpi]
+    dependencies: false
+    state: present
+    recreate: always
+    pull: never
+    wait: true
+    wait_timeout: "{{ glpi_compose_wait_timeout }}"
+  when:
+    - not ansible_check_mode
+    - glpi_security_ini_result.changed | default(false) or glpi_proxy_https_result.changed | default(false)
+
 - name: Wait for GLPI HTTP endpoint
   ansible.builtin.uri:
     url: "http://{{ glpi_validation_host }}:{{ glpi_http_port }}/"
     method: GET
-    status_code:
-      - 200
-      - 302
+    status_code: "{{ [400] if glpi_https_cookie_hardening else [200, 302] }}"
     follow_redirects: none
   register: glpi_http_result
   retries: 60
   delay: 5
-  until: glpi_http_result.status in [200, 302]
+  until: glpi_http_result.status in ([400] if glpi_https_cookie_hardening else [200, 302])
   when: not ansible_check_mode
 
 - name: Validate GLPI runtime requirements
@@ -593,14 +640,11 @@
 
 - name: Validate GLPI through Traefik HTTPS
   ansible.builtin.command:
-    argv:
-      - curl
-      - --silent
-      - --insecure
-      - --include
-      - --resolve
-      - "{{ glpi_traefik_hostname }}:{{ glpi_traefik_https_port }}:{{ glpi_traefik_validation_address }}"
-      - "https://{{ glpi_traefik_hostname }}:{{ glpi_traefik_https_port }}/"
+    argv: >-
+      {{ ['curl', '--silent', '--show-error', '--include'] +
+         (['--cacert', glpi_tls_ca_file] if glpi_https_cookie_hardening else ['--insecure']) +
+         ['--resolve', glpi_traefik_hostname ~ ':' ~ glpi_traefik_https_port ~ ':' ~ glpi_traefik_validation_address,
+          'https://' ~ glpi_traefik_hostname ~ ':' ~ glpi_traefik_https_port ~ '/'] }}
   register: glpi_traefik_response
   changed_when: false
   retries: 20

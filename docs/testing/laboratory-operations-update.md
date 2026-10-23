@@ -9,8 +9,10 @@ produção. Dados de acesso, nomes reais, endereços, identificadores de volumes
 chaves, exports e logs permanecem no inventário privado.
 
 **Estado validado não equivale a funcionalidade publicada.** Esta atualização é
-documental. Ajustes recentes de roles, runners, imagens derivadas e inventários
-continuam locais, pendentes de revisão e publicação próprias. Executar a
+documental. As partes reutilizáveis de roles e runners foram posteriormente
+revisadas na [consolidação de automação](validation-automation-consolidation.md).
+Imagens derivadas, inventários e customizações completas de ingress permanecem
+privados ou pendentes de reconciliação. Executar a
 baseline pública não reproduz automaticamente todas as configurações abaixo.
 Não executar um provisionamento completo apenas para testar um acesso.
 
@@ -92,8 +94,8 @@ roteadores nessa rodada. Os arquivos de evidência bruta não são públicos.
 
 ## Próximas consolidações
 
-- revisar e publicar separadamente a automação local, mantendo opções novas
-  desativadas nos inventários não aprovados;
+- manter opções novas desativadas nos inventários não aprovados e concluir
+  a reprodução integral da automação consolidada em ambiente limpo;
 - reconciliar integralmente as customizações de DNS, Traefik, CRL e portas
   antes de uma convergência completa do laboratório;
 - repetir reprodução em ambiente limpo e os testes adequados ao escopo dessa

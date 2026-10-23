@@ -34,3 +34,7 @@ zabbix_glpi_bridge_glpi_recovery_status: 5
 
 zabbix_glpi_bridge_netbox_url: "https://netbox.<BASE_DOMAIN>"
 zabbix_glpi_bridge_webhook_token: "<BRIDGE_WEBHOOK_TOKEN>"
+
+# Optional private TLS transport. Empty preserves existing deployments.
+iop_internal_api_tls_network: ""
+iop_internal_api_ca_certificate: ""

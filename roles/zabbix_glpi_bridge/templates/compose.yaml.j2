@@ -12,6 +12,10 @@ services:
       BRIDGE_STATE_DB: /var/lib/zabbix-glpi-bridge/correlation.sqlite3
       BRIDGE_WEBHOOK_TOKEN_FILE: /run/secrets/bridge_webhook_token
       GLPI_URL: {{ zabbix_glpi_bridge_glpi_url | to_json }}
+{% if iop_internal_api_tls_network | length > 0 %}
+      SSL_CERT_FILE: /run/ca/internal-api-ca.crt
+      REQUESTS_CA_BUNDLE: /run/ca/internal-api-ca.crt
+{% endif %}
       GLPI_WEB_URL: {{ zabbix_glpi_bridge_glpi_web_url | to_json }}
       GLPI_USER: {{ zabbix_glpi_bridge_glpi_user | to_json }}
       GLPI_PROFILE_ID: {{ zabbix_glpi_bridge_glpi_profile_id | string | to_json }}
@@ -47,6 +51,9 @@ services:
       - ./secrets/glpi_oauth_client_id:/run/secrets/glpi_oauth_client_id:ro,Z
       - ./secrets/glpi_oauth_secret:/run/secrets/glpi_oauth_secret:ro,Z
       - ./secrets/zabbix_api_token:/run/secrets/zabbix_api_token:ro,Z
+{% if iop_internal_api_tls_network | length > 0 %}
+      - ./internal-api-ca.crt:/run/ca/internal-api-ca.crt:ro,Z
+{% endif %}
     healthcheck:
       test:
         - CMD
@@ -60,6 +67,9 @@ services:
       retries: 10
       start_period: 15s
     networks:
+{% if iop_internal_api_tls_network | length > 0 %}
+      - api-tls
+{% endif %}
       - zabbix
       - glpi
 {% if zabbix_glpi_bridge_metrics_enabled | bool %}
@@ -67,6 +77,11 @@ services:
 {% endif %}
 
 networks:
+{% if iop_internal_api_tls_network | length > 0 %}
+  api-tls:
+    name: {{ iop_internal_api_tls_network }}
+    external: true
+{% endif %}
   zabbix:
     name: {{ zabbix_glpi_bridge_zabbix_network }}
     external: true

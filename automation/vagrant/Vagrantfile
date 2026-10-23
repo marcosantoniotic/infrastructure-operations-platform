@@ -12,6 +12,28 @@ Vagrant.configure("2") do |config|
   end
 
   local_config = JSON.parse(File.read(local_config_path))
+  # Optional infrastructure LAN Segment. The original host-only addresses stay
+  # available as a recovery path and for existing host-side validation runners.
+  require_relative "validation_network"
+  infrastructure = ValidationNetwork.validate(local_config)
+  configure_infrastructure = lambda do |machine, name|
+    address = infrastructure&.fetch("addresses", {})&.fetch(name, nil)
+    next unless address
+
+    machine.vm.provider "vmware_desktop" do |vmware|
+      vmware.vmx["ethernet2.present"] = "TRUE"
+      vmware.vmx["ethernet2.connectionType"] = "pvn"
+      vmware.vmx["ethernet2.pvnID"] = infrastructure.fetch("segment_id")
+      vmware.vmx["ethernet2.virtualDev"] = "vmxnet3"
+      vmware.vmx["ethernet2.addressType"] = "generated"
+      vmware.vmx["ethernet2.pciSlotNumber"] = "224"
+      vmware.vmx["ethernet2.startConnected"] = "TRUE"
+    end
+    machine.vm.provision "shell",
+                         name: "validation-infrastructure-network",
+                         path: File.join(project_root, "automation/scripts/Configure-ValidationInfrastructure.sh"),
+                         args: [address, infrastructure.fetch("gateway"), infrastructure.fetch("dns")]
+  end
   private_key = ENV.fetch(
     "VALIDATION_SSH_PRIVATE_KEY",
     File.join(validation_root, "id_ed25519")
@@ -37,6 +59,7 @@ Vagrant.configure("2") do |config|
   end
 
   config.vm.define "automation-controller", primary: true do |controller|
+    configure_infrastructure.call(controller, "automation-controller")
     controller.vm.hostname = "automation-controller"
     controller.vm.network "private_network", ip: local_config.fetch("controller_ip")
 
@@ -48,6 +71,7 @@ Vagrant.configure("2") do |config|
   end
 
   config.vm.define "srv01-validation" do |platform|
+    configure_infrastructure.call(platform, "srv01-validation")
     platform.vm.hostname = "srv01-validation"
     platform.vm.network "private_network", ip: local_config.fetch("platform_ip")
 
@@ -79,6 +103,7 @@ Vagrant.configure("2") do |config|
 
   if local_config.key?("standby_ip")
     config.vm.define "srv02-standby" do |standby|
+      configure_infrastructure.call(standby, "srv02-standby")
       standby.vm.hostname = "srv02-standby"
       standby.vm.network "private_network", ip: local_config.fetch("standby_ip")
 

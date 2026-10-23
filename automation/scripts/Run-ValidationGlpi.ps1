@@ -11,6 +11,8 @@ $validationRoot = Join-Path $projectRoot '.validation'
 $privateKey = Join-Path $validationRoot 'id_ed25519'
 $vagrantConfig = Join-Path $validationRoot 'vagrant.json'
 $ansibleRoot = Join-Path $validationRoot 'ansible'
+$inventory = Join-Path $ansibleRoot 'hosts.yml'
+. (Join-Path $PSScriptRoot 'ValidationConfiguration.ps1')
 $groupVarsRoot = Join-Path $ansibleRoot 'group_vars\all'
 $groupVars = Join-Path $groupVarsRoot 'main.yml'
 $vaultFile = Join-Path $groupVarsRoot 'vault.yml'
@@ -28,7 +30,7 @@ $vagrantRoot = Join-Path $projectRoot 'automation\vagrant'
 foreach ($path in @(
     $privateKey,
     $vagrantConfig,
-    $inventory = Join-Path $ansibleRoot 'hosts.yml',
+    $inventory,
     $requirements,
     $playbook,
     $preflightRunner
@@ -104,8 +106,7 @@ $remoteRoot = '/home/automation/infrastructure-operations-platform'
 $commonOptions = @(
     '-i', $privateKey,
     '-o', 'BatchMode=yes',
-    '-o', 'StrictHostKeyChecking=no',
-    '-o', 'UserKnownHostsFile=NUL',
+    '-o', 'StrictHostKeyChecking=yes',
     '-o', 'ConnectTimeout=10'
 )
 
@@ -265,6 +266,7 @@ foreach ($copy in @(
     & scp.exe @commonOptions $copy.Source "${controller}:$($copy.Target)"
     if ($LASTEXITCODE -ne 0) { throw "Failed to stage: $($copy.Source)" }
 }
+Sync-ValidationOverrides -ProjectRoot $projectRoot -Controller $controller -RemoteRoot $remoteRoot -SshOptions $commonOptions
 foreach ($role in @($dockerRole, $glpiRole)) {
     & scp.exe @commonOptions -r $role "${controller}:$remoteRoot/roles/"
     if ($LASTEXITCODE -ne 0) { throw "Failed to stage role: $role" }

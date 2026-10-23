@@ -125,6 +125,15 @@ O cache não é tratado como dado crítico.
 - segundo passe do Ansible sem alterações.
 - inventário demonstrativo completo quando sua provisão estiver habilitada.
 
-## Remoção
+## Cookies em acessos HTTPS
+
+`netbox_secure_cookies: true` monta uma configuração separada no frontend para
+`CSRF_COOKIE_SECURE` e `SESSION_COOKIE_SECURE`, sem alterar plugins, origens CSRF,
+tokens ou redirecionamentos. O padrão false preserva outros inventários. Antes
+de habilitar, valide HTTPS nos acessos direto e por túnel; login por um fallback
+HTTP deixa de funcionar com cookies Secure. Não recrie bancos para aplicar esta
+opção. Renove as sessões do navegador para substituir cookies antigos.
+
+## Remoção de dados
 
 O role não remove volumes. Uma remoção completa e destrutiva deve ser executada manualmente somente após backup validado.
