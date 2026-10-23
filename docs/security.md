@@ -118,6 +118,27 @@ Permissões mínimas esperadas:
 
 ## Riscos conhecidos
 
+### Revisão específica do laboratório
+
+Na [rodada de 23/10/2026](testing/laboratory-operations-update.md), foram
+validados ajustes de CA/CRL, transporte das APIs e cookies Secure. A CA passou
+a satisfazer a validação estrita dos clientes, sem relaxar certificado,
+hostname ou verificação de revogação. O certificado público foi distribuído
+somente aos consumidores aprovados; a chave de assinatura permaneceu privada.
+
+Cookies Secure exigem cuidado com contexto HTTPS e integrações: ativá-los no
+GLPI antes de migrar seu cliente HTTP interno pode interromper OAuth. No Zabbix,
+o PHP precisa receber corretamente o contexto HTTPS do proxy. No NetBox, as
+opções de sessão e CSRF devem estar coerentes com os dois caminhos de acesso.
+O [runbook TLS e cookies](runbooks/tls-and-secure-cookies.md) detalha os testes.
+
+A validação de cookies não elimina os riscos abaixo nem demonstra criptografia
+até todos os backends: TLS continua terminando no Traefik. Não transformar o
+relato de uma correção em declaração de hardening global concluído. Os ajustes
+locais de automação ainda têm sua própria etapa de revisão/publicação.
+
+### Riscos que permanecem
+
 - nó único sem alta disponibilidade;
 - agentes passivos remotos exigem desenho futuro com Zabbix Proxy ou política
   explícita para tráfego encaminhado pelo Docker;

@@ -24,7 +24,22 @@ Comprovar que a plataforma pode ser reconstruída a partir de uma instalação l
 | VAL-014 | NetBox com Traefik | publicação por hostname e TLS |
 | VAL-015 | rollback | versão anterior recuperada sem perda de volume |
 
-## Preparação
+## Regressões posteriores da operação do laboratório
+
+Os seguintes critérios complementam a matriz inicial. Os resultados observados
+e seus limites estão na [revisão datada do laboratório](laboratory-operations-update.md),
+sem presumir que toda a automação local foi publicada.
+
+| ID | Cenário | Critério |
+|---|---|---|
+| VAL-016 | HTTPS direto e por túnel | DNS/rotas corretos, certificado/hostname e revogação ativos |
+| VAL-017 | Cookies e login | Secure nos cookies-alvo, CSRF e sessão autenticada preservados |
+| VAL-018 | Integrações após TLS | leitura autenticada e dry-run sem incidentes sintéticos |
+| VAL-019 | Recuperação MySQL | original preservado, importação normal e verificação em isolamento |
+| VAL-020 | Seleção do volume recuperado | automação local recusa ausência ou substituição silenciosa |
+| VAL-021 | Inventário independente | relações, mídias e proveniência conferidas; origem inalterada |
+
+## Preparação da baseline
 
 1. instale RHEL 9 em VM descartável;
 2. crie usuário administrativo com sudo;

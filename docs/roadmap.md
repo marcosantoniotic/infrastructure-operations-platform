@@ -1,5 +1,21 @@
 # Roadmap
 
+## Evolução posterior do laboratório
+
+O [registro de 23/10/2026](testing/laboratory-operations-update.md) separa
+resultados locais da baseline pública. Os itens abaixo não reclassificam a
+release v1.1.3 nem significam que todo o código está disponível no repositório.
+
+- [x] validar inventário independente, acesso direto/túnel e recuperação
+  isolada do MySQL no laboratório;
+- [x] validar CA/CRL, HTTPS dos clientes de integração e cookies Secure;
+- [x] documentar resultados e limites de forma sanitizada;
+- [ ] consolidar e publicar os ajustes locais de automação após revisão;
+- [ ] reconciliar todas as customizações de ingress antes de novo deploy completo;
+- [ ] repetir reprodução em ambiente limpo para a futura mudança de código;
+- [ ] concluir revisão de consumidores antes de qualquer exclusão na origem;
+- [ ] validar segmentação definitiva de recovery e failover em exercícios próprios.
+
 ## Fase 0 — Baseline documentado
 
 - [x] inventário do host e containers;

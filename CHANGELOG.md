@@ -5,6 +5,19 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Documentação
+
+- revisão sanitizada da evolução operacional do laboratório em 23/10/2026,
+  separada da baseline publicada v1.1.3 e das configurações privadas;
+- procedimentos de confiança TLS, renovação de CRL, cookies Secure e
+  recuperação isolada do MySQL, com limites e critérios de verificação;
+- orientação de acesso direto e por túnel, separação de inventários e cuidados
+  de inicialização, desligamento e espaço em disco;
+- exclusão explícita de guias didáticos pessoais do escopo de publicação.
+
+Esta atualização documenta validações locais; não publica os ajustes de
+automação ainda em revisão nem representa uma atualização das aplicações.
+
 ## [1.1.3] - 2026-10-07
 
 ### Adicionado

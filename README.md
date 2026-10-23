@@ -44,6 +44,19 @@ A release `v1.1.3` foi homologada no ambiente IOP-LAB após implantação e rein
 
 Os valores, endereços e registros específicos do ambiente permanecem fora do repositório público.
 
+## Evolução do laboratório após a v1.1.3
+
+A [revisão operacional de 23/10/2026](docs/testing/laboratory-operations-update.md)
+registra a evolução do laboratório corporativo: inventário independente,
+segmentação de redes, acesso HTTPS direto e por túnel, recuperação do MySQL e
+correções de confiança TLS e cookies. O relato distingue o que foi validado no
+ambiente do que ainda precisa ser consolidado na automação pública.
+
+Essa revisão documental não cria uma nova release, não altera o ambiente
+operacional e não substitui o inventário privado. Guias visuais didáticos e
+fichas pessoais de estudo permanecem locais; diagramas de arquitetura e
+evidências operacionais sanitizadas continuam no repositório.
+
 ## Executive overview
 
 O projeto resolve cinco desafios comuns de operações:
@@ -194,6 +207,9 @@ Consulte também as provas de [stacks no Portainer](docs/evidence/portainer-stac
 - [Objetivos de confiabilidade, RPO, RTO e retenção](docs/reliability-objectives.md)
 - [Criticidade e estratégia de continuidade](docs/service-criticality.md)
 - [Resposta a incidentes](docs/runbooks/incident-response.md)
+- [Estado recente do laboratório e limites da validação](docs/testing/laboratory-operations-update.md)
+- [HTTPS, CA, CRL e cookies seguros](docs/runbooks/tls-and-secure-cookies.md)
+- [Recuperação controlada do MySQL](docs/runbooks/mysql-recovery.md)
 - [Contingência de DNS e proxy](docs/runbooks/dns-proxy-contingency.md)
 - [Gestão de mudanças](docs/runbooks/change-management.md)
 - [Adoção segura de IaC para Cloudflare](docs/runbooks/cloudflare-iac-adoption.md)

@@ -67,3 +67,8 @@ automation/vagrant/operational/.vagrant/
 *.vmx
 __pycache__/
 *.pyc
+
+# Personal study material stays local, separate from operational evidence.
+/docs/visual-learning-guide.md
+/docs/evidence/iop-visual-guide*.png
+/docs/study/

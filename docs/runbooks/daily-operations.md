@@ -59,3 +59,24 @@ docker exec <prometheus-container> promtool check config /etc/prometheus/prometh
 - acesso local e externo funcional;
 - filesystem abaixo dos limites definidos;
 - backup recente e verificável.
+
+## Cuidados no laboratório corporativo
+
+- Comparar VMs ligadas, interfaces e redes com o inventário privado, sem
+  interpretar organização de pastas do hypervisor como configuração de rede.
+- Distinguir contêiner operacional com falha de motor de teste intencionalmente
+  parado. `Exited` em uma cópia isolada não implica incidente no ambiente ativo.
+- Verificar `probe_success`, não somente `up`: exporter acessível pode estar
+  reportando falha na aplicação ou no DNS consultado.
+- Conferir espaço da raiz e resultado do Redis quando aplicações apresentarem
+  falhas simultâneas. Não reiniciar tudo antes de preservar o diagnóstico.
+- Verificar DNS, TLS/CRL e os caminhos direto e por túnel separadamente.
+  Secure cookies tornam inadequado o fallback HTTP para login.
+- Usar API autenticada de leitura e dry-run para verificar integrações; não
+  criar chamados ou executar um deploy completo só para testar conectividade.
+- Manter recovery e imagem-base desligados quando não forem necessários ao
+  exercício aprovado. Não desligar roteadores, DNS/AD ou outras dependências
+  compartilhadas sem conferir seus consumidores.
+
+As contagens da [última rodada](../testing/laboratory-operations-update.md) são
+referência datada, não valores fixos para um alarme ou garantia permanente.
