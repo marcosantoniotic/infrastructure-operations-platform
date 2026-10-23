@@ -39,3 +39,5 @@ try{
  if($resolved -ne $root -or (Split-Path $root -Leaf) -notmatch '^iop-config-test-[a-f0-9]{32}$'){throw 'Unsafe fixture cleanup path'}
  Remove-Item -LiteralPath $resolved -Recurse -Force
 }
+# Expected mocked transfer failures must not become the pwsh process exit code.
+$global:LASTEXITCODE = 0
