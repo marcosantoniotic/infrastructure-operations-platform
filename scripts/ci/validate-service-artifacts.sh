@@ -45,7 +45,8 @@ for service in glpi netbox zabbix traefik netbox_zabbix_sync zabbix_glpi_bridge;
   docker compose --project-directory "${artifact_dir}/${service}" \
     --file "${artifact_dir}/${service}/compose.https.yaml" config --quiet
 done
-python3 -m py_compile "${artifact_dir}/netbox/cookie-security.py"
+python3 -c 'import pathlib,sys; p=pathlib.Path(sys.argv[1]); compile(p.read_text(), str(p), "exec")' \
+  "${artifact_dir}/netbox/cookie-security.py"
 grep --fixed-strings --quiet 'SESSION_COOKIE_SECURE = True' "${artifact_dir}/netbox/cookie-security.py"
 grep --fixed-strings --quiet 'CSRF_COOKIE_SECURE = True' "${artifact_dir}/netbox/cookie-security.py"
 grep --fixed-strings --quiet 'session.cookie_secure=On' "${artifact_dir}/glpi/php-security.https.ini"
