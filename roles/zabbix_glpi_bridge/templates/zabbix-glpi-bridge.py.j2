@@ -41,6 +41,15 @@ def read_secret(variable: str) -> str:
     return value
 
 
+class SameOriginHTTPSRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        source, destination = urllib.parse.urlsplit(request.full_url), urllib.parse.urlsplit(newurl)
+        if (destination.scheme != "https" or destination.hostname != source.hostname
+                or (destination.port or 443) != (source.port or 443)):
+            raise RuntimeError("HTTPS API redirect downgrade or origin change refused")
+        return super().redirect_request(request, fp, code, msg, headers, newurl)
+
+
 def json_request(
     url: str,
     *,
@@ -60,7 +69,9 @@ def json_request(
         request_headers["Content-Type"] = "application/x-www-form-urlencoded"
     request = urllib.request.Request(url, data=body, headers=request_headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        opener = (urllib.request.build_opener(SameOriginHTTPSRedirect())
+                  if urllib.parse.urlsplit(url).scheme == "https" else urllib.request.build_opener())
+        with opener.open(request, timeout=timeout) as response:
             content = response.read()
     except urllib.error.HTTPError as error:
         raw_error = error.read()
@@ -86,7 +97,7 @@ def json_request(
     try:
         return json.loads(content)
     except json.JSONDecodeError as error:
-        raise RuntimeError("Remote endpoint returned invalid JSON") from error
+        raise RuntimeError("Remote endpoint returned invalid JSON; check GLPI maintenance mode and API routing") from error
 
 
 class GLPI:
@@ -631,13 +642,16 @@ def validate_event_flow() -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["serve", "configure-zabbix", "self-test", "validate-event-flow"])
+    parser.add_argument("command", choices=["serve", "configure-zabbix", "self-test", "check-glpi-oauth", "validate-event-flow"])
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if args.command == "configure-zabbix":
         configure_zabbix()
     elif args.command == "self-test":
         self_test()
+    elif args.command == "check-glpi-oauth":
+        GLPI().authenticate()
+        LOG.info("GLPI OAuth passed; no ticket or Zabbix event was created")
     elif args.command == "validate-event-flow":
         validate_event_flow()
     else:

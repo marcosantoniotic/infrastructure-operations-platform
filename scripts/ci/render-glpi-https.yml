@@ -1,0 +1,28 @@
+---
+- name: Render only disposable HTTPS integration fixtures
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Validate the same per-target policy used by the role
+      ansible.builtin.assert:
+        that:
+          - observability_blackbox_targets | iop_blackbox_tls_targets(observability_blackbox_private_ca_certificate, observability_blackbox_tls_network)
+    - name: Render project templates without running any deployment role
+      ansible.builtin.template:
+        src: "../../roles/{{ item.role }}/templates/{{ item.src }}"
+        dest: "{{ fixture_dir }}/{{ item.dest }}"
+        mode: '0644'
+      loop:
+        - {role: observability, src: blackbox.yml.j2, dest: blackbox.yml}
+        - {role: observability, src: compose.yaml.j2, dest: observability.yaml}
+        - {role: observability, src: prometheus.yml.j2, dest: prometheus.yml}
+        - {role: observability, src: alerts.yml.j2, dest: alerts.yml}
+        - {role: glpi, src: compose.yaml.j2, dest: glpi.yaml}
+        - {role: glpi, src: glpi.env.j2, dest: .env}
+        - {role: glpi, src: php-security.ini.j2, dest: php-security.ini}
+        - {role: glpi, src: proxy-https.conf.j2, dest: proxy-https.conf}
+        - {role: zabbix_glpi_bridge, src: compose.yaml.j2, dest: bridge.yaml}
+        - {role: zabbix_glpi_bridge, src: zabbix-glpi-bridge.py.j2, dest: zabbix-glpi-bridge.py}
+        - {role: zabbix_glpi_bridge, src: provision-glpi-oauth.php.j2, dest: provision-glpi-oauth.php}

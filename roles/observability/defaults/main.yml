@@ -45,6 +45,9 @@ observability_blackbox_targets:
   - name: grafana
     url: http://grafana:3000/api/health
 observability_blackbox_external_networks: []
+# Opt-in private trust; targets explicitly select private_ca and require_https.
+observability_blackbox_private_ca_certificate: ""
+observability_blackbox_tls_network: ""
 observability_dns_targets: []
 observability_adguard_metrics_enabled: false
 observability_zabbix_glpi_bridge_enabled: false
