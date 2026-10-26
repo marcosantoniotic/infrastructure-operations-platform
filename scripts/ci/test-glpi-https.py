@@ -167,11 +167,14 @@ def main():
     try:
         dc('config', '--quiet')
         dc('run', '--rm', '--no-deps', 'blackbox-exporter', '--config.file=/etc/blackbox_exporter/blackbox.yml', '--config.check')
-        dc('up', '-d', '--wait', 'db', 'glpi', 'traefik', 'plain', 'blackbox-exporter')
+        dc('up', '-d', '--wait', 'db')
         sql("GRANT SELECT ON mysql.time_zone_name TO 'glpi'@'%';")
-        dc('exec', '-T', '--user', 'www-data', 'glpi', 'php', '/var/www/glpi/bin/console',
+        dc('run', '--rm', '--no-deps', '--user', 'root', '--entrypoint', 'sh', 'glpi', '-c',
+           'chown -R www-data:www-data /var/glpi/config /var/glpi/files /var/glpi/logs /var/glpi/marketplace')
+        dc('run', '--rm', '--no-deps', '--user', 'www-data', '--entrypoint', 'php', 'glpi', '/var/www/glpi/bin/console',
            'database:install', '--db-host=db', '--db-name=glpi', '--db-user=glpi',
            '--db-password=' + passwords[0], '--no-interaction')
+        dc('up', '-d', '--wait', 'glpi', 'traefik', 'plain', 'blackbox-exporter')
         print('INFO: disposable containers started; waiting for seeded GLPI users', flush=True)
         for attempt in range(90):
             readiness = dc('exec', '-T', 'db', 'sh', '-c',

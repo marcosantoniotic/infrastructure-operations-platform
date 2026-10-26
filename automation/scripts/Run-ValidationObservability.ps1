@@ -304,6 +304,8 @@ foreach ($role in @($dockerRole, $observabilityRole)) {
     if ($LASTEXITCODE -ne 0) { throw "Failed to stage role: $role" }
 }
 
+Sync-ValidationOverrides -ProjectRoot $projectRoot -Controller $controller -RemoteRoot $remoteRoot -SshOptions $commonOptions
+
 & ssh.exe @commonOptions $controller `
     "cd $remoteRoot && ansible-galaxy collection install -r requirements.yml"
 if ($LASTEXITCODE -ne 0) { throw 'Failed to install required Ansible collections.' }
