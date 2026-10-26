@@ -165,13 +165,16 @@ def main():
         dc('config', '--quiet')
         dc('run', '--rm', '--no-deps', 'blackbox-exporter', '--config.file=/etc/blackbox_exporter/blackbox.yml', '--config.check')
         dc('up', '-d', '--wait', 'db', 'glpi', 'traefik', 'plain', 'blackbox-exporter')
+        print('INFO: disposable containers started; waiting for seeded GLPI users', flush=True)
         for attempt in range(90):
-            if dc('exec', '-T', 'glpi', 'php', '/var/www/glpi/bin/console', 'database:check_schema_integrity',
-                  '--no-interaction', check=False).returncode == 0:
+            readiness = dc('exec', '-T', 'db', 'sh', '-c',
+                           'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot -N -B -e "SELECT COUNT(*) FROM glpi.glpi_users;"',
+                           check=False)
+            if readiness.returncode == 0 and readiness.stdout.strip().isdigit() and int(readiness.stdout.strip()) > 0:
                 break
             time.sleep(3)
         else:
-            raise RuntimeError('Fresh GLPI fixture did not finish installing')
+            raise RuntimeError('Fresh GLPI fixture did not finish installing: ' + readiness.stderr[-600:])
         backend = json.loads(run(['docker', 'network', 'inspect', project + '_backend']).stdout)[0]
         values['glpi_trusted_proxy_subnet'] = backend['IPAM']['Config'][0]['Subnet']
         (fixture / 'guard/blackbox').mkdir(parents=True)
