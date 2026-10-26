@@ -15,9 +15,12 @@ modules:
       headers:
         Host: {{ target.host_header | quote }}
 {% endif %}
-      fail_if_not_ssl: false
+      fail_if_not_ssl: {{ target.require_https | default(false) | bool | lower }}
       tls_config:
         insecure_skip_verify: {{ target.tls_insecure | default(false) | bool | lower }}
+{% if target.private_ca | default(false) | bool %}
+        ca_file: /etc/blackbox_exporter/ca/private-ca.crt
+{% endif %}
 {% endfor %}
 {% for target in observability_dns_targets %}
   dns_{{ target.name | regex_replace('[^A-Za-z0-9_]', '_') }}:

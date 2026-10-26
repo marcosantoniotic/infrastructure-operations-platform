@@ -1,0 +1,14 @@
+---
+- name: Exercise the real blackbox pre-deployment guard on a disposable fixture
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Require an isolated fixture path
+      ansible.builtin.assert:
+        that:
+          - observability_project_dir.startswith('/tmp/iop-https-')
+          - observability_project_dir.endswith('/guard')
+    - name: Run only read-only preconditions, never deployment tasks
+      ansible.builtin.include_tasks: ../../roles/observability/tasks/blackbox-tls-guard.yml

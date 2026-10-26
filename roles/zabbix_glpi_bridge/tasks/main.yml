@@ -81,6 +81,26 @@
       - iop_internal_api_tls_network is match('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
       - zabbix_glpi_bridge_zabbix_url.startswith('https://')
       - iop_internal_api_ca_certificate.startswith('-----BEGIN CERTIFICATE-----')
+      - zabbix_glpi_bridge_glpi_url | urlsplit('hostname') in (iop_internal_api_tls_aliases | default([]))
+      - zabbix_glpi_bridge_zabbix_url | urlsplit('hostname') in (iop_internal_api_tls_aliases | default([]))
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - iop_internal_api_tls_network | length > 0
+
+- name: Inspect the coordinated API network without creating it
+  ansible.builtin.command:
+    argv: [docker, network, inspect, "{{ iop_internal_api_tls_network }}"]
+  changed_when: false
+  check_mode: false
+  register: bridge_api_tls_network
+  when:
+    - zabbix_glpi_bridge_enabled | bool
+    - iop_internal_api_tls_network | length > 0
+
+- name: Require internal API network prepared by the proxy migration
+  ansible.builtin.assert:
+    that:
+      - (bridge_api_tls_network.stdout | from_json | first).Internal | bool
   when:
     - zabbix_glpi_bridge_enabled | bool
     - iop_internal_api_tls_network | length > 0

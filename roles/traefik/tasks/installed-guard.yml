@@ -17,6 +17,7 @@
       - not data.get('services') or (data.services.keys() | difference(['traefik', 'docker-socket-proxy', 'whoami']) | length == 0)
       - not data.get('entryPoints') or (data.entryPoints.keys() | difference(['web', 'websecure', 'metrics']) | length == 0)
       - not data.get('networks', {}).get('api-tls') or data.networks['api-tls'].name == iop_internal_api_tls_network
+      - (data.get('services', {}).get('traefik', {}).get('networks', {}) is not mapping) or (data.get('services', {}).get('traefik', {}).get('networks', {}).get('api-tls', {}).get('aliases', []) | difference(iop_internal_api_tls_aliases | default([])) | length == 0)
     fail_msg: Installed custom ingress/PKI must be reconciled into a reviewed design before a full Traefik deploy. No changes made.
   vars:
     data: "{{ item.content | b64decode | from_yaml }}"

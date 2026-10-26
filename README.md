@@ -215,6 +215,7 @@ Consulte também as provas de [stacks no Portainer](docs/evidence/portainer-stac
 - [Estado recente do laboratório e limites da validação](docs/testing/laboratory-operations-update.md)
 - [HTTPS, CA, CRL e cookies seguros](docs/runbooks/tls-and-secure-cookies.md)
 - [Recuperação controlada do MySQL](docs/runbooks/mysql-recovery.md)
+- [Migração coordenada GLPI API e sonda para HTTPS](docs/runbooks/glpi-coordinated-https.md)
 - [Contingência de DNS e proxy](docs/runbooks/dns-proxy-contingency.md)
 - [Gestão de mudanças](docs/runbooks/change-management.md)
 - [Adoção segura de IaC para Cloudflare](docs/runbooks/cloudflare-iac-adoption.md)

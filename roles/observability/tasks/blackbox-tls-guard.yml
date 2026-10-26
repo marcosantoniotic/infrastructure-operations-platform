@@ -1,0 +1,48 @@
+---
+- name: Validate blackbox per-target TLS policy before changes
+  ansible.builtin.assert:
+    that:
+      - observability_blackbox_targets | iop_blackbox_tls_targets(observability_blackbox_private_ca_certificate, observability_blackbox_tls_network)
+  no_log: true
+- name: Require private targets to use the coordinated proxy DNS aliases
+  ansible.builtin.assert:
+    that:
+      - observability_blackbox_tls_network == iop_internal_api_tls_network | default('')
+      - item.url | urlsplit('hostname') in (iop_internal_api_tls_aliases | default([]))
+    fail_msg: Prepare the same internal TLS network and certificate DNS alias on Traefik before migrating the probe.
+  loop: "{{ observability_blackbox_targets }}"
+  when: item.private_ca | default(false) | bool
+- name: Locate installed blackbox policy and Compose
+  ansible.builtin.stat:
+    path: "{{ observability_project_dir }}/{{ item }}"
+  loop: [blackbox/blackbox.yml, compose.yaml]
+  register: blackbox_installed_files
+- name: Read installed blackbox definitions privately
+  ansible.builtin.slurp:
+    src: "{{ item.stat.path }}"
+  loop: "{{ blackbox_installed_files.results }}"
+  when: item.stat.exists
+  register: blackbox_installed_content
+  no_log: true
+- name: Refuse silent removal of installed blackbox TLS protections
+  ansible.builtin.assert:
+    that:
+      - data | iop_blackbox_preserve_tls(observability_blackbox_targets, observability_blackbox_tls_network, data.get('networks', {}).get('blackbox_tls', {}).get('name', ''))
+  vars:
+    data: "{{ item.content | b64decode | from_yaml }}"
+  loop: "{{ blackbox_installed_content.results }}"
+  when: not item.skipped | default(false)
+  no_log: true
+- name: Inspect explicitly selected TLS network without changing it
+  ansible.builtin.command:
+    argv: [docker, network, inspect, "{{ observability_blackbox_tls_network }}"]
+  register: blackbox_tls_network_inspection
+  changed_when: false
+  check_mode: false
+  when: observability_blackbox_tls_network | length > 0
+- name: Require an already prepared internal TLS network
+  ansible.builtin.assert:
+    that:
+      - (blackbox_tls_network_inspection.stdout | from_json | first).Internal | bool
+    fail_msg: Prepare the dedicated internal network and Traefik DNS aliases first; do not expose new host ports.
+  when: observability_blackbox_tls_network | length > 0

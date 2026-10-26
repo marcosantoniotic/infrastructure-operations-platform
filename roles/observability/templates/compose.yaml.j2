@@ -127,6 +127,9 @@ services:
       - --config.file=/etc/blackbox_exporter/blackbox.yml
     volumes:
       - ./blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro,Z
+{% if observability_blackbox_private_ca_certificate | length > 0 %}
+      - ./blackbox/private-ca.crt:/etc/blackbox_exporter/ca/private-ca.crt:ro,Z
+{% endif %}
     read_only: true
     tmpfs:
       - /tmp
@@ -154,6 +157,9 @@ services:
 {% for network in observability_blackbox_external_networks %}
       - blackbox_external_{{ loop.index }}
 {% endfor %}
+{% if observability_blackbox_tls_network | length > 0 %}
+      - blackbox_tls
+{% endif %}
 {% if observability_enable_traefik %}
       - proxy
 {% endif %}
@@ -288,6 +294,11 @@ services:
 {% endif %}
 
 networks:
+{% if observability_blackbox_tls_network | length > 0 %}
+  blackbox_tls:
+    name: {{ observability_blackbox_tls_network }}
+    external: true
+{% endif %}
   metrics:
     driver: bridge
     internal: true

@@ -1,4 +1,7 @@
 ---
+- name: Guard blackbox TLS policy and installed protections
+  ansible.builtin.import_tasks: blackbox-tls-guard.yml
+
 - name: Validate observability variables
   ansible.builtin.assert:
     that:
@@ -213,6 +216,57 @@
   no_log: true
   when: observability_unifi_poller_enabled | bool
 
+- name: Validate proposed CA in a temporary file before replacing installed trust
+  when:
+    - observability_blackbox_private_ca_certificate | length > 0
+    - not ansible_check_mode
+  block:
+    - name: Allocate temporary CA validation file
+      ansible.builtin.tempfile:
+        state: file
+        suffix: .crt
+      register: blackbox_ca_candidate
+      changed_when: false
+    - name: Write candidate public CA
+      ansible.builtin.copy:
+        content: "{{ observability_blackbox_private_ca_certificate }}"
+        dest: "{{ blackbox_ca_candidate.path }}"
+        mode: '0600'
+      changed_when: false
+    - name: Verify proposed CA strictly
+      ansible.builtin.command:
+        argv: [openssl, verify, -x509_strict, -check_ss_sig, -CAfile, "{{ blackbox_ca_candidate.path }}", "{{ blackbox_ca_candidate.path }}"]
+      changed_when: false
+    - name: Inspect explicit CA signing constraints
+      ansible.builtin.command:
+        argv: [openssl, x509, -in, "{{ blackbox_ca_candidate.path }}", -noout, -ext, 'basicConstraints,keyUsage']
+      register: blackbox_ca_extensions
+      changed_when: false
+    - name: Require a CA with certificate and CRL signing usages
+      ansible.builtin.assert:
+        that:
+          - "'CA:TRUE' in blackbox_ca_extensions.stdout"
+          - "'Certificate Sign' in blackbox_ca_extensions.stdout"
+          - "'CRL Sign' in blackbox_ca_extensions.stdout"
+  always:
+    - name: Remove temporary CA validation file only
+      ansible.builtin.file:
+        path: "{{ blackbox_ca_candidate.path }}"
+        state: absent
+      when: blackbox_ca_candidate.path is defined
+      changed_when: false
+
+- name: Stage the public private-CA bundle for blackbox
+  ansible.builtin.copy:
+    content: "{{ observability_blackbox_private_ca_certificate }}"
+    dest: "{{ observability_project_dir }}/blackbox/private-ca.crt"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  register: observability_blackbox_ca_result
+  when: observability_blackbox_private_ca_certificate | length > 0
+
 - name: Render observability configuration
   ansible.builtin.template:
     src: "{{ item.src }}"
@@ -287,15 +341,12 @@
 
 - name: Validate Blackbox Exporter configuration
   ansible.builtin.command:
-    argv:
-      - docker
-      - run
-      - --rm
-      - -v
-      - "{{ observability_project_dir }}/blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro,Z"
-      - "{{ observability_blackbox_image }}"
-      - --config.file=/etc/blackbox_exporter/blackbox.yml
-      - --config.check
+    argv: >-
+      {{ ['docker', 'run', '--rm', '-v',
+          observability_project_dir ~ '/blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro,Z'] +
+         (['-v', observability_project_dir ~ '/blackbox/private-ca.crt:/etc/blackbox_exporter/ca/private-ca.crt:ro,Z']
+          if observability_blackbox_private_ca_certificate | length > 0 else []) +
+         [observability_blackbox_image, '--config.file=/etc/blackbox_exporter/blackbox.yml', '--config.check'] }}
   changed_when: false
   when: not ansible_check_mode
 
@@ -330,6 +381,24 @@
     wait: true
     wait_timeout: 420
   when: not ansible_check_mode
+
+- name: Reload changed blackbox trust and modules without restarting other collectors
+  community.docker.docker_compose_v2:
+    project_src: "{{ observability_project_dir }}"
+    services: [blackbox-exporter]
+    dependencies: false
+    state: present
+    recreate: always
+    pull: never
+    wait: true
+    wait_timeout: 120
+  when:
+    - not ansible_check_mode
+    - >-
+      (observability_blackbox_ca_result.changed | default(false)) or
+      (observability_rendered_configuration.results |
+       selectattr('item.dest', 'equalto', 'blackbox/blackbox.yml') |
+       selectattr('changed', 'defined') | selectattr('changed') | list | length > 0)
 
 - name: Inspect Prometheus local port publication
   ansible.builtin.command:
@@ -376,7 +445,9 @@
   when:
     - not ansible_check_mode
     - >-
-      observability_rendered_configuration.changed or
+      (observability_rendered_configuration.results |
+       rejectattr('item.dest', 'equalto', 'blackbox/blackbox.yml') |
+       selectattr('changed', 'defined') | selectattr('changed') | list | length > 0) or
       (observability_snmp_auth.changed | default(false)) or
       (observability_unifi_password_file.changed | default(false)) or
       observability_prometheus_published_port.stdout | trim | length == 0 or
