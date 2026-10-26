@@ -208,9 +208,10 @@ def main():
             target = dict(values['observability_blackbox_targets'][1], **change)
             guard(dict(observability_blackbox_targets=legacy + [target]), expected=False)
         print('PASS: actual Ansible guards, downgrade refusals and read-only second pass')
-        run(['docker', 'run', '--rm', '--entrypoint', '/bin/promtool', '-v', f'{fixture}:/fixture:ro',
+        run(['docker', 'run', '--rm', '--entrypoint', '/bin/promtool',
+             '-v', f'{fixture}/prometheus.yml:/etc/prometheus/prometheus.yml:ro',
              '-v', f'{fixture}/alerts.yml:/etc/prometheus/alerts.yml:ro',
-             values['observability_prometheus_image'], 'check', 'config', '/fixture/prometheus.yml'])
+             values['observability_prometheus_image'], 'check', 'config', '/etc/prometheus/prometheus.yml'])
         dc('cp', str(fixture / 'provision-glpi-oauth.php'), 'glpi:/tmp/provision.php')
         dc('cp', str(fixture / 'secrets/glpi_oauth_secret'), 'glpi:/tmp/oauth-secret')
         if dc('exec', '-T', 'glpi', 'test', '-s', '/var/glpi/config/oauth.pem', check=False).returncode:
