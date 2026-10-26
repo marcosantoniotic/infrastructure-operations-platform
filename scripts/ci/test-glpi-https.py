@@ -150,10 +150,12 @@ def main():
                                  read_only=True, cap_drop=['ALL'], networks=['api'])},
         networks={'api': {'internal': True}, 'backend': {'internal': True}},
         volumes={name: {} for name in ['database', 'glpi_config', 'glpi_files', 'glpi_logs', 'glpi_marketplace']})
-    dynamic = dict(http=dict(routers={'glpi': dict(rule='Host(`glpi.test`)', entryPoints=['websecure'],
+    dynamic = dict(http=dict(routers={'glpi': dict(rule='Host(`glpi.test`) || Host(`wrong.test`)', entryPoints=['websecure'],
                                                   service='glpi', tls={})},
                              services={'glpi': dict(loadBalancer=dict(servers=[dict(url='http://glpi:80')]))}),
                    tls=dict(certificates=[dict(certFile='/certs/server.crt', keyFile='/certs/server.key')]))
+    dynamic['tls']['stores'] = {'default': {'defaultCertificate': {
+        'certFile': '/certs/server.crt', 'keyFile': '/certs/server.key'}}}
     dynamic['http']['routers']['downgrade'] = dict(rule='Host(`glpi.test`) && PathPrefix(`/downgrade`)',
                                                   entryPoints=['websecure'], service='glpi', tls={},
                                                   middlewares=['downgrade'], priority=100)
@@ -234,6 +236,8 @@ def main():
                             'exec(open("/usr/local/libexec/zabbix-glpi-bridge.py").read().split("def main()")[0]);GLPI().authenticate()', check=False)
             assert result.returncode != 0, 'Bridge accepted an untrusted/mismatched endpoint'
             assert 'CERTIFICATE_VERIFY_FAILED' in result.stderr, 'Negative control failed for a non-TLS reason'
+            if 'wrong.test' in url:
+                assert 'Hostname mismatch' in result.stderr, 'Hostname test failed for another TLS reason'
         redirect = client('exec(open("/usr/local/libexec/zabbix-glpi-bridge.py").read().split("def main()")[0]);'
                           'json_request("https://glpi.test/downgrade")', check=False)
         assert redirect.returncode != 0 and 'origin change refused' in redirect.stderr
