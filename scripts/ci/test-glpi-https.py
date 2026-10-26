@@ -69,6 +69,7 @@ def main():
     legacy = [dict(name='legacy', url='http://plain:8080')]
     values.update(fixture_dir=str(fixture), glpi_database_password=passwords[0],
                   glpi_database_root_password=passwords[1], glpi_crontab_enabled=False,
+                  glpi_auto_install=False,
                   glpi_php_security_hardening=True, glpi_https_cookie_hardening=True,
                   glpi_trusted_proxy_subnet='0.0.0.0/0',  # replaced with actual isolated backend CIDR below
                   observability_blackbox_targets=legacy)
@@ -167,6 +168,10 @@ def main():
         dc('config', '--quiet')
         dc('run', '--rm', '--no-deps', 'blackbox-exporter', '--config.file=/etc/blackbox_exporter/blackbox.yml', '--config.check')
         dc('up', '-d', '--wait', 'db', 'glpi', 'traefik', 'plain', 'blackbox-exporter')
+        sql("GRANT SELECT ON mysql.time_zone_name TO 'glpi'@'%';")
+        dc('exec', '-T', '--user', 'www-data', 'glpi', 'php', '/var/www/glpi/bin/console',
+           'database:install', '--db-host=db', '--db-name=glpi', '--db-user=glpi',
+           '--db-password=' + passwords[0], '--no-interaction')
         print('INFO: disposable containers started; waiting for seeded GLPI users', flush=True)
         for attempt in range(90):
             readiness = dc('exec', '-T', 'db', 'sh', '-c',
@@ -205,7 +210,8 @@ def main():
              values['observability_prometheus_image'], 'check', 'config', '/fixture/prometheus.yml'])
         dc('cp', str(fixture / 'provision-glpi-oauth.php'), 'glpi:/tmp/provision.php')
         dc('cp', str(fixture / 'secrets/glpi_oauth_secret'), 'glpi:/tmp/oauth-secret')
-        dc('exec', '-T', 'glpi', 'php', '/var/www/glpi/bin/console', 'security:change_oauth_key', '--no-interaction')
+        if dc('exec', '-T', 'glpi', 'test', '-s', '/var/glpi/config/oauth.pem', check=False).returncode:
+            dc('exec', '-T', 'glpi', 'php', '/var/www/glpi/bin/console', 'security:change_oauth_key', '--no-interaction')
         identifier = dc('exec', '-T', 'glpi', 'php', '/tmp/provision.php', 'IOP disposable OAuth', '/tmp/oauth-secret').stdout.strip()
         (fixture / 'secrets/glpi_oauth_client_id').write_text(identifier)
         baseline = sql('SELECT COUNT(*) FROM glpi.glpi_tickets;')
