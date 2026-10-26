@@ -341,15 +341,12 @@
 
 - name: Validate Blackbox Exporter configuration
   ansible.builtin.command:
-    argv:
-      - docker
-      - run
-      - --rm
-      - -v
-      - "{{ observability_project_dir }}/blackbox:/etc/blackbox_exporter:ro,Z"
-      - "{{ observability_blackbox_image }}"
-      - --config.file=/etc/blackbox_exporter/blackbox.yml
-      - --config.check
+    argv: >-
+      {{ ['docker', 'run', '--rm', '-v',
+          observability_project_dir ~ '/blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro,Z'] +
+         (['-v', observability_project_dir ~ '/blackbox/private-ca.crt:/etc/blackbox_exporter/ca/private-ca.crt:ro,Z']
+          if observability_blackbox_private_ca_certificate | length > 0 else []) +
+         [observability_blackbox_image, '--config.file=/etc/blackbox_exporter/blackbox.yml', '--config.check'] }}
   changed_when: false
   when: not ansible_check_mode
 

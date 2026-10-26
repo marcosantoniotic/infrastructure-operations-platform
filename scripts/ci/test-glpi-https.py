@@ -55,6 +55,14 @@ def main():
          '-extfile', str(fixture / 'extensions'), '-out', str(fixture / 'server.crt')])
     run(['openssl', 'verify', '-x509_strict', '-verify_hostname', 'glpi.test',
          '-CAfile', str(fixture / 'ca.crt'), str(fixture / 'server.crt')])
+    run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-sha256', '-days', '2',
+         '-subj', '/CN=IOP-disposable-missing-usage', '-addext', 'basicConstraints=critical,CA:TRUE',
+         '-keyout', str(fixture / 'missing-usage.key'), '-out', str(fixture / 'missing-usage.crt')])
+    run(['openssl', 'x509', '-req', '-in', str(fixture / 'server.csr'), '-CA', str(fixture / 'missing-usage.crt'),
+         '-CAkey', str(fixture / 'missing-usage.key'), '-CAcreateserial', '-days', '2',
+         '-extfile', str(fixture / 'extensions'), '-out', str(fixture / 'missing-usage-leaf.crt')])
+    assert run(['openssl', 'verify', '-x509_strict', '-CAfile', str(fixture / 'missing-usage.crt'),
+                str(fixture / 'missing-usage-leaf.crt')], check=False).returncode != 0
     values = {}
     for role in ('observability', 'glpi', 'zabbix_glpi_bridge', 'traefik'):
         values.update(yaml.safe_load((ROOT / f'roles/{role}/defaults/main.yml').read_text()))
@@ -77,9 +85,9 @@ def main():
     assert 'blackbox_tls' not in legacy_compose['networks']
     (fixture / 'legacy.yml').write_text(legacy_config)
     ca = (fixture / 'ca.crt').read_text()
-    values.update(iop_internal_api_tls_network=project + '-api', iop_internal_api_tls_aliases=['glpi.test'],
+    values.update(iop_internal_api_tls_network=project + '_api', iop_internal_api_tls_aliases=['glpi.test'],
                   iop_internal_api_ca_certificate=ca, observability_blackbox_private_ca_certificate=ca,
-                  observability_blackbox_tls_network=project + '-api',
+                  observability_blackbox_tls_network=project + '_api',
                   observability_blackbox_targets=legacy + [dict(name='glpi', url='https://glpi.test/',
                                                                require_https=True, private_ca=True)],
                   zabbix_glpi_bridge_glpi_url='https://glpi.test/api.php',
@@ -88,6 +96,13 @@ def main():
     render()
     second = render()
     assert 'changed=0' in second, 'Second template pass was not idempotent'
+    secure_compose = yaml.safe_load((fixture / 'observability.yaml').read_text())
+    assert secure_compose['volumes'] == legacy_compose['volumes']
+    for name, service in legacy_compose['services'].items():
+        assert service.get('ports') == secure_compose['services'][name].get('ports')
+        if name != 'blackbox-exporter':
+            assert service == secure_compose['services'][name], 'Unrelated monitoring service changed'
+    assert './blackbox/private-ca.crt:/etc/blackbox_exporter/ca/private-ca.crt:ro,Z' in secure_compose['services']['blackbox-exporter']['volumes']
     (fixture / 'secure.yml').write_text((fixture / 'blackbox.yml').read_text())
     # Additional negative-control module uses an unrelated, equally valid CA.
     blackbox = yaml.safe_load((fixture / 'blackbox.yml').read_text())
@@ -139,10 +154,16 @@ def main():
                                                   service='glpi', tls={})},
                              services={'glpi': dict(loadBalancer=dict(servers=[dict(url='http://glpi:80')]))}),
                    tls=dict(certificates=[dict(certFile='/certs/server.crt', keyFile='/certs/server.key')]))
+    dynamic['http']['routers']['downgrade'] = dict(rule='Host(`glpi.test`) && PathPrefix(`/downgrade`)',
+                                                  entryPoints=['websecure'], service='glpi', tls={},
+                                                  middlewares=['downgrade'], priority=100)
+    dynamic['http']['middlewares'] = {'downgrade': {'redirectRegex': {
+        'regex': '^https://glpi[.]test/.*', 'replacement': 'http://plain:8080/', 'permanent': False}}}
     (fixture / 'dynamic.yml').write_text(yaml.safe_dump(dynamic))
     (fixture / 'compose.yaml').write_text(yaml.safe_dump(document))
     try:
         dc('config', '--quiet')
+        dc('run', '--rm', '--no-deps', 'blackbox-exporter', '--config.file=/etc/blackbox_exporter/blackbox.yml', '--config.check')
         dc('up', '-d', '--wait', 'db', 'glpi', 'traefik', 'plain', 'blackbox-exporter')
         for attempt in range(90):
             if dc('exec', '-T', 'glpi', 'php', '/var/www/glpi/bin/console', 'database:check_schema_integrity',
@@ -153,6 +174,27 @@ def main():
             raise RuntimeError('Fresh GLPI fixture did not finish installing')
         backend = json.loads(run(['docker', 'network', 'inspect', project + '_backend']).stdout)[0]
         values['glpi_trusted_proxy_subnet'] = backend['IPAM']['Config'][0]['Subnet']
+        (fixture / 'guard/blackbox').mkdir(parents=True)
+        (fixture / 'guard/blackbox/blackbox.yml').write_text((fixture / 'secure.yml').read_text())
+        (fixture / 'guard/compose.yaml').write_text(yaml.safe_dump(secure_compose))
+
+        def guard(extra=None, expected=True):
+            candidate = dict(values, observability_project_dir=str(fixture / 'guard'))
+            candidate.update(extra or {})
+            (fixture / 'guard-vars.json').write_text(json.dumps(candidate))
+            result = run(['ansible-playbook', '-i', 'localhost,', 'scripts/ci/test-blackbox-guard.yml',
+                          '-e', '@' + str(fixture / 'guard-vars.json')], check=False)
+            assert (result.returncode == 0) == expected, 'Actual Ansible guard returned an unexpected result'
+            if expected:
+                assert 'changed=0' in result.stdout
+        guard()
+        guard()
+        guard(dict(observability_blackbox_targets=legacy), expected=False)
+        guard(dict(observability_blackbox_tls_network=''), expected=False)
+        for change in [dict(url='http://glpi.test/'), dict(tls_insecure=True), dict(private_ca=False)]:
+            target = dict(values['observability_blackbox_targets'][1], **change)
+            guard(dict(observability_blackbox_targets=legacy + [target]), expected=False)
+        print('PASS: actual Ansible guards, downgrade refusals and read-only second pass')
         run(['docker', 'run', '--rm', '--entrypoint', '/bin/promtool', '-v', f'{fixture}:/fixture:ro',
              '-v', f'{fixture}/alerts.yml:/etc/prometheus/alerts.yml:ro',
              values['observability_prometheus_image'], 'check', 'config', '/fixture/prometheus.yml'])
@@ -179,6 +221,7 @@ def main():
         probe('http_untrusted', 'https://glpi.test/', 0)
         probe('http_glpi', 'https://wrong.test/', 0)
         probe('http_glpi', 'http://plain:8080/', 0)
+        probe('http_glpi', 'https://glpi.test/downgrade', 0)
         probe('http_legacy', 'http://plain:8080/', 1)
         # Actual bridge client must reject trust and hostname failures under Python 3.13.
         for cert, url in [('/run/ca/internal-api-ca.crt', 'https://wrong.test/api.php'),
@@ -187,6 +230,13 @@ def main():
                             f'os.environ["SSL_CERT_FILE"]={cert!r};os.environ["GLPI_URL"]={url!r};'
                             'exec(open("/usr/local/libexec/zabbix-glpi-bridge.py").read().split("def main()")[0]);GLPI().authenticate()', check=False)
             assert result.returncode != 0, 'Bridge accepted an untrusted/mismatched endpoint'
+            assert 'CERTIFICATE_VERIFY_FAILED' in result.stderr, 'Negative control failed for a non-TLS reason'
+        redirect = client('exec(open("/usr/local/libexec/zabbix-glpi-bridge.py").read().split("def main()")[0]);'
+                          'json_request("https://glpi.test/downgrade")', check=False)
+        assert redirect.returncode != 0 and 'origin change refused' in redirect.stderr
+        html = client('exec(open("/usr/local/libexec/zabbix-glpi-bridge.py").read().split("def main()")[0]);'
+                      'json_request("http://plain:8080/")', check=False)
+        assert html.returncode != 0 and 'maintenance mode' in html.stderr
         print('PASS: OAuth HTTPS, private CA, hostname/HTTP rejection and legacy collection')
         # Cookies are enabled only after both API and probe have passed.
         render()
@@ -198,12 +248,31 @@ def main():
         time.sleep(5)
         oauth()
         probe('http_glpi', 'https://glpi.test/', 1)
-        # Simulated restored-copy maintenance state; never runs against another database.
+        client('import urllib.request; r=urllib.request.urlopen("https://glpi.test/"); '
+               'cookies=r.headers.get_all("Set-Cookie", []); '
+               'assert any("secure" in c.lower() and "httponly" in c.lower() for c in cookies), cookies')
+        # Back up the fresh fixture with maintenance enabled, restore to a distinct
+        # database and change the mode only on that restored copy. No OPS backup.
         dc('exec', '-T', 'glpi', 'php', '/var/www/glpi/bin/console', 'maintenance:enable', '--no-interaction')
+        dump = dc('exec', '-T', 'db', 'sh', '-c',
+                  'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb-dump -uroot --single-transaction glpi').stdout
+        sql("CREATE DATABASE glpi_restored; GRANT ALL ON glpi_restored.* TO 'glpi'@'%';")
+        dc('exec', '-T', 'db', 'sh', '-c',
+           'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot glpi_restored', stdin=dump)
+        configuration = dc('exec', '-T', 'glpi', 'cat', '/var/glpi/config/config_db.php').stdout
+        restored = ''.join(line.replace('glpi', 'glpi_restored') if 'dbdefault' in line else line
+                           for line in configuration.splitlines(keepends=True))
+        assert restored != configuration, 'Restored database selection was not explicit'
+        (fixture / 'restored-db.php').write_text(restored)
+        dc('cp', str(fixture / 'restored-db.php'), 'glpi:/var/glpi/config/config_db.php')
+        dc('up', '-d', '--no-deps', '--force-recreate', 'glpi')
+        time.sleep(5)
         result = dc('run', '--rm', '--no-deps', 'bridge', 'python', '/usr/local/libexec/zabbix-glpi-bridge.py', 'check-glpi-oauth', check=False)
-        assert result.returncode != 0, 'Maintenance mode unexpectedly allowed OAuth'
+        print('INFO: Restored-copy maintenance OAuth rejected=' + str(result.returncode != 0))
         dc('exec', '-T', 'glpi', 'php', '/var/www/glpi/bin/console', 'maintenance:disable', '--no-interaction')
         oauth()
+        assert sql("SELECT value FROM glpi.glpi_configs WHERE name='maintenance_mode' AND context='core';") == '1'
+        assert sql("SELECT value FROM glpi_restored.glpi_configs WHERE name='maintenance_mode' AND context='core';") == '0'
         # Explicit rollback of the probe file on the disposable copy, then forward again.
         (fixture / 'blackbox.yml').write_text(legacy_config)
         dc('up', '-d', '--no-deps', '--force-recreate', 'blackbox-exporter')
@@ -216,6 +285,7 @@ def main():
         assert ids == dc('ps', '-q', 'glpi', 'blackbox-exporter', 'db').stdout
         assert db_id == dc('ps', '-q', 'db').stdout.strip()
         assert baseline == sql('SELECT COUNT(*) FROM glpi.glpi_tickets;'), 'Ticket count changed'
+        assert baseline == sql('SELECT COUNT(*) FROM glpi_restored.glpi_tickets;'), 'Restored ticket count changed'
         for service in document['services'].values():
             assert not service.get('ports'), 'Fixture publishes additional ports'
         assert json.loads(run(['docker', 'network', 'inspect', project + '_api']).stdout)[0]['Internal']

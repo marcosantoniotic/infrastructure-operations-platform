@@ -11,7 +11,9 @@ def validate_targets(targets, certificate='', network=''):
         raise ValueError('Invalid private TLS network name')
     if certificate and not (certificate.strip().startswith('-----BEGIN CERTIFICATE-----')
                             and certificate.strip().endswith('-----END CERTIFICATE-----')):
-        raise ValueError('Public CA must be a PEM certificate bundle, never a key')
+        raise ValueError('Public CA must be a PEM certificate, never a key')
+    if certificate and certificate.count('-----BEGIN CERTIFICATE-----') != 1:
+        raise ValueError('Use one explicitly validated root CA; the server supplies its intermediate chain')
     if 'PRIVATE KEY' in certificate:
         raise ValueError('A public CA certificate, not a private key, is required')
     for target in targets:

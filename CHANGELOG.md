@@ -17,6 +17,9 @@ versionamento segue [Semantic Versioning](https://semver.org/).
 
 ### Automação de validação
 
+- migração opt-in da sonda GLPI e da API para HTTPS, com CA privada somente
+  leitura, política por alvo, guards e teste descartável coordenado;
+- comando OAuth da ponte sem criação de chamados e recusa de downgrade em redirects;
 - consolidação opt-in dos cookies Secure, contexto HTTPS restrito e CA das APIs;
 - proteção da identidade do volume MySQL recuperado e recusa de downgrade das
   proteções reconhecidas nas definições instaladas;
