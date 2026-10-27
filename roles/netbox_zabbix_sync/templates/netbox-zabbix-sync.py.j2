@@ -10,23 +10,48 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import requests
-
-sys.path.insert(0, "/opt/netbox/netbox")
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "netbox.settings")
-
-import django  # noqa: E402
-
-django.setup()
-
-from dcim.models import Device  # noqa: E402
-from django.contrib.contenttypes.models import ContentType  # noqa: E402
-from extras.models import CustomField  # noqa: E402
+def setup_netbox() -> None:
+    global Device, VirtualMachine, ContentType, CustomField
+    sys.path.insert(0, "/opt/netbox/netbox")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "netbox.settings")
+    import django
+    django.setup()
+    from dcim.models import Device
+    from virtualization.models import VirtualMachine
+    from django.contrib.contenttypes.models import ContentType
+    from extras.models import CustomField
 
 LOG = logging.getLogger("netbox-zabbix-sync")
 MANAGED_TAG_KEYS = {
-    "source", "netbox_id", "netbox_status", "netbox_site", "netbox_role", "netbox_platform"
+    "source", "netbox_id", "netbox_status", "netbox_site", "netbox_role", "netbox_platform",
+    "netbox_object_type",
 }
+
+
+def object_type(obj: Any) -> str:
+    return obj._meta.label_lower
+
+
+def identity(obj: Any) -> tuple[str, str]:
+    return object_type(obj), str(obj.pk)
+
+
+def host_name(obj: Any) -> str:
+    # Stable namespace prevents VM/device ID and name collisions and survives VM renames.
+    return f"netbox-vm-{obj.pk}" if object_type(obj) == "virtualization.virtualmachine" else obj.name
+
+
+def host_identity(host: dict[str, Any]) -> tuple[str, str] | None:
+    tags: dict[str, str] = {}
+    for tag in host.get("tags", []):
+        key = tag.get("tag", "")
+        if key in MANAGED_TAG_KEYS and key in tags:
+            raise RuntimeError("Duplicate ownership tags on Zabbix host")
+        tags[key] = tag.get("value", "")
+    if tags.get("source") != "netbox" or not tags.get("netbox_id"):
+        return None
+    # Pre-VM deployments have untyped device IDs; preserve their ownership.
+    return tags.get("netbox_object_type", "dcim.device"), tags["netbox_id"]
 
 
 class ZabbixAPI:
@@ -36,6 +61,7 @@ class ZabbixAPI:
         self.request_id = 0
 
     def call(self, method: str, params: dict[str, Any]) -> Any:
+        import requests
         self.request_id += 1
         response = requests.post(
             self.url,
@@ -67,6 +93,7 @@ def managed_tags(device: Device) -> list[dict[str, str]]:
     return [
         {"tag": "source", "value": "netbox"},
         {"tag": "netbox_id", "value": str(device.pk)},
+        {"tag": "netbox_object_type", "value": object_type(device)},
         {"tag": "netbox_status", "value": str(device.status)},
         {"tag": "netbox_site", "value": device.site.slug if device.site else ""},
         {"tag": "netbox_role", "value": device.role.slug if device.role else ""},
@@ -78,19 +105,23 @@ def normalized(tags: list[dict[str, Any]]) -> list[tuple[str, str]]:
     return sorted((str(tag.get("tag", "")), str(tag.get("value", ""))) for tag in tags)
 
 
-def ensure_custom_field(name: str, apply: bool) -> None:
+def ensure_custom_field(name: str, apply: bool, include_vms: bool = False) -> None:
     field = CustomField.objects.filter(name=name).first()
     if field is None:
         if not apply:
             raise RuntimeError(f"NetBox custom field is missing: {name}; run once with --apply")
         field = CustomField.objects.create(name=name, label="Zabbix Host ID", type="text", required=False)
         LOG.info("CREATE-CUSTOM-FIELD field=%s", name)
-    device_type = ContentType.objects.get_for_model(Device)
-    if not field.object_types.filter(pk=device_type.pk).exists():
-        if not apply:
-            raise RuntimeError(f"NetBox custom field {name} is not assigned to devices")
-        field.object_types.add(device_type)
-        LOG.info("ASSIGN-CUSTOM-FIELD field=%s object=device", name)
+    if field.type != "text":
+        raise RuntimeError("Zabbix Host ID custom field must be text")
+    for model in ([Device, VirtualMachine] if include_vms else [Device]):
+        content_type = ContentType.objects.get_for_model(model)
+        if not field.object_types.filter(pk=content_type.pk).exists():
+            if not apply:
+                LOG.info("PENDING-CUSTOM-FIELD field=%s object=%s", name, model._meta.label_lower)
+            else:
+                field.object_types.add(content_type)
+                LOG.info("ASSIGN-CUSTOM-FIELD field=%s object=%s", name, model._meta.label_lower)
 
 
 def set_hostid(device: Device, field_name: str, hostid: str, apply: bool) -> bool:
@@ -109,6 +140,7 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+    setup_netbox()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
 
@@ -120,27 +152,71 @@ def main() -> int:
     templateid = unique_id(api, "template.get", "templateid", os.environ["ZABBIX_TEMPLATE"])
     tag_slug = os.environ["NETBOX_TAG_SLUG"]
     field_name = os.environ["NETBOX_ZABBIX_HOSTID_FIELD"]
-    ensure_custom_field(field_name, args.apply)
+    include_vms_raw = os.environ.get("NETBOX_INCLUDE_VMS", "false").lower()
+    if include_vms_raw not in {"true", "false"}:
+        raise RuntimeError("NETBOX_INCLUDE_VMS must be true or false")
+    include_vms = include_vms_raw == "true"
+    sites = {s.strip() for s in os.environ.get("NETBOX_SITE_SLUGS", "").split(",") if s.strip()}
+    vm_groupid = vm_templateid = None
+    if include_vms:
+        if not os.environ.get("NETBOX_VM_TEMPLATE"):
+            raise RuntimeError("An explicit VM template is required")
+        vm_groupid = unique_id(api, "hostgroup.get", "groupid", os.environ["NETBOX_VM_GROUP"])
+        vm_templateid = unique_id(api, "template.get", "templateid", os.environ["NETBOX_VM_TEMPLATE"])
 
     hosts = api.call("host.get", {
-        "output": ["hostid", "host", "name", "status"], "groupids": [groupid],
+        "output": ["hostid", "host", "name", "status"],
         "selectTags": "extend", "selectInterfaces": "extend",
+        "selectHostGroups": ["groupid"], "selectParentTemplates": ["templateid"],
     })
-    managed = {
-        next(tag["value"] for tag in host.get("tags", []) if tag.get("tag") == "netbox_id"): host
-        for host in hosts
-        if any(t.get("tag") == "source" and t.get("value") == "netbox" for t in host.get("tags", []))
-        and any(t.get("tag") == "netbox_id" for t in host.get("tags", []))
-    }
+    managed = {}
+    for host in hosts:
+        key = host_identity(host)
+        if key is None:
+            continue
+        if key in managed:
+            raise RuntimeError("Multiple Zabbix hosts claim the same NetBox object")
+        managed[key] = host
     by_name = {host["host"]: host for host in hosts}
-    desired_ids: set[str] = set()
+    desired_ids: set[tuple[str, str]] = set()
     changes = 0
 
-    devices = Device.objects.filter(tags__slug=tag_slug).select_related(
+    devices = list(Device.objects.filter(tags__slug=tag_slug).select_related(
         "site", "role", "platform", "primary_ip4", "primary_ip6"
-    ).distinct().order_by("name")
-    for device in devices:
-        netbox_id = str(device.pk)
+    ).distinct().order_by("name"))
+    vms = list(VirtualMachine.objects.filter(tags__slug=tag_slug).select_related(
+        "site", "role", "platform", "primary_ip4", "primary_ip6"
+    ).distinct().order_by("name")) if include_vms else []
+    objects = [obj for obj in devices + vms if not sites or (obj.site and obj.site.slug in sites)]
+    # Preflight the entire set before any API or metadata write: no partial collision takeover.
+    for obj in objects:
+        existing = managed.get(identity(obj))
+        collision = by_name.get(host_name(obj))
+        if collision and collision is not existing:
+            raise RuntimeError(f"Zabbix host name collision: {host_name(obj)}")
+        stored = str(obj.custom_field_data.get(field_name) or "")
+        if stored and (not existing or stored != str(existing["hostid"])):
+            raise RuntimeError(f"Conflicting stored Zabbix ID for {host_name(obj)}")
+        if existing:
+            expected_group = vm_groupid if object_type(obj) == "virtualization.virtualmachine" else groupid
+            if str(expected_group) not in {str(g["groupid"]) for g in existing.get("hostgroups", [])}:
+                raise RuntimeError("Existing managed host is outside the configured group")
+            expected_template = vm_templateid if object_type(obj) == "virtualization.virtualmachine" else templateid
+            if str(expected_template) not in {str(t["templateid"]) for t in existing.get("parentTemplates", [])}:
+                raise RuntimeError("Existing host template differs; an explicit migration is required")
+    def in_scope(host: dict[str, Any], key: tuple[str, str]) -> bool:
+        tags = {t["tag"]: t.get("value", "") for t in host.get("tags", [])}
+        group = vm_groupid if key[0] == "virtualization.virtualmachine" else groupid
+        return (not sites or tags.get("netbox_site") in sites) and str(group) in {
+            str(g["groupid"]) for g in host.get("hostgroups", [])}
+    if not include_vms and any(k[0] == "virtualization.virtualmachine" for k in managed):
+        raise RuntimeError("Refusing to silently disable previously managed VM synchronization")
+    ensure_custom_field(field_name, args.apply, include_vms)
+    for device in objects:
+        netbox_id = identity(device)
+        target_group = vm_groupid if netbox_id[0] == "virtualization.virtualmachine" else groupid
+        target_template = vm_templateid if netbox_id[0] == "virtualization.virtualmachine" else templateid
+        technical_name = host_name(device)
         desired_ids.add(netbox_id)
         ip = primary_ip(device)
         existing = managed.get(netbox_id)
@@ -151,8 +227,6 @@ def main() -> int:
                 if args.apply:
                     api.call("host.update", {"hostid": existing["hostid"], "status": 1})
             continue
-        if existing is None and device.name in by_name:
-            raise RuntimeError(f"Unmanaged Zabbix host already uses NetBox device name: {device.name}")
 
         tags = managed_tags(device)
         status = 0 if str(device.status) == "active" else 1
@@ -161,8 +235,8 @@ def main() -> int:
             LOG.info("CREATE host=%s ip=%s", device.name, ip)
             if args.apply:
                 result = api.call("host.create", {
-                    "host": device.name, "name": device.name, "status": status,
-                    "groups": [{"groupid": groupid}], "templates": [{"templateid": templateid}],
+                    "host": technical_name, "name": device.name, "status": status,
+                    "groups": [{"groupid": target_group}], "templates": [{"templateid": target_template}],
                     "interfaces": [{"type": 1, "main": 1, "useip": 1, "ip": ip, "dns": "", "port": "10050"}],
                     "tags": tags,
                 })
@@ -170,8 +244,8 @@ def main() -> int:
             continue
 
         update: dict[str, Any] = {"hostid": existing["hostid"]}
-        if existing["host"] != device.name:
-            update.update({"host": device.name, "name": device.name})
+        if existing["host"] != technical_name or existing["name"] != device.name:
+            update.update({"host": technical_name, "name": device.name})
         if int(existing["status"]) != status:
             update["status"] = status
         preserved = [t for t in existing.get("tags", []) if t.get("tag") not in MANAGED_TAG_KEYS]
@@ -197,14 +271,15 @@ def main() -> int:
             changes += 1
 
     for netbox_id, host in managed.items():
-        if netbox_id not in desired_ids and host["status"] != "1":
+        if in_scope(host, netbox_id) and netbox_id not in desired_ids and host["status"] != "1":
             changes += 1
             LOG.info("DISABLE host=%s reason=tag-removed", host["host"])
             if args.apply:
                 api.call("host.update", {"hostid": host["hostid"], "status": 1})
 
-    LOG.info("Synchronization complete mode=%s devices=%d changes=%d",
-             "apply" if args.apply else "dry-run", len(desired_ids), changes)
+    LOG.info("Synchronization complete mode=%s devices=%d changes=%d vms=%d",
+             "apply" if args.apply else "dry-run", sum(k[0] == "dcim.device" for k in desired_ids),
+             changes, sum(k[0] == "virtualization.virtualmachine" for k in desired_ids))
     return 0
 
 

@@ -16,6 +16,10 @@ services:
       ZABBIX_TEMPLATE: {{ netbox_zabbix_sync_template | to_json }}
       NETBOX_TAG_SLUG: {{ netbox_zabbix_sync_tag_slug | to_json }}
       NETBOX_ZABBIX_HOSTID_FIELD: {{ netbox_zabbix_sync_hostid_field | to_json }}
+      NETBOX_INCLUDE_VMS: {{ ('true' if netbox_zabbix_sync_include_vms | bool else 'false') | to_json }}
+      NETBOX_VM_GROUP: {{ netbox_zabbix_sync_vm_group | to_json }}
+      NETBOX_VM_TEMPLATE: {{ netbox_zabbix_sync_vm_template | to_json }}
+      NETBOX_SITE_SLUGS: {{ (netbox_zabbix_sync_site_slugs | join(',')) | to_json }}
     command:
       - /bin/sh
       - -c

@@ -11,6 +11,9 @@
       - netbox_zabbix_sync_zabbix_url | length > 0
       - netbox_zabbix_sync_group | length > 0
       - netbox_zabbix_sync_template | length > 0
+      - not (netbox_zabbix_sync_include_vms | bool) or netbox_zabbix_sync_vm_template | length > 0
+      - not (netbox_zabbix_sync_include_vms | bool) or netbox_zabbix_sync_vm_group | length > 0
+      - netbox_zabbix_sync_site_slugs is sequence and netbox_zabbix_sync_site_slugs is not string
     fail_msg: Review the NetBox-Zabbix synchronization variables and Vault token.
     quiet: true
   no_log: true

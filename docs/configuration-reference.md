@@ -117,7 +117,13 @@ Prometheus, Alertmanager, bancos, caches e portas de fallback não são publicad
 NetBox e Zabbix. O segredo `vault_netbox_zabbix_sync_api_token` deve ser um token
 Zabbix restrito às operações de leitura e manutenção dos hosts gerenciados.
 
-Somente dispositivos NetBox com a tag `zabbix` e IP primário são reconciliados.
+Por padrão, somente dispositivos NetBox com a tag `zabbix` e IP primário são reconciliados.
+VMs exigem `netbox_zabbix_sync_include_vms: true`, grupo em
+`netbox_zabbix_sync_vm_group` e template explícito em `netbox_zabbix_sync_vm_template`.
+Use `netbox_zabbix_sync_site_slugs` para limitar ambos os tipos a sites revisados;
+a lista vazia preserva o escopo legado. VMs usam `netbox-vm-<id>` como nome técnico
+estável e a tag `netbox_object_type` evita colisões com IDs de dispositivos.
+Consulte o [procedimento de inclusão e rollback](deployment/netbox-zabbix-sync-implementation.md).
 Grupo e template são configurados por nome em `netbox_zabbix_sync_group` e
 `netbox_zabbix_sync_template`; IDs específicos de um ambiente não são aceitos.
 O campo personalizado `zabbix_hostid` é criado de forma idempotente. A remoção

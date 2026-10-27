@@ -19,6 +19,27 @@
     - name: Test installed protection preservation and refusal
       ansible.builtin.include_tasks: test-installed-guard-case.yml
       loop:
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: {services: {netbox-zabbix-sync: {environment: {NETBOX_INCLUDE_VMS: 'true', NETBOX_VM_GROUP: Virtual machines, NETBOX_VM_TEMPLATE: ICMP Ping, NETBOX_SITE_SLUGS: example-lab}}}}
+          reject: true
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: {services: {netbox-zabbix-sync: {environment: {NETBOX_INCLUDE_VMS: 'true', NETBOX_VM_GROUP: Virtual machines, NETBOX_VM_TEMPLATE: ICMP Ping, NETBOX_SITE_SLUGS: example-lab}}}}
+          vms: true
+          reject: false
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: {services: {netbox-zabbix-sync: {environment: {NETBOX_INCLUDE_VMS: 'true', NETBOX_VM_GROUP: Virtual machines, NETBOX_VM_TEMPLATE: ICMP Ping, NETBOX_SITE_SLUGS: example-lab}}}}
+          vms: true
+          sites: []
+          reject: true
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: {services: {netbox-zabbix-sync: {environment: {NETBOX_INCLUDE_VMS: 'true', NETBOX_VM_GROUP: Virtual machines, NETBOX_VM_TEMPLATE: ICMP Ping, NETBOX_SITE_SLUGS: example-lab}}}}
+          vms: true
+          vm_template: Linux by Zabbix agent active
+          reject: true
         - role: glpi
           task: installed-guard.yml
           compose: {services: {glpi: {volumes: ['./security.ini:/usr/local/etc/php/conf.d/zzz-iop-security.ini:ro']}}}
