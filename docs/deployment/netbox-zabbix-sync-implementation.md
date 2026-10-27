@@ -42,7 +42,8 @@ VMs usam nome técnico estável `netbox-vm-<id>` e nome visível do inventário.
 A identidade inclui `netbox_object_type` e `netbox_id`; hosts legados sem tipo
 continuam sendo dispositivos. O campo `zabbix_hostid` passa a aceitar VMs sem
 remover suas associações anteriores. Colisões globais de nomes, IDs conflitantes,
-posse duplicada e divergências de grupo/template bloqueiam a execução antes das
+posse duplicada, tipos de posse desconhecidos, colisões entre nomes planejados
+e divergências de grupo/template bloqueiam a execução antes das
 escritas. Hosts existentes não são adotados automaticamente. Tags, histórico,
 grupos e templates externos são preservados; objetos fora do site não são
 desabilitados por ausência no conjunto selecionado.

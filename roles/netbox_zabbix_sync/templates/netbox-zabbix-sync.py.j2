@@ -51,7 +51,10 @@ def host_identity(host: dict[str, Any]) -> tuple[str, str] | None:
     if tags.get("source") != "netbox" or not tags.get("netbox_id"):
         return None
     # Pre-VM deployments have untyped device IDs; preserve their ownership.
-    return tags.get("netbox_object_type", "dcim.device"), tags["netbox_id"]
+    kind = tags.get("netbox_object_type", "dcim.device")
+    if kind not in {"dcim.device", "virtualization.virtualmachine"}:
+        raise RuntimeError("Unsupported NetBox ownership type; refusing reconciliation")
+    return kind, tags["netbox_id"]
 
 
 class ZabbixAPI:
@@ -189,7 +192,12 @@ def main() -> int:
     ).distinct().order_by("name")) if include_vms else []
     objects = [obj for obj in devices + vms if not sites or (obj.site and obj.site.slug in sites)]
     # Preflight the entire set before any API or metadata write: no partial collision takeover.
+    planned_names: dict[str, tuple[str, str]] = {}
     for obj in objects:
+        name = host_name(obj)
+        if name in planned_names and planned_names[name] != identity(obj):
+            raise RuntimeError(f"Planned Zabbix host name collision: {name}")
+        planned_names[name] = identity(obj)
         existing = managed.get(identity(obj))
         collision = by_name.get(host_name(obj))
         if collision and collision is not existing:

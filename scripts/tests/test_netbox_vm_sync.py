@@ -106,6 +106,19 @@ class SyncTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'collision'): self.run_sync()
         self.assertEqual(self.api.writes, [])
 
+    def test_new_objects_cannot_share_planned_technical_name(self):
+        self.devices.append(obj(9, 'dcim.device', 'netbox-vm-1'))
+        with self.assertRaisesRegex(RuntimeError, 'collision'): self.run_sync()
+        self.assertEqual(self.api.writes, [])
+
+    def test_unknown_managed_object_type_cannot_be_disabled(self):
+        self.api.hosts.append(dict(hostid='8', host='foreign-object', status='0',
+            hostgroups=[{'groupid':'2'}], tags=[{'tag':'source','value':'netbox'},
+            {'tag':'netbox_id','value':'1'}, {'tag':'netbox_site','value':'test'},
+            {'tag':'netbox_object_type','value':'unsupported.model'}]))
+        with self.assertRaisesRegex(RuntimeError, 'Unsupported'): self.run_sync()
+        self.assertEqual(self.api.writes, [])
+
     def test_conflicting_custom_field_refused(self):
         self.vms[0].custom_field_data['zabbix_hostid'] = 'other'
         with self.assertRaisesRegex(RuntimeError, 'Conflicting'): self.run_sync()
