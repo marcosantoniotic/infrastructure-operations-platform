@@ -133,6 +133,24 @@
         dest: "{{ ci_output_dir }}/netbox_zabbix_sync/compose.yaml"
         mode: "0644"
 
+    - name: Enable optional VM synchronization fixture
+      ansible.builtin.set_fact:
+        netbox_zabbix_sync_include_vms: true
+        netbox_zabbix_sync_vm_template: ICMP Ping
+        netbox_zabbix_sync_site_slugs: [example-lab]
+
+    - name: Render optional VM synchronization fixture
+      ansible.builtin.template:
+        src: ../../roles/netbox_zabbix_sync/templates/compose.yaml.j2
+        dest: "{{ ci_output_dir }}/netbox_zabbix_sync/compose.vms.yaml"
+        mode: "0644"
+
+    - name: Reset optional VM fixture settings
+      ansible.builtin.set_fact:
+        netbox_zabbix_sync_include_vms: false
+        netbox_zabbix_sync_vm_template: ""
+        netbox_zabbix_sync_site_slugs: []
+
     - name: Load Portainer defaults
       ansible.builtin.include_vars:
         file: ../../roles/portainer/defaults/main.yml

@@ -12,9 +12,14 @@
     that:
       - not data.get('networks', {}).get('api-tls') or data.networks['api-tls'].name == iop_internal_api_tls_network
       - not old_url.startswith('https://') or netbox_zabbix_sync_zabbix_url.startswith('https://')
+      - old_env.get('NETBOX_INCLUDE_VMS', 'false') | string | lower != 'true' or netbox_zabbix_sync_include_vms | bool
+      - not old_env.get('NETBOX_SITE_SLUGS', '') or old_env.NETBOX_SITE_SLUGS == (netbox_zabbix_sync_site_slugs | join(','))
+      - old_env.get('NETBOX_INCLUDE_VMS', 'false') | string | lower != 'true' or old_env.get('NETBOX_VM_TEMPLATE') == netbox_zabbix_sync_vm_template
+      - old_env.get('NETBOX_INCLUDE_VMS', 'false') | string | lower != 'true' or old_env.get('NETBOX_VM_GROUP') == netbox_zabbix_sync_vm_group
     fail_msg: Preserve the installed TLS transport and network in private overrides before deploying.
   vars:
     data: "{{ sync_installed_compose.content | b64decode | from_yaml }}"
     old_url: "{{ data.services['netbox-zabbix-sync'].get('environment', {}).get('ZABBIX_URL', '') }}"
+    old_env: "{{ data.services['netbox-zabbix-sync'].get('environment', {}) }}"
   when: sync_installed_file.stat.exists
   no_log: true

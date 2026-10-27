@@ -7,6 +7,10 @@ netbox_zabbix_sync_api_token: "<ZABBIX_API_TOKEN>"
 netbox_zabbix_sync_zabbix_url: http://zabbix-web:8080/api_jsonrpc.php
 netbox_zabbix_sync_group: Linux servers
 netbox_zabbix_sync_template: Linux by Zabbix agent active
+netbox_zabbix_sync_include_vms: false
+netbox_zabbix_sync_vm_group: Virtual machines
+netbox_zabbix_sync_vm_template: ""
+netbox_zabbix_sync_site_slugs: []
 netbox_zabbix_sync_tag_slug: zabbix
 netbox_zabbix_sync_hostid_field: zabbix_hostid
 netbox_zabbix_sync_netbox_env_file: /opt/netbox/.env

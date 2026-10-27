@@ -26,6 +26,22 @@ for service in traefik cloudflare_tunnel zabbix netbox netbox_zabbix_sync portai
     config --quiet
 done
 
+for variant in compose.yaml compose.vms.yaml; do
+  docker compose --project-directory "${artifact_dir}/netbox_zabbix_sync" \
+    --file "${artifact_dir}/netbox_zabbix_sync/${variant}" config --quiet
+done
+python3 - "${artifact_dir}/netbox_zabbix_sync" <<'PY'
+import pathlib,sys,yaml
+p=pathlib.Path(sys.argv[1])
+legacy=yaml.safe_load((p/'compose.yaml').read_text())['services']['netbox-zabbix-sync']
+vms=yaml.safe_load((p/'compose.vms.yaml').read_text())['services']['netbox-zabbix-sync']
+assert legacy['environment']['NETBOX_INCLUDE_VMS']=='false'
+assert vms['environment']['NETBOX_INCLUDE_VMS']=='true'
+assert vms['environment']['NETBOX_VM_TEMPLATE']=='ICMP Ping'
+assert vms['environment']['NETBOX_SITE_SLUGS']=='example-lab'
+assert not legacy.get('ports') and not vms.get('ports')
+PY
+
 # Config rendering must preserve legacy storage and opt into existing external
 # storage explicitly. This does not create volumes or start any containers.
 docker compose --project-directory "${artifact_dir}/zabbix" \

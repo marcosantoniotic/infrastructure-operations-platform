@@ -16,6 +16,12 @@
         netbox_project_dir: "{{ fixture_root }}"
         zabbix_project_dir: "{{ fixture_root }}"
         traefik_project_dir: "{{ fixture_root }}"
+        netbox_zabbix_sync_project_dir: "{{ fixture_root }}"
+        netbox_zabbix_sync_include_vms: "{{ scenario.vms | default(false) }}"
+        netbox_zabbix_sync_vm_group: Virtual machines
+        netbox_zabbix_sync_vm_template: "{{ scenario.vm_template | default('ICMP Ping') }}"
+        netbox_zabbix_sync_site_slugs: "{{ scenario.sites | default(['example-lab']) }}"
+        netbox_zabbix_sync_zabbix_url: http://zabbix-web:8080/api_jsonrpc.php
         glpi_php_security_hardening: "{{ scenario.php | default(false) }}"
         glpi_https_cookie_hardening: false
         netbox_secure_cookies: "{{ scenario.cookies | default(false) }}"
