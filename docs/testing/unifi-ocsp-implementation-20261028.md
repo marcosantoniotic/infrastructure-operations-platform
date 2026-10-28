@@ -24,6 +24,34 @@ Previously recorded image/source hashes below describe the initial candidate,
 not the revised non-root image. Final CI results must be checked at the PR head.
 The PR remains draft; all release/rollout limitations below continue to apply.
 
+Follow-up validation results:
+
+- Windows unittest discovery: 59 tests, 58 passed and 1 explicitly skipped
+  (the Linux directory-fsync test). No cryptographic fixture tests skipped.
+- Linux CI: the four durability tests (including directory fsync ordering and
+  failure injection), six guard tests and 54 actual collector cases passed.
+  This CI builds and runs the non-root candidate; it is no longer only fixture
+  generation or pure-function guards. The pre-existing GLPI HTTPS CI also passed
+  on the first correction commit.
+- Disposable Linux VM independently repeated the same 54 collector cases.
+  Real Ansible/Compose checked both running UIDs=10001 and original secret
+  owner=root/mode=0600. Final repeated apply: ok=41, changed=0, failed=0.
+- Configuration-only rollback again recovered transient failure, retained both
+  journals and refused subsequent GOOD for the confirmed-revoked leaf. A
+  different pre-generated fictitious leaf recovered collection without clearing
+  either deny history. Collectors/emulators were stopped after acceptance.
+- Test harness issues (metrics-mode reset and root-owned responder control file)
+  were fixed in the fixture, not by relaxing runtime security. The rollback
+  fixture preserves journal ownership during its test-only GOOD-cache eviction.
+- Independently built revised local runtime image:
+  `sha256:26d272e98365351e9aee912ebd224b1bc68a6686b8cf3ed260d8492d7a477901`,
+  user `10001:10001`; image is still unpublished. Revised Linux verifier SHA-256:
+  `d7189f4fd0dee9319f4e5790bdd90cdc9ec1ca614ef16d4f8354b981ddc7af8e`.
+
+CI status is commit-specific: consult the PR head before approval. Image scans
+are reporting jobs, not a claim that no vulnerabilities exist. No operational
+controller, OPS or LAB01 was accessed during these corrections.
+
 ## Version and implementation evidence
 
 - Project base: dcfb850c0ec94fecd32095a2f6a96ecfd10c3b9d.

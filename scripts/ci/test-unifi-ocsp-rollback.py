@@ -1,5 +1,6 @@
 """Safe CONFIG rollback on disposable fixture, never reset a revocation journal."""
 import fcntl
+import argparse
 import hashlib
 import json
 import os
@@ -10,8 +11,14 @@ import subprocess
 import time
 
 assert socket.gethostname() == 'iop-netbox-security-test' and os.geteuid() == 0
-root = Path('/tmp/iop-unifi-ocsp-acceptance-v2')
-fixture = Path('/home/automation/unifi-ocsp-isolated-20261028/.validation/ocsp-private/ansible-fixture')
+parser = argparse.ArgumentParser()
+parser.add_argument('--project', choices=['/tmp/iop-unifi-ocsp-acceptance-v2', '/tmp/iop-unifi-ocsp-pr91-acceptance'],
+                    default='/tmp/iop-unifi-ocsp-acceptance-v2')
+parser.add_argument('--fixture', type=Path,
+                    default=Path('/home/automation/unifi-ocsp-isolated-20261028/.validation/ocsp-private/ansible-fixture'))
+args = parser.parse_args()
+root, fixture = Path(args.project), args.fixture.resolve()
+assert 'ocsp-private' in fixture.parts and fixture.is_relative_to('/home/automation')
 assert root.is_dir() and json.loads((fixture / 'manifest.json').read_text())['fictitious_only']
 command = ['docker', 'compose', '--project-directory', str(root)]
 
@@ -30,6 +37,13 @@ def states():
             for name in ['unpoller', 'ap']}
 
 
+def responder_mode(value):
+    path = fixture / 'responder-mode.txt'
+    path.write_text(value)
+    metadata = fixture.stat()
+    os.chown(path, metadata.st_uid, metadata.st_gid)
+
+
 def clear_good_cache():
     for name in ['unpoller', 'ap']:
         path = root / 'unifi-ocsp' / (name + '-state') / 'state.json'
@@ -40,6 +54,8 @@ def clear_good_cache():
             temporary = path.with_name('test-cache-eviction.json')
             temporary.write_text(json.dumps(data))
             temporary.chmod(0o600)
+            metadata = path.stat()
+            os.chown(temporary, metadata.st_uid, metadata.st_gid)
             os.replace(temporary, path)
 
 
@@ -71,7 +87,7 @@ else:
 assert all(states()[name]['revoked'] == before[name]['revoked'] for name in before)
 
 # Record real, correctly signed REVOKED in BOTH collectors.
-(fixture / 'responder-mode.txt').write_text('revoked')
+responder_mode('revoked')
 previous_denials = states()
 clear_good_cache()
 restart()
@@ -84,7 +100,7 @@ else:
     raise AssertionError('Both collectors must retain confirmed revocation')
 
 # Even a restored protected Compose + subsequent GOOD cannot override the deny.
-(fixture / 'responder-mode.txt').write_text('good')
+responder_mode('good')
 shutil.copy2(backup / 'compose.yaml', root / 'compose.yaml')
 restart()
 time.sleep(5)
