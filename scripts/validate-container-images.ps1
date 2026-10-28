@@ -19,8 +19,11 @@ foreach ($file in $defaultFiles) {
 
         $variable = $Matches[1]
         $reference = $Matches[2].Trim().Trim('"', "'")
-        if ($reference -in @('', '>-', '|-', '>', '|')) {
-            if ($index + 1 -ge $lines.Count) {
+        # Optional empty image defaults must not consume the next YAML key.
+        # Their enabled-state immutable-image requirement is enforced by guards.
+        if ($reference -eq '') { continue }
+        if ($reference -in @('>-', '|-', '>', '|')) {
+            if ($index + 1 -ge $lines.Count -or $lines[$index + 1] -notmatch '^\s+\S') {
                 $errors.Add("$variable has no container image value in $($file.FullName)")
                 continue
             }

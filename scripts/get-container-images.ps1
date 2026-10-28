@@ -21,8 +21,10 @@ foreach ($file in $defaultFiles) {
         }
 
         $reference = $Matches[1].Trim().Trim('"', "'")
-        if ($reference -in @('', '>-', '|-', '>', '|')) {
-            if ($index + 1 -ge $lines.Count) {
+        # An explicit empty scalar is an opt-in image, not a block scalar.
+        if ($reference -eq '') { continue }
+        if ($reference -in @('>-', '|-', '>', '|')) {
+            if ($index + 1 -ge $lines.Count -or $lines[$index + 1] -notmatch '^\s+\S') {
                 throw "Image reference has no value in $($file.FullName)."
             }
             $reference = $lines[++$index].Trim().Trim('"', "'")

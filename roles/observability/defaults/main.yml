@@ -74,6 +74,16 @@ observability_unifi_password: "<UNIFI_READ_ONLY_PASSWORD>"
 observability_unifi_verify_ssl: true
 observability_unifi_save_dpi: true
 
+# Dedicated collector-only playbook. No automatic global enablement.
+observability_unifi_ocsp_enabled: false
+observability_unifi_ocsp_image: ""
+observability_unifi_ocsp_previous_image: ""
+observability_unifi_ocsp_policy: {}
+observability_unifi_ocsp_ca_certificate: ""
+observability_unifi_ocsp_issuer_certificate: ""
+observability_unifi_ocsp_change_approved: false
+observability_unifi_ocsp_backup_confirmed: false
+
 observability_enable_traefik: false
 observability_grafana_hostname: "grafana.<BASE_DOMAIN>"
 observability_grafana_additional_hostnames: []

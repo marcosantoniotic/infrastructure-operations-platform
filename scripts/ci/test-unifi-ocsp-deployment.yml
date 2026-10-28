@@ -1,0 +1,132 @@
+---
+- name: Exercise coordinated OCSP only on disposable fixture
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  become: true
+  vars:
+    test_project_dir: /tmp/iop-unifi-ocsp-acceptance-v2
+    test_fixture_dir: /home/automation/unifi-ocsp-isolated-20261028/.validation/ocsp-private/ansible-fixture
+    fixture: "{{ test_fixture_dir }}"
+    observability_project_dir: "{{ test_project_dir }}"
+    observability_textfile_collector_dir: "{{ test_project_dir }}/metrics"
+  pre_tasks:
+    - name: Refuse operational hosts or destinations
+      ansible.builtin.assert:
+        that:
+          - ansible_hostname == 'iop-netbox-security-test'
+          - test_project_dir in ['/tmp/iop-unifi-ocsp-acceptance-v2', '/tmp/iop-unifi-ocsp-pr91-acceptance']
+          - "'/ocsp-private/' in test_fixture_dir"
+    - name: Load role defaults
+      ansible.builtin.include_vars: ../../roles/observability/defaults/main.yml
+    - name: Select explicitly attested local test image
+      ansible.builtin.command:
+        argv: [docker, image, inspect, iop-isolated/unpoller-ocsp:3.4.1-candidate]
+      register: image
+      changed_when: false
+    - name: Set only fictitious fixture variables
+      ansible.builtin.set_fact:
+        observability_project_dir: "{{ test_project_dir }}"
+        observability_textfile_collector_dir: "{{ test_project_dir }}/metrics"
+        observability_unifi_ocsp_image: "{{ (image.stdout | from_json | first).Id }}"
+        # This automatic discovery is confined to this fictitious fixture.
+        # Operational inventory must explicitly attest the previous image.
+        observability_unifi_ocsp_previous_image: "{{ (lookup('file', test_project_dir ~ '/compose.yaml', errors='ignore') | default('{}', true) | from_yaml).get('services', {}).get('unifi-poller', {}).get('image', '') }}"
+        observability_unifi_ocsp_enabled: true
+        observability_unifi_poller_enabled: true
+        observability_unifi_verify_ssl: true
+        observability_unifi_url: https://controller.example.test:41443
+        observability_unifi_username: fixture-user
+        observability_unifi_ocsp_ca_certificate: "{{ lookup('file', fixture ~ '/issuer.pem') }}"
+        observability_unifi_ocsp_issuer_certificate: "{{ lookup('file', fixture ~ '/issuer.pem') }}"
+        observability_unifi_ocsp_change_approved: true
+        observability_unifi_ocsp_backup_confirmed: true
+        observability_unifi_ocsp_policy:
+          responder_url: http://ocsp.example.test:41089/ocsp
+          responder_address: 127.0.0.1
+          controller_address: 127.0.0.1
+          timeout_seconds: 2
+          response_limit: 65536
+          cache_entries: 16
+          clock_skew_seconds: 120
+          max_age_seconds: 3600
+          cache_ttl_seconds: 60
+    - name: Create fixture directories
+      ansible.builtin.file:
+        path: "{{ observability_project_dir }}/{{ item }}"
+        state: directory
+        mode: '0700'
+      # The real role owns metrics permissions; the fixture must not reset them
+      # before each apply and manufacture a false idempotence failure.
+      loop: ['', secrets]
+    - name: Write only synthetic password
+      ansible.builtin.copy:
+        content: test-only-password
+        dest: "{{ observability_project_dir }}/secrets/unifi_password"
+        mode: '0600'
+    - name: Create first-install Compose only if no state exists
+      ansible.builtin.copy:
+        force: false
+        content: |
+          name: iop-ocsp-acceptance
+          services:
+            unifi-poller:
+              image: {{ observability_unifi_ocsp_image }}
+              network_mode: host
+              environment:
+                UP_INFLUXDB_DISABLE: 'true'
+                UP_PROMETHEUS_DISABLE: 'false'
+                UP_PROMETHEUS_HTTP_LISTEN: '127.0.0.1:41930'
+                UP_PROMETHEUS_NAMESPACE: unpoller
+                UP_UNIFI_DEFAULT_URL: '{{ observability_unifi_url }}'
+                UP_UNIFI_DEFAULT_VERIFY_SSL: 'true'
+                UP_UNIFI_DEFAULT_USER: fixture-user
+                UP_UNIFI_DEFAULT_PASS: file:///run/secrets/unifi_password
+                UP_UNIFI_DEFAULT_SAVE_SITES: 'true'
+              volumes:
+                - ./secrets/unifi_password:/run/secrets/unifi_password:ro,Z
+              cap_drop: [ALL]
+              read_only: true
+              tmpfs: [/tmp]
+              security_opt: ['no-new-privileges:true']
+        dest: "{{ observability_project_dir }}/compose.yaml"
+        mode: '0600'
+  tasks:
+    - name: Execute actual targeted role only
+      ansible.builtin.include_role:
+        name: observability
+        tasks_from: unifi-ocsp.yml
+    - name: Wait for auxiliary real collection metrics
+      ansible.builtin.slurp:
+        src: "{{ observability_textfile_collector_dir }}/unifi_ap_counts.prom"
+      register: ap_metrics
+      retries: 45
+      delay: 2
+      until: "'iop_unifi_ap_counts_success 1' in (ap_metrics.content | b64decode)"
+    - name: Validate actual Prometheus endpoint
+      ansible.builtin.uri:
+        url: http://127.0.0.1:41930/metrics
+        return_content: true
+      register: poller_metrics
+      retries: 8
+      delay: 2
+      until: "'Fictitious site (default)' in poller_metrics.content and 'unpoller_topology_vertices_total' in poller_metrics.content"
+    - name: Inspect actual collector users and original protected secret
+      ansible.builtin.command:
+        argv: [docker, compose, --project-directory, "{{ test_project_dir }}", exec, -T, "{{ item }}", id, -u]
+      loop: [unifi-poller, unifi-ap-counts]
+      register: collector_users
+      changed_when: false
+    - name: Require both running collectors to be non-root
+      ansible.builtin.assert:
+        that: "item.stdout | trim == '10001'"
+      loop: "{{ collector_users.results }}"
+    - name: Inspect original credential mode
+      ansible.builtin.stat:
+        path: "{{ test_project_dir }}/secrets/unifi_password"
+      register: original_password
+    - name: Verify original credential was not made accessible to other users
+      ansible.builtin.assert:
+        that:
+          - original_password.stat.mode == '0600'
+          - original_password.stat.uid == 0

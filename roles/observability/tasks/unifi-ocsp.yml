@@ -1,0 +1,213 @@
+---
+- name: Require explicit reviewed collector-only change and backups
+  ansible.builtin.assert:
+    that:
+      - observability_unifi_ocsp_change_approved | bool
+      - observability_unifi_ocsp_backup_confirmed | bool
+      - observability_unifi_ocsp_enabled | iop_unifi_ocsp_policy(observability_unifi_poller_enabled, observability_unifi_verify_ssl, observability_unifi_ocsp_image, observability_unifi_url, observability_unifi_ocsp_policy)
+      - observability_unifi_ocsp_enabled | bool
+      - "'BEGIN CERTIFICATE' in observability_unifi_ocsp_ca_certificate"
+      - "'BEGIN CERTIFICATE' in observability_unifi_ocsp_issuer_certificate"
+
+- name: Read installed Compose privately without rendering the full platform
+  ansible.builtin.slurp:
+    src: "{{ observability_project_dir }}/compose.yaml"
+  register: unifi_ocsp_installed
+  no_log: true
+
+- name: Inspect the already built immutable protected image without pulling
+  ansible.builtin.command:
+    argv: [docker, image, inspect, "{{ observability_unifi_ocsp_image }}"]
+  register: unifi_ocsp_image_inspect
+  changed_when: false
+  no_log: true
+
+- name: Require a tested connection-enforcing image
+  ansible.builtin.assert:
+    that:
+      - (unifi_ocsp_image_inspect.stdout | from_json | first).Config.Labels['io.iop.ocsp.enforcement'] == 'connection-v1'
+
+- name: Require current controller and account to match the reviewed inventory
+  ansible.builtin.assert:
+    that:
+      - current_env.UP_UNIFI_DEFAULT_URL == observability_unifi_url
+      - current_env.UP_UNIFI_DEFAULT_USER == observability_unifi_username
+      - current_env.UP_UNIFI_DEFAULT_VERIFY_SSL | bool
+  vars:
+    current_env: "{{ (unifi_ocsp_installed.content | b64decode | from_yaml).services['unifi-poller'].environment }}"
+  no_log: true
+
+- name: Preserve both installed protections and journal paths
+  ansible.builtin.assert:
+    that:
+      - (unifi_ocsp_installed.content | b64decode | from_yaml) | iop_unifi_ocsp_preserve(observability_unifi_ocsp_enabled, observability_unifi_ocsp_image, observability_unifi_ocsp_previous_image)
+
+- name: Create private OCSP configuration and state directories
+  ansible.builtin.file:
+    path: "{{ observability_project_dir }}/unifi-ocsp/{{ item }}"
+    state: directory
+    owner: root
+    group: '10001'
+    mode: '0750'
+  loop: [unpoller, ap, credentials]
+
+- name: Prepare persistent writable journals for the fixed non-root collector UID
+  ansible.builtin.file:
+    path: "{{ observability_project_dir }}/unifi-ocsp/{{ item }}-state"
+    state: directory
+    owner: '10001'
+    group: '10001'
+    mode: '0700'
+  loop: [unpoller, ap]
+
+- name: Allow non-root collectors to write readable textfile metrics
+  ansible.builtin.file:
+    path: "{{ observability_textfile_collector_dir }}"
+    state: directory
+    owner: root
+    group: '10001'
+    mode: '0775'
+
+- name: Copy existing credential privately without changing the original secret
+  ansible.builtin.copy:
+    src: "{{ observability_project_dir }}/secrets/unifi_password"
+    remote_src: true
+    dest: "{{ observability_project_dir }}/unifi-ocsp/credentials/unifi_password"
+    owner: root
+    group: '10001'
+    mode: '0640'
+  no_log: true
+  register: unifi_ocsp_credential_result
+
+- name: Inspect existing installation marker before initializing anything
+  ansible.builtin.stat:
+    path: "{{ observability_project_dir }}/unifi-ocsp/unpoller/policy.json"
+  register: unifi_ocsp_marker
+
+- name: Require persistent journal after a protection was installed
+  ansible.builtin.stat:
+    path: "{{ observability_project_dir }}/unifi-ocsp/{{ item }}-state/state.json"
+  loop: [unpoller, ap]
+  register: unifi_ocsp_states
+
+- name: Read the installed issuer identity before any trust replacement
+  ansible.builtin.slurp:
+    src: "{{ observability_project_dir }}/unifi-ocsp/unpoller/issuer.pem"
+  register: unifi_ocsp_existing_issuer
+  when: unifi_ocsp_marker.stat.exists
+  no_log: true
+
+- name: Refuse issuer changes that could change historical deny identities
+  ansible.builtin.assert:
+    that:
+      - (unifi_ocsp_existing_issuer.content | b64decode | trim) == (observability_unifi_ocsp_issuer_certificate | trim)
+    fail_msg: Issuer changes require a separate reviewed revocation-journal migration; they are not a configuration rollback.
+  when: unifi_ocsp_marker.stat.exists
+  no_log: true
+
+- name: Refuse loss of installed revocation history
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists or not unifi_ocsp_marker.stat.exists
+    fail_msg: Missing installed state cannot be reinitialized; reconcile protected journal first.
+  loop: "{{ unifi_ocsp_states.results }}"
+
+- name: Initialize state only for a first installation, never overwrite history
+  ansible.builtin.copy:
+    content: '{"version":1,"revoked":[],"cache":{},"last_clock":0}'
+    dest: "{{ observability_project_dir }}/unifi-ocsp/{{ item }}-state/state.json"
+    force: false
+    mode: '0600'
+  loop: [unpoller, ap]
+
+- name: Provision persistent lock inodes without replacing them
+  ansible.builtin.copy:
+    content: '0'
+    dest: "{{ observability_project_dir }}/unifi-ocsp/{{ item }}-state/state.json.lock"
+    force: false
+    mode: '0600'
+  loop: [unpoller, ap]
+
+- name: Preserve journal bytes while assigning non-root journal ownership
+  ansible.builtin.file:
+    path: "{{ observability_project_dir }}/unifi-ocsp/{{ item.0 }}-state/{{ item.1 }}"
+    owner: '10001'
+    group: '10001'
+    mode: '0600'
+  loop: "{{ ['unpoller', 'ap'] | product(['state.json', 'state.json.lock']) | list }}"
+
+- name: Write public trust and issuer for each isolated collector
+  ansible.builtin.copy:
+    content: "{{ item.1.value }}"
+    dest: "{{ observability_project_dir }}/unifi-ocsp/{{ item.0 }}/{{ item.1.name }}"
+    owner: root
+    group: '10001'
+    mode: '0640'
+    backup: true
+  loop: "{{ ['unpoller', 'ap'] | product([{'name': 'ca.pem', 'value': observability_unifi_ocsp_ca_certificate}, {'name': 'issuer.pem', 'value': observability_unifi_ocsp_issuer_certificate}]) | list }}"
+  register: unifi_ocsp_trust_result
+
+- name: Write bounded shared OCSP policy without operational credentials
+  ansible.builtin.copy:
+    content: "{{ observability_unifi_ocsp_policy | combine({'issuer_file': '/etc/iop-ocsp/issuer.pem', 'state_file': '/var/lib/iop-ocsp/state.json', 'collector': ('unpoller' if item == 'unpoller' else 'ap_counts'), 'metrics_file': '/metrics/unifi_ocsp_' ~ item ~ '.prom'}) | to_nice_json }}"
+    dest: "{{ observability_project_dir }}/unifi-ocsp/{{ item }}/policy.json"
+    owner: root
+    group: '10001'
+    mode: '0640'
+    backup: true
+  loop: [unpoller, ap]
+
+  register: unifi_ocsp_policy_result
+
+- name: Write auxiliary configuration without granting Docker socket access
+  ansible.builtin.copy:
+    content: "{{ {'hostname': observability_unifi_url | urlsplit('hostname'), 'port': (observability_unifi_url | urlsplit('port')) | default(443, true), 'url': observability_unifi_url, 'username': observability_unifi_username, 'internal_address': observability_unifi_ocsp_policy.controller_address, 'ca_file': '/etc/iop-ocsp/ca.pem', 'password_file': '/run/secrets/unifi_password', 'destination': '/metrics/unifi_ap_counts.prom', 'ocsp_policy_file': '/etc/iop-ocsp/policy.json'} | to_nice_json }}"
+    dest: "{{ observability_project_dir }}/unifi-ocsp/ap/config.json"
+    owner: root
+    group: '10001'
+    mode: '0640'
+    backup: true
+  no_log: true
+  register: unifi_ocsp_ap_result
+
+- name: Prepare semantic Compose patch for collectors only
+  ansible.builtin.set_fact:
+    unifi_ocsp_candidate: "{{ (unifi_ocsp_installed.content | b64decode | from_yaml) | iop_unifi_ocsp_compose(observability_unifi_ocsp_image, observability_textfile_collector_dir) }}"
+  no_log: true
+
+- name: Add explicit controller route to both protected services
+  ansible.builtin.set_fact:
+    unifi_ocsp_candidate: "{{ unifi_ocsp_candidate | combine({'services': {item: {'environment': {'IOP_UNIFI_OCSP_CONTROLLER_ADDRESS': observability_unifi_ocsp_policy.controller_address}}}}, recursive=true) }}"
+  loop: [unifi-poller, unifi-ap-counts]
+  no_log: true
+
+- name: Stage collector-only Compose and preserve rollback copy
+  ansible.builtin.copy:
+    content: "{{ unifi_ocsp_candidate | to_nice_yaml(indent=2, sort_keys=false) }}"
+    dest: "{{ observability_project_dir }}/.unifi-ocsp-candidate.yaml"
+    mode: '0600'
+  no_log: true
+
+- name: Validate candidate without deployment
+  ansible.builtin.command:
+    argv: [docker, compose, --project-directory, "{{ observability_project_dir }}", -f, "{{ observability_project_dir }}/.unifi-ocsp-candidate.yaml", config, --quiet]
+  changed_when: false
+
+- name: Install reviewed Compose preserving prior configuration
+  ansible.builtin.copy:
+    src: "{{ observability_project_dir }}/.unifi-ocsp-candidate.yaml"
+    remote_src: true
+    dest: "{{ observability_project_dir }}/compose.yaml"
+    mode: '0640'
+    backup: true
+
+- name: Apply only the coordinated collectors without build or pull
+  community.docker.docker_compose_v2:
+    project_src: "{{ observability_project_dir }}"
+    services: [unifi-poller, unifi-ap-counts]
+    dependencies: false
+    build: never
+    pull: never
+    state: present
+    recreate: "{{ 'always' if (unifi_ocsp_trust_result.changed or unifi_ocsp_policy_result.changed or unifi_ocsp_ap_result.changed or unifi_ocsp_credential_result.changed) else 'auto' }}"
+    wait: true
