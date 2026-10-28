@@ -1,0 +1,10 @@
+---
+- name: Apply reviewed NetBox security change to the existing web service only
+  hosts: platform
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Apply narrowly scoped web configuration
+      ansible.builtin.include_role:
+        name: netbox
+        tasks_from: web-security.yml

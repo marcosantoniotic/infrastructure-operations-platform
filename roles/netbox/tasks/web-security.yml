@@ -1,0 +1,192 @@
+---
+- name: Require a reviewed change and verified post-MEDIA_ROOT rollback point
+  ansible.builtin.assert:
+    that:
+      - netbox_web_security_change_approved | bool
+      - netbox_web_security_backup_confirmed | bool
+      - netbox_web_security_expected_image_id is match('^sha256:[a-f0-9]{64}$')
+      - netbox_proxy_boundary_enabled | iop_netbox_proxy_policy(netbox_secure_cookies, netbox_proxy_trusted_peers, netbox_allowed_hosts, netbox_csrf_trusted_origins)
+      - netbox_proxy_boundary_enabled | bool
+    fail_msg: Review the diff/impact and confirm verified post-MEDIA_ROOT backups and exact web image before this web-only change.
+
+- name: Check installed security policy
+  ansible.builtin.import_tasks: installed-guard.yml
+
+- name: Require an existing Compose project
+  ansible.builtin.assert:
+    that: netbox_installed_file.stat.exists
+
+- name: Require the reviewed Granian web launcher
+  ansible.builtin.assert:
+    that:
+      - (netbox_installed_compose.content | b64decode | from_yaml) | iop_netbox_web_launcher
+
+- name: Read current environment privately without changing it
+  ansible.builtin.slurp:
+    src: "{{ netbox_project_dir }}/.env"
+  register: netbox_web_current_env
+  no_log: true
+
+- name: Require the corrected shared media location
+  ansible.builtin.assert:
+    that:
+      - "'MEDIA_ROOT=/opt/netbox/netbox/media' in (netbox_web_current_env.content | b64decode).splitlines()"
+    fail_msg: Stop and validate post-MEDIA_ROOT web/worker configuration before any security change.
+
+- name: Read existing web container ID
+  ansible.builtin.command:
+    argv: [docker, compose, --project-directory, "{{ netbox_project_dir }}", ps, -q, netbox]
+  register: netbox_web_id
+  changed_when: false
+  check_mode: false
+
+- name: Inspect existing web container privately
+  ansible.builtin.command:
+    argv: [docker, inspect, "{{ netbox_web_id.stdout | trim }}"]
+  register: netbox_web_inspect
+  changed_when: false
+  check_mode: false
+  no_log: true
+
+- name: Refuse image changes in this security-only operation
+  ansible.builtin.assert:
+    that:
+      - (netbox_web_inspect.stdout | from_json | first).Image == netbox_web_security_expected_image_id
+      - (netbox_web_inspect.stdout | from_json | first).State.Running
+
+- name: Inspect the image reference used for web recreation
+  ansible.builtin.command:
+    argv: [docker, image, inspect, "{{ (netbox_web_inspect.stdout | from_json | first).Config.Image }}"]
+  register: netbox_web_image_inspect
+  changed_when: false
+  check_mode: false
+  no_log: true
+
+- name: Refuse a retagged image during the security-only change
+  ansible.builtin.assert:
+    that:
+      - (netbox_web_image_inspect.stdout | from_json | first).Id == netbox_web_security_expected_image_id
+
+- name: Capture current runtime cookie, origin, redirect and media policy privately
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - "{{ netbox_web_id.stdout | trim }}"
+      - /opt/netbox/venv/bin/python
+      - /opt/netbox/netbox/manage.py
+      - shell
+      - -c
+      - >-
+        from django.conf import settings; import json;
+        print(json.dumps({k: getattr(settings,k) for k in
+        ['SESSION_COOKIE_HTTPONLY','CSRF_COOKIE_HTTPONLY','SESSION_COOKIE_SAMESITE',
+        'CSRF_COOKIE_SAMESITE','CSRF_TRUSTED_ORIGINS','ALLOWED_HOSTS','MEDIA_ROOT',
+        'SECURE_SSL_REDIRECT']}))
+  register: netbox_web_runtime_policy
+  changed_when: false
+  check_mode: false
+  no_log: true
+
+- name: Prepare only web security additions to installed Compose
+  ansible.builtin.copy:
+    content: "{{ (netbox_installed_compose.content | b64decode | from_yaml) | iop_netbox_secure_web_compose(netbox_proxy_trusted_peers) | to_nice_yaml(indent=2, sort_keys=false) }}"
+    dest: "{{ netbox_project_dir }}/.web-security-candidate.yml"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Install the web entry boundary
+  ansible.builtin.import_tasks: proxy-files.yml
+
+- name: Install Secure cookies without overriding HttpOnly or SameSite
+  ansible.builtin.template:
+    src: cookie-security.py.j2
+    dest: "{{ netbox_project_dir }}/cookie-security.py"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  register: netbox_cookie_security_result
+
+- name: Validate candidate Compose without deploying
+  ansible.builtin.command:
+    argv: [docker, compose, --project-directory, "{{ netbox_project_dir }}", -f, "{{ netbox_project_dir }}/.web-security-candidate.yml", config, --quiet]
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Save installed Compose rollback copy and install reviewed candidate
+  ansible.builtin.copy:
+    src: "{{ netbox_project_dir }}/.web-security-candidate.yml"
+    remote_src: true
+    dest: "{{ netbox_project_dir }}/compose.yaml"
+    owner: root
+    group: root
+    mode: "0640"
+    backup: true
+  register: netbox_security_compose_result
+  when: not ansible_check_mode
+
+- name: Recreate only web, never databases, worker, housekeeping or sync
+  community.docker.docker_compose_v2:
+    project_src: "{{ netbox_project_dir }}"
+    files: [compose.yaml]
+    services: [netbox]
+    dependencies: false
+    state: present
+    recreate: always
+    build: never
+    pull: never
+    wait: true
+    wait_timeout: "{{ netbox_compose_wait_timeout }}"
+  when:
+    - not ansible_check_mode
+    - netbox_security_compose_result.changed | default(false) or netbox_cookie_security_result.changed | default(false) or netbox_proxy_boundary_result.changed | default(false)
+  register: netbox_security_web_result
+
+- name: Ensure plugin static assets exist in the web layer
+  ansible.builtin.command:
+    argv: [docker, compose, --project-directory, "{{ netbox_project_dir }}", exec, -T, netbox, /opt/netbox/venv/bin/python, /opt/netbox/netbox/manage.py, collectstatic, --no-input]
+  register: netbox_security_static_result
+  changed_when: "'0 static files copied' not in netbox_security_static_result.stdout"
+  when:
+    - not ansible_check_mode
+    - netbox_topology_views_enabled | bool or netbox_qrcode_enabled | bool
+
+- name: Validate effective web security and preserved runtime policy
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ netbox_project_dir }}"
+      - exec
+      - -T
+      - netbox
+      - /opt/netbox/venv/bin/python
+      - /opt/netbox/netbox/manage.py
+      - shell
+      - -c
+      - >-
+        import json; from django.conf import settings; from netbox import granian;
+        before=json.loads({{ netbox_web_runtime_policy.stdout_lines | last | to_json }});
+        assert all(getattr(settings,k)==v for k,v in before.items());
+        assert settings.MEDIA_ROOT=='/opt/netbox/netbox/media';
+        assert settings.SESSION_COOKIE_SECURE and settings.CSRF_COOKIE_SECURE;
+        assert settings.SECURE_PROXY_SSL_HEADER is None;
+        assert not settings.USE_X_FORWARDED_HOST and not settings.USE_X_FORWARDED_PORT;
+        assert isinstance(granian.application,granian.ProxyBoundary);
+        assert granian.application.trusted==frozenset(granian.peers(json.loads(
+        {{ netbox_proxy_trusted_peers | to_json | to_json }})));
+        print('NETBOX_WEB_SECURITY_RUNTIME_OK')
+  changed_when: false
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Report web-only rollback material
+  ansible.builtin.debug:
+    msg:
+      compose_backup: "{{ netbox_security_compose_result.backup_file | default('unchanged') }}"
+      image_id: "{{ netbox_web_security_expected_image_id }}"
+      scope: web only; no database restore, migrations, volumes, origin changes or worker restart

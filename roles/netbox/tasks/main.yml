@@ -1,6 +1,10 @@
 ---
 - name: Protect installed cookie settings
   ansible.builtin.import_tasks: installed-guard.yml
+- name: Validate opt-in NetBox transport policy
+  ansible.builtin.assert:
+    that:
+      - netbox_proxy_boundary_enabled | iop_netbox_proxy_policy(netbox_secure_cookies, netbox_proxy_trusted_peers, netbox_allowed_hosts, netbox_csrf_trusted_origins)
 - name: Evaluate NetBox secret requirements without exposing values
   ansible.builtin.set_fact:
     netbox_secret_validation:
@@ -177,6 +181,9 @@
   register: netbox_cookie_security_result
   when: netbox_secure_cookies | bool
 
+- name: Install optional proxy boundary files
+  ansible.builtin.import_tasks: proxy-files.yml
+
 - name: Validate rendered Compose configuration
   ansible.builtin.command:
     cmd: docker compose --project-directory {{ netbox_project_dir }} config --quiet
@@ -214,7 +221,7 @@
     wait_timeout: "{{ netbox_compose_wait_timeout }}"
   when:
     - not ansible_check_mode
-    - netbox_cookie_security_result.changed | default(false)
+    - netbox_cookie_security_result.changed | default(false) or netbox_proxy_boundary_result.changed | default(false)
 
 - name: Apply pending NetBox database migrations
   ansible.builtin.command:

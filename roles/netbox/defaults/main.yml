@@ -49,3 +49,10 @@ netbox_demo_cluster_name: Infrastructure Operations Validation
 
 # Enable only after both browser access paths use HTTPS.
 netbox_secure_cookies: false
+
+# Web-only transport-peer boundary. Exact IPs only, no CIDRs or wildcards.
+netbox_proxy_boundary_enabled: false
+netbox_proxy_trusted_peers: []
+netbox_web_security_change_approved: false
+netbox_web_security_backup_confirmed: false
+netbox_web_security_expected_image_id: ""
