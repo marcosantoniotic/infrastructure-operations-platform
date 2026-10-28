@@ -83,6 +83,7 @@ jobs:
           python scripts/tests/test_netbox_vm_sync.py
           python scripts/tests/test_netbox_proxy.py
           python scripts/tests/test_unifi_ocsp_policy.py
+          python scripts/tests/test_container_image_inventory.py
           ruby scripts/tests/test_validation_network.rb
           bash -n automation/scripts/Configure-ValidationInfrastructure.sh
           bash automation/scripts/Configure-ValidationInfrastructure.sh --validate-only 192.0.2.20/24 192.0.2.1 192.0.2.10
@@ -102,6 +103,7 @@ jobs:
           mkdir -p .validation/ocsp-private
           python scripts/ci/create-unifi-ocsp-fixtures.py --destination .validation/ocsp-private/ci-fixtures
           IOP_OCSP_FIXTURE_DIR="$PWD/.validation/ocsp-private/ci-fixtures" python scripts/tests/test_unifi_ocsp_fixtures.py
+          python scripts/tests/test_unifi_ocsp_durability.py
 
       - name: Generate sanitized inventory fixture
         shell: bash
@@ -201,3 +203,36 @@ jobs:
         run: python -m pip install --disable-pip-version-check ansible-core==2.19.7
       - name: Exercise disposable migration, negative controls and rollback
         run: python scripts/ci/test-glpi-https.py
+
+  unifi-ocsp:
+    name: Isolated non-root UniFi OCSP collector acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build exact patched runtime and fixture-only image (no publication)
+        run: |
+          docker build -f containers/unifi-ocsp/Dockerfile -t iop-isolated/unpoller-ocsp:3.4.1-candidate .
+          docker build -f containers/unifi-ocsp/Dockerfile.test -t iop-isolated/unpoller-ocsp:test .
+          test "$(docker image inspect --format '{{.Config.User}}' iop-isolated/unpoller-ocsp:test)" = '10001:10001'
+      - name: Run real TLS, verifier, transports, revocation and durability without network access
+        shell: bash
+        run: |
+          mkdir -p .validation/ocsp-private
+          sudo chown 10001:10001 .validation/ocsp-private
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges:true --memory 1g --cpus 2 --pids-limit 256 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+            -e PYTHONDONTWRITEBYTECODE=1 \
+            -v "$PWD:/workspace:ro" \
+            -v "$PWD/.validation/ocsp-private:/workspace/.validation/ocsp-private:rw" \
+            -w /workspace --entrypoint /bin/sh iop-isolated/unpoller-ocsp:test -ec '
+              test "$(id -u)" = 10001
+              cmp /opt/iop/unifi_ocsp.py roles/observability/files/unifi_ocsp.py
+              cmp /opt/iop/unifi-ap-counts.py roles/observability/files/unifi-ap-counts.py
+              python scripts/ci/create-unifi-ocsp-fixtures.py --destination .validation/ocsp-private/collector-ci
+              python scripts/tests/test_unifi_ocsp_durability.py
+              python scripts/tests/test_unifi_ocsp_policy.py
+              python scripts/ci/test-unifi-ocsp-connections.py --fixture .validation/ocsp-private/collector-ci --binary /usr/bin/unpoller
+            '

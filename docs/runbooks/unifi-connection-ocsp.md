@@ -115,6 +115,28 @@ provision is refused after OCSP installation; it cannot erase the protection.
 
 ## Metrics and limits
 
+### Non-root execution and journal durability
+
+Both images and both protected Compose services use UID/GID `10001:10001`.
+The targeted role keeps the original password file unchanged and copies it to
+a root-owned, group-10001-readable private credential file mounted read-only.
+Configuration directories are root-owned 0750 with group 10001; configuration
+files are 0640. Only journals/locks are owned by the collector (0700/0600).
+The existing textfile directory is root-owned, group 10001, 0775; review this
+group assignment before applying if another writer already owns that directory.
+Shared credential/metrics mounts use shared SELinux labels (`z`), not exclusive
+labels that conflict between the two collectors or a metrics reader. The role
+does not rewrite journal contents when changing ownership. Unknown customized
+auxiliary service definitions still require a separate migration review.
+
+Linux journal updates sync the temporary file, atomically replace the journal,
+then sync its parent directory before returning success. File sync, replacement
+or directory sync failures propagate and deny collection. This assumes a local
+filesystem/storage stack honoring fsync; it is not a physical power-loss test.
+Portable Windows test execution cannot provide directory-fsync evidence; the
+Linux CI executes that boundary and its injected failures. External deny-history
+backup/reconciliation remains required for disaster recovery.
+
 `iop_unifi_ocsp_last_check_success`, bounded `...last_check_reason` gauges and
 timestamp are emitted for unpoller/ap_counts. They report the LAST CHECK, not an
 assertion that a newer scrape happened: monitor timestamp freshness as well.

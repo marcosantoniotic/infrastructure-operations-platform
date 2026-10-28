@@ -186,6 +186,16 @@ class Policy:
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(name, self.state)
+            # Persist the directory entry as well as file contents before a
+            # confirmed revocation may be acknowledged. Fail closed on error.
+            # Windows has no portable directory fsync; operational containers
+            # are Linux and acceptance tests require this durability boundary.
+            if os.name == 'posix':
+                directory = os.open(self.state.parent, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
         finally:
             if os.path.exists(name):
                 os.unlink(name)

@@ -47,9 +47,37 @@
     path: "{{ observability_project_dir }}/unifi-ocsp/{{ item }}"
     state: directory
     owner: root
-    group: root
+    group: '10001'
+    mode: '0750'
+  loop: [unpoller, ap, credentials]
+
+- name: Prepare persistent writable journals for the fixed non-root collector UID
+  ansible.builtin.file:
+    path: "{{ observability_project_dir }}/unifi-ocsp/{{ item }}-state"
+    state: directory
+    owner: '10001'
+    group: '10001'
     mode: '0700'
-  loop: [unpoller, ap, unpoller-state, ap-state, metrics]
+  loop: [unpoller, ap]
+
+- name: Allow non-root collectors to write readable textfile metrics
+  ansible.builtin.file:
+    path: "{{ observability_textfile_collector_dir }}"
+    state: directory
+    owner: root
+    group: '10001'
+    mode: '0775'
+
+- name: Copy existing credential privately without changing the original secret
+  ansible.builtin.copy:
+    src: "{{ observability_project_dir }}/secrets/unifi_password"
+    remote_src: true
+    dest: "{{ observability_project_dir }}/unifi-ocsp/credentials/unifi_password"
+    owner: root
+    group: '10001'
+    mode: '0640'
+  no_log: true
+  register: unifi_ocsp_credential_result
 
 - name: Inspect existing installation marker before initializing anything
   ansible.builtin.stat:
@@ -100,11 +128,21 @@
     mode: '0600'
   loop: [unpoller, ap]
 
+- name: Preserve journal bytes while assigning non-root journal ownership
+  ansible.builtin.file:
+    path: "{{ observability_project_dir }}/unifi-ocsp/{{ item.0 }}-state/{{ item.1 }}"
+    owner: '10001'
+    group: '10001'
+    mode: '0600'
+  loop: "{{ ['unpoller', 'ap'] | product(['state.json', 'state.json.lock']) | list }}"
+
 - name: Write public trust and issuer for each isolated collector
   ansible.builtin.copy:
     content: "{{ item.1.value }}"
     dest: "{{ observability_project_dir }}/unifi-ocsp/{{ item.0 }}/{{ item.1.name }}"
-    mode: '0644'
+    owner: root
+    group: '10001'
+    mode: '0640'
     backup: true
   loop: "{{ ['unpoller', 'ap'] | product([{'name': 'ca.pem', 'value': observability_unifi_ocsp_ca_certificate}, {'name': 'issuer.pem', 'value': observability_unifi_ocsp_issuer_certificate}]) | list }}"
   register: unifi_ocsp_trust_result
@@ -113,7 +151,9 @@
   ansible.builtin.copy:
     content: "{{ observability_unifi_ocsp_policy | combine({'issuer_file': '/etc/iop-ocsp/issuer.pem', 'state_file': '/var/lib/iop-ocsp/state.json', 'collector': ('unpoller' if item == 'unpoller' else 'ap_counts'), 'metrics_file': '/metrics/unifi_ocsp_' ~ item ~ '.prom'}) | to_nice_json }}"
     dest: "{{ observability_project_dir }}/unifi-ocsp/{{ item }}/policy.json"
-    mode: '0600'
+    owner: root
+    group: '10001'
+    mode: '0640'
     backup: true
   loop: [unpoller, ap]
 
@@ -123,7 +163,9 @@
   ansible.builtin.copy:
     content: "{{ {'hostname': observability_unifi_url | urlsplit('hostname'), 'port': (observability_unifi_url | urlsplit('port')) | default(443, true), 'url': observability_unifi_url, 'username': observability_unifi_username, 'internal_address': observability_unifi_ocsp_policy.controller_address, 'ca_file': '/etc/iop-ocsp/ca.pem', 'password_file': '/run/secrets/unifi_password', 'destination': '/metrics/unifi_ap_counts.prom', 'ocsp_policy_file': '/etc/iop-ocsp/policy.json'} | to_nice_json }}"
     dest: "{{ observability_project_dir }}/unifi-ocsp/ap/config.json"
-    mode: '0600'
+    owner: root
+    group: '10001'
+    mode: '0640'
     backup: true
   no_log: true
   register: unifi_ocsp_ap_result
@@ -167,5 +209,5 @@
     build: never
     pull: never
     state: present
-    recreate: "{{ 'always' if (unifi_ocsp_trust_result.changed or unifi_ocsp_policy_result.changed or unifi_ocsp_ap_result.changed) else 'auto' }}"
+    recreate: "{{ 'always' if (unifi_ocsp_trust_result.changed or unifi_ocsp_policy_result.changed or unifi_ocsp_ap_result.changed or unifi_ocsp_credential_result.changed) else 'auto' }}"
     wait: true

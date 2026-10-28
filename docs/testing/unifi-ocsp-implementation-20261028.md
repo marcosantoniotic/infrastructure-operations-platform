@@ -5,6 +5,25 @@ No operational deployment, OPS/LAB01 access, real certificate issuance or
 controller/CA change. Original working tree changes remain untouched. The custom
 runtime image remains local and unpublished; this PR is not rollout approval.
 
+## PR #91 review follow-up (2026-10-28)
+
+The first candidate's CI found root Dockerfile execution and an image inventory
+parser consuming the next YAML key after an empty optional image. Both are
+corrected: fixed non-root identity with private read-only credential copy and
+explicit empty-vs-block-scalar parsing, with malformed-block rejection tests.
+Confirmed-revocation journal writes now also fsync the Linux parent directory.
+Fault-injection tests cover file sync, atomic replace and directory sync errors;
+these simulate errors, not a physical power-cut experiment.
+
+The new CI acceptance job builds the patched runtime plus a fixture-only image,
+asserts non-root identity, compares packaged Python sources to the checkout and
+runs both real collectors against local fictitious TLS/OCSP services. Runtime
+acceptance has network=none, read-only root, dropped capabilities and bounded
+resources. It neither publishes the image nor contacts operational controllers.
+Previously recorded image/source hashes below describe the initial candidate,
+not the revised non-root image. Final CI results must be checked at the PR head.
+The PR remains draft; all release/rollout limitations below continue to apply.
+
 ## Version and implementation evidence
 
 - Project base: dcfb850c0ec94fecd32095a2f6a96ecfd10c3b9d.

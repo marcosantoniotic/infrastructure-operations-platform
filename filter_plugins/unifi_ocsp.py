@@ -66,6 +66,7 @@ def compose_patch(compose, image, metrics_dir='./unifi-ocsp/metrics'):
     if any('cert' in str(key).lower() or 'remote' in str(key).lower() for key in env):
         raise ValueError('Pinning/remote modes need explicit review and are not supported')
     poller['image'] = image
+    poller['user'] = '10001:10001'
     poller.pop('build', None)
     env.update(IOP_UNIFI_OCSP_POLICY='/etc/iop-ocsp/policy.json',
                IOP_UNIFI_OCSP_PYTHON='/usr/local/bin/python3',
@@ -74,9 +75,18 @@ def compose_patch(compose, image, metrics_dir='./unifi-ocsp/metrics'):
     # Address is supplied separately by the reviewed deployment task.
     poller['environment'] = env
     mounts = poller.setdefault('volumes', [])
+    # Keep the existing secret untouched; use a private non-root-readable copy.
+    credential = './unifi-ocsp/credentials/unifi_password:/run/secrets/unifi_password:ro,z'
+    password_mounts = [m for m in mounts if isinstance(m, str) and
+                       m.split(':')[1] == '/run/secrets/unifi_password']
+    if password_mounts not in (['./secrets/unifi_password:/run/secrets/unifi_password:ro,Z'], [credential]):
+        raise ValueError('Review existing password mount before OCSP migration')
+    mounts[mounts.index(password_mounts[0])] = credential
+    if metrics_dir + ':/metrics:rw,Z' in mounts:
+        mounts[mounts.index(metrics_dir + ':/metrics:rw,Z')] = metrics_dir + ':/metrics:rw,z'
     additions = ['./unifi-ocsp/unpoller:/etc/iop-ocsp:ro,Z',
                  './unifi-ocsp/unpoller-state:/var/lib/iop-ocsp:rw,Z',
-                 metrics_dir + ':/metrics:rw,Z']
+                 metrics_dir + ':/metrics:rw,z']
     for mount in additions:
         target = mount.split(':')[1]
         existing = [m for m in mounts if (m.get('target') if isinstance(m, dict) else m.split(':')[1]) == target]
@@ -90,15 +100,23 @@ def compose_patch(compose, image, metrics_dir='./unifi-ocsp/metrics'):
     ap['volumes'] = ['./unifi-ocsp/ap:/etc/iop-ocsp:ro,Z',
                      './unifi-ocsp/ap/config.json:/etc/iop-unifi-ap-counts.json:ro,Z',
                      './unifi-ocsp/ap-state:/var/lib/iop-ocsp:rw,Z',
-                     './secrets/unifi_password:/run/secrets/unifi_password:ro,Z',
-                     metrics_dir + ':/metrics:rw,Z']
+                     credential,
+                     metrics_dir + ':/metrics:rw,z']
     for key in ['ports', 'healthcheck', 'labels', 'container_name']:
         ap.pop(key, None)
     if 'unifi-ap-counts' in result['services']:
         previous = copy.deepcopy(result['services']['unifi-ap-counts'])
         previous['image'] = image  # Previous digest is attested by preserve().
         if previous != ap:
-            raise ValueError('Review existing AP collector service before replacing')
+            legacy = copy.deepcopy(ap)
+            legacy.pop('user')
+            legacy['volumes'] = ['./unifi-ocsp/ap:/etc/iop-ocsp:ro,Z',
+                                 './unifi-ocsp/ap/config.json:/etc/iop-unifi-ap-counts.json:ro,Z',
+                                 './unifi-ocsp/ap-state:/var/lib/iop-ocsp:rw,Z',
+                                 './secrets/unifi_password:/run/secrets/unifi_password:ro,Z',
+                                 metrics_dir + ':/metrics:rw,Z']
+            if previous != legacy:
+                raise ValueError('Review existing AP collector service before replacing')
     result['services']['unifi-ap-counts'] = ap
     return result
 

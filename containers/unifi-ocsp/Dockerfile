@@ -20,4 +20,5 @@ LABEL io.iop.ocsp.enforcement="connection-v1"
 COPY roles/observability/files/unifi_ocsp.py /opt/iop/unifi_ocsp.py
 COPY roles/observability/files/unifi-ap-counts.py /opt/iop/unifi-ap-counts.py
 ENV IOP_UNIFI_OCSP_PYTHON=/usr/local/bin/python3 IOP_UNIFI_OCSP_VERIFIER=/opt/iop/unifi_ocsp.py
+USER 10001:10001
 ENTRYPOINT ["/usr/bin/unpoller"]

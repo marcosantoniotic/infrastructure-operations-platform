@@ -18,7 +18,7 @@ class PolicyTests(unittest.TestCase):
                          'max_age_seconds': 3600, 'cache_ttl_seconds': 300}
         self.compose = {'services': {'unifi-poller': {'image': 'old-image',
             'environment': {'UP_UNIFI_DEFAULT_VERIFY_SSL': 'true'},
-            'volumes': ['./secrets/password:/run/secrets/unifi_password:ro'], 'networks': ['metrics', 'access']},
+            'volumes': ['./secrets/unifi_password:/run/secrets/unifi_password:ro,Z'], 'networks': ['metrics', 'access']},
             'prometheus': {'image': 'prometheus-pinned', 'volumes': ['data:/prometheus']},
             'grafana': {'image': 'grafana-pinned'}}, 'volumes': {'data': {}}, 'networks': {'metrics': {}, 'access': {}}}
 
@@ -55,6 +55,8 @@ class PolicyTests(unittest.TestCase):
             self.assertEqual(patched[key], original[key])
         self.assertEqual(self.compose, original)
         self.assertNotIn('ports', patched['services']['unifi-ap-counts'])
+        for name in ['unifi-poller', 'unifi-ap-counts']:
+            self.assertEqual(patched['services'][name]['user'], '10001:10001')
         self.assertTrue(guard.preserve(patched, True, self.image))
         self.assertEqual(guard.compose_patch(patched, self.image), patched)
 
@@ -67,6 +69,18 @@ class PolicyTests(unittest.TestCase):
         del patched['services']['unifi-ap-counts']
         with self.assertRaises(ValueError):
             guard.preserve(patched, True, self.image)
+
+    def test_reviewed_legacy_permissions_migrate_without_losing_journal_mounts(self):
+        current = guard.compose_patch(self.compose, self.image)
+        legacy = copy.deepcopy(current)
+        for service in legacy['services'].values():
+            service.pop('user', None)
+            service['volumes'] = [v.replace('./unifi-ocsp/credentials/unifi_password:', './secrets/unifi_password:')
+                                  .replace(':ro,z', ':ro,Z').replace(':rw,z', ':rw,Z')
+                                  for v in service.get('volumes', [])]
+        migrated = guard.compose_patch(legacy, self.image)
+        self.assertEqual(migrated['services']['unifi-poller'], current['services']['unifi-poller'])
+        self.assertEqual(migrated['services']['unifi-ap-counts'], current['services']['unifi-ap-counts'])
 
     def test_insecure_pin_remote_and_mount_conflicts_refused(self):
         for key in ['UP_UNIFI_DEFAULT_CERT', 'UP_UNIFI_REMOTE_API_KEY']:
