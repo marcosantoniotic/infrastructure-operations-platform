@@ -1,0 +1,12 @@
+---
+- name: Inspect installed UniFi OCSP policy marker without changing it
+  ansible.builtin.stat:
+    path: "{{ observability_project_dir }}/unifi-ocsp/unpoller/policy.json"
+  register: observability_ocsp_marker
+
+- name: Refuse full-platform overwrite of collector-only OCSP protection
+  ansible.builtin.assert:
+    that:
+      - not observability_ocsp_marker.stat.exists
+      - not observability_unifi_ocsp_enabled | bool
+    fail_msg: Installed OCSP requires the dedicated coordinated collector playbook; full provisioning is refused to preserve journals and protection.

@@ -1,0 +1,27 @@
+---
+- name: Verify full provisioning refuses an installed OCSP marker
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Require disposable test host
+      ansible.builtin.assert:
+        that: ansible_hostname == 'iop-netbox-security-test'
+    - name: Reset observed result
+      ansible.builtin.set_fact:
+        guard_rejected: false
+    - name: Exercise real early refusal without running provisioning
+      block:
+        - name: Include actual preservation tasks only
+          ansible.builtin.include_tasks: ../../roles/observability/tasks/unifi-ocsp-preserve.yml
+          vars:
+            observability_project_dir: /tmp/iop-unifi-ocsp-acceptance-v2
+            observability_unifi_ocsp_enabled: false
+      rescue:
+        - name: Record expected refusal
+          ansible.builtin.set_fact:
+            guard_rejected: true
+    - name: Require guard to refuse even with the new opt-in disabled
+      ansible.builtin.assert:
+        that: guard_rejected

@@ -1,0 +1,2 @@
+FROM iop-isolated/unpoller-ocsp:3.4.1-candidate
+RUN pip install --no-cache-dir asn1crypto==1.5.1

@@ -1,4 +1,7 @@
 ---
+- name: Preserve installed collector-only OCSP protection
+  ansible.builtin.import_tasks: unifi-ocsp-preserve.yml
+
 - name: Guard blackbox TLS policy and installed protections
   ansible.builtin.import_tasks: blackbox-tls-guard.yml
 

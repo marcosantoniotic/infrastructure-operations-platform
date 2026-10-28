@@ -1,0 +1,10 @@
+---
+- name: Apply reviewed coordinated UniFi OCSP only
+  hosts: platform
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Apply collector-only protection
+      ansible.builtin.include_role:
+        name: observability
+        tasks_from: unifi-ocsp.yml
