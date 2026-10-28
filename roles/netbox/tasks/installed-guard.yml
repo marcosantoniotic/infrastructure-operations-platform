@@ -1,4 +1,14 @@
 ---
+- name: Inspect installed proxy boundary marker
+  ansible.builtin.stat:
+    path: "{{ netbox_project_dir }}/proxy-boundary.py"
+  register: netbox_proxy_marker
+- name: Refuse removal of existing transport-peer boundary
+  ansible.builtin.assert:
+    that:
+      - not netbox_proxy_marker.stat.exists or netbox_proxy_boundary_enabled | bool
+      - not netbox_proxy_marker.stat.exists or netbox_secure_cookies | bool
+    fail_msg: Preserve installed web proxy boundary and Secure cookies; use the reviewed manual rollback for removal.
 - name: Inspect installed NetBox Compose before changing anything
   ansible.builtin.stat:
     path: "{{ netbox_project_dir }}/compose.yaml"
@@ -16,4 +26,10 @@
     fail_msg: Preserve the installed cookie protection in this environment's private overrides before deployment.
   vars:
     installed: "{{ (netbox_installed_compose.content | b64decode | from_yaml) | iop_installed_features('netbox') }}"
+  when: netbox_installed_file.stat.exists
+
+- name: Preserve the installed exact-peer proxy boundary
+  ansible.builtin.assert:
+    that:
+      - (netbox_installed_compose.content | b64decode | from_yaml) | iop_netbox_preserve_proxy(netbox_proxy_boundary_enabled, netbox_secure_cookies, netbox_proxy_trusted_peers)
   when: netbox_installed_file.stat.exists

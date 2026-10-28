@@ -74,6 +74,10 @@ services:
 
   netbox:
     <<: *netbox-common
+{% if netbox_proxy_boundary_enabled | bool %}
+    environment:
+      IOP_NETBOX_TRUSTED_PROXY_PEERS: {{ netbox_proxy_trusted_peers | iop_netbox_exact_peers | to_json | to_json }}
+{% endif %}
     command:
       - /bin/bash
       - -lc
@@ -92,6 +96,9 @@ services:
       - media_data:/opt/netbox/netbox/media
 {% if netbox_secure_cookies | bool %}
       - ./cookie-security.py:/etc/netbox/config/zz-iop-cookie-security.py:ro,Z
+{% endif %}
+{% if netbox_proxy_boundary_enabled | bool %}
+      - ./proxy-boundary.py:/opt/netbox/netbox/netbox/granian.py:ro,Z
 {% endif %}
 {% if netbox_enable_traefik %}
     labels:

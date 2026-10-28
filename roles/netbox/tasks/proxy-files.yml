@@ -1,0 +1,11 @@
+---
+- name: Install exact-peer NetBox web boundary
+  ansible.builtin.copy:
+    src: proxy_boundary.py
+    dest: "{{ netbox_project_dir }}/proxy-boundary.py"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  register: netbox_proxy_boundary_result
+  when: netbox_proxy_boundary_enabled | bool

@@ -81,6 +81,7 @@ jobs:
           python scripts/tests/test_validation_safety.py
           python scripts/tests/test_blackbox_tls.py
           python scripts/tests/test_netbox_vm_sync.py
+          python scripts/tests/test_netbox_proxy.py
           ruby scripts/tests/test_validation_network.rb
           bash -n automation/scripts/Configure-ValidationInfrastructure.sh
           bash automation/scripts/Configure-ValidationInfrastructure.sh --validate-only 192.0.2.20/24 192.0.2.1 192.0.2.10

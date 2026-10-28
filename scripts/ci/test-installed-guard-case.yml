@@ -25,6 +25,8 @@
         glpi_php_security_hardening: "{{ scenario.php | default(false) }}"
         glpi_https_cookie_hardening: false
         netbox_secure_cookies: "{{ scenario.cookies | default(false) }}"
+        netbox_proxy_boundary_enabled: "{{ scenario.proxy | default(false) }}"
+        netbox_proxy_trusted_peers: "{{ scenario.peers | default([]) }}"
         zabbix_mysql_external_volume: "{{ scenario.volume | default('') }}"
         iop_internal_api_tls_network: ''
   rescue:

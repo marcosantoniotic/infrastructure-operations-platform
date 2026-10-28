@@ -58,6 +58,25 @@
           compose: {services: {netbox: {volumes: ['./cookies.py:/etc/netbox/config/cookie-security.py:ro']}}}
           cookies: true
           reject: false
+        - role: netbox
+          task: installed-guard.yml
+          compose: {services: {netbox: {volumes: ['./proxy-boundary.py:/opt/netbox/netbox/netbox/granian.py:ro', './cookie-security.py:/etc/netbox/config/zz-iop-cookie-security.py:ro'], environment: {IOP_NETBOX_TRUSTED_PROXY_PEERS: '["192.0.2.10"]'}}}}
+          cookies: true
+          proxy: true
+          peers: ['192.0.2.10']
+          reject: false
+        - role: netbox
+          task: installed-guard.yml
+          compose: {services: {netbox: {volumes: ['./proxy-boundary.py:/opt/netbox/netbox/netbox/granian.py:ro', './cookie-security.py:/etc/netbox/config/zz-iop-cookie-security.py:ro'], environment: {IOP_NETBOX_TRUSTED_PROXY_PEERS: '["192.0.2.10"]'}}}}
+          cookies: true
+          reject: true
+        - role: netbox
+          task: installed-guard.yml
+          compose: {services: {netbox: {volumes: ['./proxy-boundary.py:/opt/netbox/netbox/netbox/granian.py:ro', './cookie-security.py:/etc/netbox/config/zz-iop-cookie-security.py:ro'], environment: {IOP_NETBOX_TRUSTED_PROXY_PEERS: '["192.0.2.10"]'}}}}
+          cookies: true
+          proxy: true
+          peers: ['192.0.2.11']
+          reject: true
         - role: zabbix
           task: mysql-volume-guard.yml
           compose: {volumes: {mysql_data: {external: true, name: ci-preserved-volume}}}

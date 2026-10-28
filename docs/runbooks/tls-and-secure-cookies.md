@@ -65,7 +65,8 @@ real do cliente antes de exigir HTTPS na aplicação.
   Secure. No frontend nginx, conferir o parâmetro FastCGI e aceitar
   X-Forwarded-Proto somente da origem de proxy explicitamente confiada.
   Não alterar o código PHP da aplicação só para acrescentar o atributo.
-- **NetBox:** configurar `CSRF_COOKIE_SECURE` e `SESSION_COOKIE_SECURE` no
+- **NetBox:** revisar também a [fronteira de confiança do proxy](netbox-web-proxy-boundary.md).
+  Configurar `CSRF_COOKIE_SECURE` e `SESSION_COOKIE_SECURE` no
   frontend. Manter origens CSRF, plugins, segredos e nomes de cookies. Não
   habilitar redirecionamento global sem validar o contexto do proxy, evitando
   loops e quebra de healthchecks.
