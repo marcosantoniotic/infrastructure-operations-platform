@@ -1,0 +1,532 @@
+{
+  "schema": 1,
+  "provenance": "allowlisted extract of real isolated API evidence; no UI screenshots",
+  "result": "PASS",
+  "execution": {
+    "address_a": "198.51.100.10",
+    "address_b": "203.0.113.20",
+    "host_enabled": false,
+    "mode": "real NetBox REST + real Zabbix JSON-RPC; unmodified sync ORM; guarded one-shot --apply",
+    "published_ports": 0,
+    "revision": "dcfb850c0ec94fecd32095a2f6a96ecfd10c3b9d",
+    "run_id": "synthetic-ip-20261028",
+    "scheduled_sync": false,
+    "started_utc": "2026-10-29T02:50:36.873916+00:00",
+    "sync_sha256": "7d15091e04daa83d3cd4380145175708c2999b8e259de6014fea6af17c2426f6",
+    "timezone": "America/Sao_Paulo"
+  },
+  "versions": {
+    "images": {
+      "mysql": "mysql:8.4.10-oraclelinux9",
+      "netbox": "iop-isolated/netbox:4.6.10-topology-4.5.1-qrcode-0.0.21",
+      "postgres": "postgres:18-alpine",
+      "proxy": "traefik:v3.7.13",
+      "redis": "valkey/valkey:9.0-alpine",
+      "zabbix-server": "zabbix/zabbix-server-mysql:alpine-7.4.13",
+      "zabbix-web": "zabbix/zabbix-web-nginx-mysql:alpine-7.4.13"
+    },
+    "netbox": "4.6.10-Docker-5.0.2",
+    "qrcode": "0.0.21",
+    "topology": "4.5.1",
+    "zabbix": "7.4.13"
+  },
+  "events": [
+    {
+      "expected": "empty NetBox fixture, no managed Zabbix hosts or notification media",
+      "observed": {
+        "alerts": 0,
+        "managed_hosts": 0,
+        "netbox_counts": {
+          "dcim/device-roles/": 0,
+          "dcim/device-types/": 0,
+          "dcim/devices/": 0,
+          "dcim/manufacturers/": 0,
+          "dcim/sites/": 0,
+          "extras/custom-fields/": 0,
+          "extras/tags/": 0,
+          "ipam/ip-addresses/": 0,
+          "virtualization/virtual-machines/": 0
+        },
+        "notification_media": 0,
+        "real_pending": 0,
+        "scheduled_sync": false
+      },
+      "result": "PASS",
+      "stage": "preflight",
+      "time_local": "2026-10-28T23:50:41.434550-03:00",
+      "time_utc": "2026-10-29T02:50:41.434525+00:00"
+    },
+    {
+      "expected": "one selected synthetic device with primary IP A; status planned",
+      "observed": {
+        "device_id": 5,
+        "primary_ip": "198.51.100.10",
+        "selected_tag": "synthetic-ip-20261028",
+        "status": "planned"
+      },
+      "result": "PASS",
+      "stage": "A",
+      "time_local": "2026-10-28T23:50:43.140611-03:00",
+      "time_utc": "2026-10-29T02:50:43.140594+00:00"
+    },
+    {
+      "expected": "dry-run plans one creation, no writes",
+      "observed": {
+        "log": "CREATE host=synthetic-ip-20261028 ip=198.51.100.10\nSynchronization complete mode=dry-run devices=1 changes=1 vms=0",
+        "writes": 0
+      },
+      "result": "PASS",
+      "stage": "B-preflight",
+      "time_local": "2026-10-28T23:50:43.334560-03:00",
+      "time_utc": "2026-10-29T02:50:43.334533+00:00"
+    },
+    {
+      "expected": "exactly one disabled host; primary agent A; host ID persisted",
+      "observed": {
+        "device_id": 5,
+        "duplicates": 0,
+        "hostid": "10784",
+        "interfaceid": "88",
+        "ip": "198.51.100.10",
+        "status": 1
+      },
+      "result": "PASS",
+      "stage": "B-C",
+      "time_local": "2026-10-28T23:50:44.144062-03:00",
+      "time_utc": "2026-10-29T02:50:44.144045+00:00"
+    },
+    {
+      "expected": "unmanaged tag, description and secondary interface established",
+      "observed": {
+        "description": "synthetic-ip-20261028: local description",
+        "local_tag": {
+          "tag": "local-test-owner",
+          "value": "synthetic-ip-20261028"
+        },
+        "secondary_interfaceid": "89"
+      },
+      "result": "PASS",
+      "stage": "D",
+      "time_local": "2026-10-28T23:50:44.469001-03:00",
+      "time_utc": "2026-10-29T02:50:44.468982+00:00"
+    },
+    {
+      "expected": "NetBox primary B; Zabbix still A before reconciliation",
+      "observed": {
+        "netbox_primary": "203.0.113.20",
+        "zabbix_primary": "198.51.100.10"
+      },
+      "result": "PASS",
+      "stage": "E",
+      "time_local": "2026-10-28T23:50:45.081045-03:00",
+      "time_utc": "2026-10-29T02:50:45.081025+00:00"
+    },
+    {
+      "expected": "same host/interface, B, no duplicate, local state and other interface preserved",
+      "observed": {
+        "all_other_returned_host_configuration_preserved": true,
+        "device_id": 5,
+        "hostid": "10784",
+        "interfaceid": "88",
+        "ip_after": "203.0.113.20",
+        "ip_before": "198.51.100.10",
+        "local_tag_preserved": true,
+        "owned_host_count": 1,
+        "rpc": [
+          {
+            "method": "hostinterface.update",
+            "params": {
+              "dns": "",
+              "interfaceid": "88",
+              "ip": "203.0.113.20",
+              "port": "10050",
+              "useip": 1
+            },
+            "phase": "F-change",
+            "result": {
+              "interfaceids": [
+                "88"
+              ]
+            },
+            "time": "2026-10-29T02:50:45.280764+00:00"
+          }
+        ]
+      },
+      "result": "PASS",
+      "stage": "F-G",
+      "time_local": "2026-10-28T23:50:45.604559-03:00",
+      "time_utc": "2026-10-29T02:50:45.604540+00:00"
+    },
+    {
+      "expected": "repeat: zero writes, zero changes, unchanged device and Zabbix configuration",
+      "observed": {
+        "device_timestamp_unchanged": true,
+        "log": "Synchronization complete mode=apply devices=1 changes=0 vms=0",
+        "rpc_writes": 0
+      },
+      "result": "PASS",
+      "stage": "H",
+      "time_local": "2026-10-28T23:50:46.344771-03:00",
+      "time_utc": "2026-10-29T02:50:46.344758+00:00"
+    },
+    {
+      "expected": "managed tag update preserves local tag/description/interfaces; host stays disabled",
+      "observed": {
+        "hostid": "10784",
+        "interfaceid": "88",
+        "local_tag_preserved": true,
+        "rpc": [
+          {
+            "method": "host.update",
+            "params": {
+              "hostid": "10784",
+              "tags": [
+                {
+                  "tag": "local-test-owner",
+                  "value": "synthetic-ip-20261028"
+                },
+                {
+                  "tag": "source",
+                  "value": "netbox"
+                },
+                {
+                  "tag": "netbox_id",
+                  "value": "5"
+                },
+                {
+                  "tag": "netbox_object_type",
+                  "value": "dcim.device"
+                },
+                {
+                  "tag": "netbox_status",
+                  "value": "offline"
+                },
+                {
+                  "tag": "netbox_site",
+                  "value": "synthetic-ip-20261028"
+                },
+                {
+                  "tag": "netbox_role",
+                  "value": "synthetic-ip-20261028"
+                },
+                {
+                  "tag": "netbox_platform",
+                  "value": ""
+                }
+              ]
+            },
+            "phase": "J-managed-tag-change",
+            "result": {
+              "hostids": [
+                "10784"
+              ]
+            },
+            "time": "2026-10-29T02:50:46.964537+00:00"
+          }
+        ],
+        "status": "1"
+      },
+      "result": "PASS",
+      "stage": "J-supplemental",
+      "time_local": "2026-10-28T23:50:47.200595-03:00",
+      "time_utc": "2026-10-29T02:50:47.200575+00:00"
+    },
+    {
+      "expected": "tag merge repeat has zero writes",
+      "observed": {
+        "rpc_writes": 0
+      },
+      "result": "PASS",
+      "stage": "J-idempotence",
+      "time_local": "2026-10-28T23:50:47.325349-03:00",
+      "time_utc": "2026-10-29T02:50:47.325322+00:00"
+    },
+    {
+      "expected": "all non-owned hosts unchanged; no real inventory in fixture",
+      "observed": {
+        "alerts_after": 0,
+        "alerts_before": 0,
+        "non_owned_configuration_unchanged": true,
+        "real_objects": 0
+      },
+      "result": "PASS",
+      "stage": "outside-scope",
+      "time_local": "2026-10-28T23:50:47.380026-03:00",
+      "time_utc": "2026-10-29T02:50:47.380006+00:00"
+    },
+    {
+      "expected": "run-owned objects removed by ledger ID; baseline restored",
+      "observed": {
+        "baseline_zabbix_fingerprint": "632260b5b64a241541dca577d0ca5326eb330c7c0bd3288f60381fca1bbcbc1a",
+        "cleanup_errors": 0,
+        "netbox_counts": {
+          "dcim/device-roles/": 0,
+          "dcim/device-types/": 0,
+          "dcim/devices/": 0,
+          "dcim/manufacturers/": 0,
+          "dcim/sites/": 0,
+          "extras/custom-fields/": 0,
+          "extras/tags/": 0,
+          "ipam/ip-addresses/": 0,
+          "virtualization/virtual-machines/": 0
+        }
+      },
+      "result": "PASS",
+      "stage": "I",
+      "time_local": "2026-10-28T23:50:52.695988-03:00",
+      "time_utc": "2026-10-29T02:50:52.695967+00:00"
+    }
+  ],
+  "snapshots": {
+    "C-initial": {
+      "netbox_device_id": 5,
+      "netbox_primary": "198.51.100.10/32",
+      "netbox_stored_hostid": "10784",
+      "zabbix_hostid": "10784",
+      "synthetic_identity": "synthetic-ip-20261028",
+      "zabbix_status": "1",
+      "interfaces": [
+        {
+          "interfaceid": "88",
+          "type": "1",
+          "main": "1",
+          "useip": "1",
+          "ip": "198.51.100.10",
+          "port": "10050",
+          "dns": ""
+        }
+      ],
+      "unmanaged_local_tag": [],
+      "local_description_present": false
+    },
+    "D-local-state": {
+      "netbox_device_id": 5,
+      "netbox_primary": "198.51.100.10/32",
+      "netbox_stored_hostid": "10784",
+      "zabbix_hostid": "10784",
+      "synthetic_identity": "synthetic-ip-20261028",
+      "zabbix_status": "1",
+      "interfaces": [
+        {
+          "interfaceid": "88",
+          "type": "1",
+          "main": "1",
+          "useip": "1",
+          "ip": "198.51.100.10",
+          "port": "10050",
+          "dns": ""
+        },
+        {
+          "interfaceid": "89",
+          "type": "1",
+          "main": "0",
+          "useip": "1",
+          "ip": "192.0.2.99",
+          "port": "10051",
+          "dns": ""
+        }
+      ],
+      "unmanaged_local_tag": [
+        "synthetic-ip-20261028"
+      ],
+      "local_description_present": true
+    },
+    "E-before-apply": {
+      "netbox_device_id": 5,
+      "netbox_primary": "203.0.113.20/32",
+      "netbox_stored_hostid": "10784",
+      "zabbix_hostid": "10784",
+      "synthetic_identity": "synthetic-ip-20261028",
+      "zabbix_status": "1",
+      "interfaces": [
+        {
+          "interfaceid": "88",
+          "type": "1",
+          "main": "1",
+          "useip": "1",
+          "ip": "198.51.100.10",
+          "port": "10050",
+          "dns": ""
+        },
+        {
+          "interfaceid": "89",
+          "type": "1",
+          "main": "0",
+          "useip": "1",
+          "ip": "192.0.2.99",
+          "port": "10051",
+          "dns": ""
+        }
+      ],
+      "unmanaged_local_tag": [
+        "synthetic-ip-20261028"
+      ],
+      "local_description_present": true
+    },
+    "G-after": {
+      "netbox_device_id": 5,
+      "netbox_primary": "203.0.113.20/32",
+      "netbox_stored_hostid": "10784",
+      "zabbix_hostid": "10784",
+      "synthetic_identity": "synthetic-ip-20261028",
+      "zabbix_status": "1",
+      "interfaces": [
+        {
+          "interfaceid": "88",
+          "type": "1",
+          "main": "1",
+          "useip": "1",
+          "ip": "203.0.113.20",
+          "port": "10050",
+          "dns": ""
+        },
+        {
+          "interfaceid": "89",
+          "type": "1",
+          "main": "0",
+          "useip": "1",
+          "ip": "192.0.2.99",
+          "port": "10051",
+          "dns": ""
+        }
+      ],
+      "unmanaged_local_tag": [
+        "synthetic-ip-20261028"
+      ],
+      "local_description_present": true
+    },
+    "H-repeated": {
+      "netbox_device_id": 5,
+      "netbox_primary": "203.0.113.20/32",
+      "netbox_stored_hostid": "10784",
+      "zabbix_hostid": "10784",
+      "synthetic_identity": "synthetic-ip-20261028",
+      "zabbix_status": "1",
+      "interfaces": [
+        {
+          "interfaceid": "88",
+          "type": "1",
+          "main": "1",
+          "useip": "1",
+          "ip": "203.0.113.20",
+          "port": "10050",
+          "dns": ""
+        },
+        {
+          "interfaceid": "89",
+          "type": "1",
+          "main": "0",
+          "useip": "1",
+          "ip": "192.0.2.99",
+          "port": "10051",
+          "dns": ""
+        }
+      ],
+      "unmanaged_local_tag": [
+        "synthetic-ip-20261028"
+      ],
+      "local_description_present": true
+    },
+    "J-after": {
+      "netbox_device_id": 5,
+      "netbox_primary": "203.0.113.20/32",
+      "netbox_stored_hostid": "10784",
+      "zabbix_hostid": "10784",
+      "synthetic_identity": "synthetic-ip-20261028",
+      "zabbix_status": "1",
+      "interfaces": [
+        {
+          "interfaceid": "88",
+          "type": "1",
+          "main": "1",
+          "useip": "1",
+          "ip": "203.0.113.20",
+          "port": "10050",
+          "dns": ""
+        },
+        {
+          "interfaceid": "89",
+          "type": "1",
+          "main": "0",
+          "useip": "1",
+          "ip": "192.0.2.99",
+          "port": "10051",
+          "dns": ""
+        }
+      ],
+      "unmanaged_local_tag": [
+        "synthetic-ip-20261028"
+      ],
+      "local_description_present": true
+    }
+  },
+  "ip_change_rpc": [
+    {
+      "method": "hostinterface.update",
+      "params": {
+        "dns": "",
+        "interfaceid": "88",
+        "ip": "203.0.113.20",
+        "port": "10050",
+        "useip": 1
+      },
+      "phase": "F-change",
+      "result": {
+        "interfaceids": [
+          "88"
+        ]
+      },
+      "time": "2026-10-29T02:50:45.280764+00:00"
+    }
+  ],
+  "idempotence_rpc": [],
+  "cleanup": {
+    "objects_removed_by_id": true,
+    "credentials_revoked": true,
+    "errors": []
+  },
+  "isolation": {
+    "internal_network": true,
+    "published_ports": 0,
+    "unchanged_existing_containers": 24,
+    "new_test_containers": 8
+  },
+  "comparator_self_check": {
+    "host_identity_change_detected": true,
+    "ip_change_detected": true,
+    "lost_interface_detected": true,
+    "order_ignored": true,
+    "port_change_detected": true,
+    "tag_value_change_detected": true
+  },
+  "private_raw_sha256": {
+    "C-initial.json": "c4aed1bacb91f8dca7518222f3a0b0f5e96f074a7f5305eb9a287677952013ae",
+    "D-local-state.json": "3b1fa28b70a915a6d9901843570e015ec364574593bd077a2c9dcb06a1b408a6",
+    "E-before-apply.json": "9cbb8d7d92204bc45ac284d6ef1b2898350f0c40a02e58151701e972fd49f65d",
+    "G-after.json": "d8e7a7a327ae9d9666bebe03ad7f9d228ed3573a6eca5d3813c7d0d65d005097",
+    "H-repeated.json": "d8e7a7a327ae9d9666bebe03ad7f9d228ed3573a6eca5d3813c7d0d65d005097",
+    "J-after.json": "40b57a41fa771980aa96f50160bc49d4c386c741cd96686d89b9cccedf843ad6",
+    "events.json": "13a178e03f4a518bf1a4fd0b2bee6e4f33824c58d632c2e55c7e59ae38f7bd6e",
+    "F-change-rpc.json": "fd8c3a85f547acb234c2b0a789f7ef70c7ff0a3720e589b086591f4eb32d9cba",
+    "H-idempotence-rpc.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "cleanup.json": "e26371071fa2cebd56903592ed1fb482e490c1b5f6de1e2f342758b87d2e39b9",
+    "result.json": "f7a999fd6842a5eb0faac46f1383d3c403b452124e9aceb612a97cb43b87b3d7",
+    "execution.json": "e13953a08b5845ba219eee0f2894ea2f881b7966b69ebe99602b180d4d8d4ffc",
+    "resource-cleanup-result.json": "d6195bedcd831cfa79f0cae95ee2a56575bc3fa039e0d1dabf96d39cb31c533b"
+  },
+  "limitations": [
+    "No agent/collection/recovery test",
+    "Disabled synthetic host only",
+    "No LAB01 or OPS access",
+    "No minimum-privilege token test",
+    "No deployment or publication"
+  ],
+  "finished_utc": "2026-10-29T02:50:52.737530+00:00",
+  "resource_cleanup": {
+    "test_containers_removed": 8,
+    "test_volumes_removed": 5,
+    "test_network_removed": true,
+    "shared_volumes": 0,
+    "finished_utc": "2026-10-29T02:52:15.785402+00:00"
+  }
+}

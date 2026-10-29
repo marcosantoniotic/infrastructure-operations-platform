@@ -81,6 +81,7 @@ jobs:
           python scripts/tests/test_validation_safety.py
           python scripts/tests/test_blackbox_tls.py
           python scripts/tests/test_netbox_vm_sync.py
+          python scripts/tests/test_netbox_sync_evidence.py
           python scripts/tests/test_netbox_proxy.py
           python scripts/tests/test_unifi_ocsp_policy.py
           python scripts/tests/test_container_image_inventory.py

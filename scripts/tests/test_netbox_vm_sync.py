@@ -34,7 +34,12 @@ class API:
         if method == 'hostgroup.get':
             return [{'groupid': '6' if params['filter']['name'] == ['Virtual machines'] else '2'}]
         if method == 'template.get': return [{'templateid': '99'}]
-        if method == 'host.get': return copy.deepcopy(self.hosts)
+        if method == 'host.get':
+            output = copy.deepcopy(self.hosts)
+            for h in output:
+                for tag in h.get('tags', []):
+                    tag.setdefault('automatic', '0')  # Zabbix 7.4 read-only output
+            return output
         self.writes.append((method, copy.deepcopy(params)))
         if method == 'host.create':
             h = copy.deepcopy(params); h['hostid'] = str(100 + len(self.hosts))
@@ -44,8 +49,15 @@ class API:
             self.hosts.append(h)
             return {'hostids': [h['hostid']]}
         if method == 'host.update':
+            if any(set(t) - {'tag', 'value'} for t in params.get('tags', [])):
+                raise RuntimeError('host.update: unexpected read-only tag parameter')
             h = next(h for h in self.hosts if h['hostid'] == params['hostid'])
             h.update(params); h['status'] = str(h['status']); return {}
+        if method == 'hostinterface.update':
+            interface = next(i for h in self.hosts for i in h['interfaces']
+                             if i['interfaceid'] == params['interfaceid'])
+            interface.update(params)
+            return {'interfaceids': [interface['interfaceid']]}
         raise AssertionError(method)
 
 
@@ -152,6 +164,55 @@ class SyncTests(unittest.TestCase):
         self.run_sync(); self.api.hosts[0]['parentTemplates'] = []; self.api.writes.clear()
         with self.assertRaisesRegex(RuntimeError, 'template'): self.run_sync()
         self.assertEqual(self.api.writes, [])
+
+    def test_device_primary_ip_updates_same_agent_interface_only(self):
+        self.vms.clear()
+        device = obj(7, 'dcim.device', 'synthetic-ip-change', ip='198.51.100.10')
+        device.status = 'planned'
+        self.devices.append(device)
+        self.run_sync()
+        host = self.api.hosts[0]
+        host['description'] = 'outside sync responsibility'
+        host['tags'].append({'tag': 'local-test-owner', 'value': 'keep'})
+        agent_id = host['interfaces'][0]['interfaceid']
+        secondary = dict(interfaceid='secondary', type=2, main=1, ip='192.0.2.99', port='161')
+        host['interfaces'].insert(0, secondary)
+        before = copy.deepcopy(host)
+        device.primary_ip4.address.ip = '203.0.113.20'
+        self.api.writes.clear()
+        self.run_sync()
+        self.assertEqual(self.api.writes, [('hostinterface.update', {
+            'interfaceid': agent_id, 'ip': '203.0.113.20', 'useip': 1, 'dns': '', 'port': '10050'})])
+        self.assertEqual(len(self.api.hosts), 1)
+        self.assertEqual(host['hostid'], before['hostid'])
+        self.assertEqual(host['tags'], before['tags'])
+        self.assertEqual(host['description'], before['description'])
+        self.assertEqual(host['interfaces'][0], before['interfaces'][0])
+        self.assertEqual(device.custom_field_data['zabbix_hostid'], host['hostid'])
+        self.api.writes.clear()
+        self.run_sync()
+        self.assertEqual(self.api.writes, [])
+
+    def test_primary_ip_change_dry_run_preserves_interface(self):
+        self.run_sync()
+        before = copy.deepcopy(self.api.hosts)
+        self.vms[0].primary_ip4.address.ip = '203.0.113.20'
+        self.api.writes.clear()
+        self.run_sync(False)
+        self.assertEqual(self.api.writes, [])
+        self.assertEqual(self.api.hosts, before)
+
+    def test_managed_tag_change_drops_readonly_metadata_not_local_tag(self):
+        self.vms[0].status = 'planned'
+        self.run_sync()
+        self.api.hosts[0]['tags'].append(dict(tag='local-test-owner', value='keep'))
+        self.vms[0].status = 'offline'  # both map to disabled host, but tag changes
+        self.api.writes.clear()
+        self.run_sync()
+        self.assertEqual([m for m, p in self.api.writes], ['host.update'])
+        tags = self.api.writes[0][1]['tags']
+        self.assertIn(dict(tag='local-test-owner', value='keep'), tags)
+        self.assertTrue(all(set(t) == {'tag', 'value'} for t in tags))
 
 
 if __name__ == '__main__': unittest.main()
