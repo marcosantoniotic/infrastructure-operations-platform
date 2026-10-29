@@ -256,7 +256,10 @@ def main() -> int:
             update.update({"host": technical_name, "name": device.name})
         if int(existing["status"]) != status:
             update["status"] = status
-        preserved = [t for t in existing.get("tags", []) if t.get("tag") not in MANAGED_TAG_KEYS]
+        # host.get includes read-only fields (e.g. automatic in Zabbix 7.4).
+        # Preserve unmanaged tag/value, not output-only metadata in update input.
+        preserved = [{"tag": t["tag"], "value": t.get("value", "")}
+                     for t in existing.get("tags", []) if t.get("tag") not in MANAGED_TAG_KEYS]
         merged = preserved + tags
         if normalized(existing.get("tags", [])) != normalized(merged):
             update["tags"] = merged

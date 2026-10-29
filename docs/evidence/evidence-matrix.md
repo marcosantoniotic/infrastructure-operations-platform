@@ -6,6 +6,7 @@
 | Infraestrutura como código | imagem base, VMs e configuração idempotente | [Packer](../../automation/packer/), [Vagrant](../../automation/vagrant/) e [Ansible](../../playbooks/) |
 | Containers | projetos Compose isolados e redes por responsabilidade | [roles da plataforma](../../roles/) e [dependências](../architecture/service-dependencies.md) |
 | Inventário e IPAM | NetBox como fonte de verdade | [role NetBox](../../roles/netbox/) e [ADR de limites](../decisions/ADR-001-platform-boundary.md) |
+| Reconciliação de inventário | IP primário NetBox → interface do mesmo host Zabbix | [aceitação real isolada, preservação e idempotência](../testing/netbox-zabbix-ip-functional-20261028.md) e [extrato sanitizado de APIs](netbox-zabbix-ip-functional-20261028.json) |
 | Monitoramento | Zabbix para eventos, triggers e mapas | [role Zabbix](../../roles/zabbix/) e [observabilidade](../observability.md) |
 | Métricas e alertas | Prometheus, exporters, Grafana e Alertmanager | [role de observabilidade](../../roles/observability/) |
 | Segurança de acesso | Traefik, TLS, middlewares e Zero Trust | [role Traefik](../../roles/traefik/) e [ADR de entrada](../decisions/ADR-002-ingress-and-security.md) |
