@@ -26,12 +26,12 @@ for service in traefik cloudflare_tunnel zabbix netbox netbox_zabbix_sync portai
     config --quiet
 done
 
-for variant in compose.yaml compose.vms.yaml; do
+for variant in compose.yaml compose.vms.yaml compose.platforms.yaml; do
   docker compose --project-directory "${artifact_dir}/netbox_zabbix_sync" \
     --file "${artifact_dir}/netbox_zabbix_sync/${variant}" config --quiet
 done
 python3 - "${artifact_dir}/netbox_zabbix_sync" <<'PY'
-import pathlib,sys,yaml
+import json,pathlib,sys,yaml
 p=pathlib.Path(sys.argv[1])
 legacy=yaml.safe_load((p/'compose.yaml').read_text())['services']['netbox-zabbix-sync']
 vms=yaml.safe_load((p/'compose.vms.yaml').read_text())['services']['netbox-zabbix-sync']
@@ -40,6 +40,14 @@ assert vms['environment']['NETBOX_INCLUDE_VMS']=='true'
 assert vms['environment']['NETBOX_VM_TEMPLATE']=='ICMP Ping'
 assert vms['environment']['NETBOX_SITE_SLUGS']=='example-lab'
 assert not legacy.get('ports') and not vms.get('ports')
+mapped=yaml.safe_load((p/'compose.platforms.yaml').read_text())['services']['netbox-zabbix-sync']
+assert 'NETBOX_PLATFORM_MAPPING_ENABLED' not in legacy['environment']
+assert 'NETBOX_PLATFORM_MAPPING_ENABLED' not in vms['environment']
+assert mapped['environment']['NETBOX_PLATFORM_MAPPING_ENABLED']=='true'
+assert json.loads(mapped['environment']['NETBOX_PLATFORM_MAP'])['routeros']=='network-icmp'
+assert json.loads(mapped['environment']['NETBOX_PLATFORM_PROFILES'])['windows-active']['template']=='Windows by Zabbix agent active'
+assert not mapped.get('ports')
+assert mapped['networks']==vms['networks'] and mapped['volumes']==vms['volumes']
 PY
 
 # Config rendering must preserve legacy storage and opt into existing external

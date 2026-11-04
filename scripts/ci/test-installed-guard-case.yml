@@ -4,6 +4,12 @@
     content: "{{ scenario.compose | to_nice_yaml }}"
     dest: "{{ fixture_root }}/compose.yaml"
     mode: '0600'
+  when: not (scenario.absent | default(false))
+- name: Simulate a first installation with no previous Compose
+  ansible.builtin.file:
+    path: "{{ fixture_root }}/compose.yaml"
+    state: absent
+  when: scenario.absent | default(false)
 - name: Reset case result
   ansible.builtin.set_fact:
     guard_rejected: false
@@ -22,6 +28,9 @@
         netbox_zabbix_sync_vm_template: "{{ scenario.vm_template | default('ICMP Ping') }}"
         netbox_zabbix_sync_site_slugs: "{{ scenario.sites | default(['example-lab']) }}"
         netbox_zabbix_sync_zabbix_url: http://zabbix-web:8080/api_jsonrpc.php
+        netbox_zabbix_sync_platform_mapping_enabled: "{{ scenario.platforms | default(false) }}"
+        netbox_zabbix_sync_platform_map: "{{ scenario.platform_map | default({}) }}"
+        netbox_zabbix_sync_platform_profiles: "{{ scenario.profiles | default({}) }}"
         glpi_php_security_hardening: "{{ scenario.php | default(false) }}"
         glpi_https_cookie_hardening: false
         netbox_secure_cookies: "{{ scenario.cookies | default(false) }}"

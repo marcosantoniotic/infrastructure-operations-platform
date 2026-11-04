@@ -1,0 +1,19 @@
+---
+# Sanitized opt-in example. Slugs must exactly match your NetBox Platforms.
+netbox_zabbix_sync_platform_mapping_enabled: true
+netbox_zabbix_sync_platform_map:
+  linux: linux-active
+  rhel: linux-active
+  windows-server: windows-active
+  routeros: network-icmp
+  ios: network-icmp
+netbox_zabbix_sync_platform_profiles:
+  linux-active:
+    group: Linux servers
+    template: Linux by Zabbix agent active
+  windows-active:
+    group: Windows servers
+    template: Windows by Zabbix agent active
+  network-icmp:
+    group: Network devices
+    template: ICMP Ping
