@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -25,7 +27,63 @@ LOG = logging.getLogger("netbox-zabbix-sync")
 MANAGED_TAG_KEYS = {
     "source", "netbox_id", "netbox_status", "netbox_site", "netbox_role", "netbox_platform",
     "netbox_object_type",
+    "netbox_monitoring_profile",
 }
+
+
+def load_platform_mapping() -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    """Exact inventory slugs only; never guess an OS or fall back to Linux."""
+    enabled = os.environ.get("NETBOX_PLATFORM_MAPPING_ENABLED", "false")
+    if enabled not in {"true", "false"}:
+        raise RuntimeError("NETBOX_PLATFORM_MAPPING_ENABLED must be true or false")
+
+    def unique_pairs(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise RuntimeError("Duplicate platform mapping JSON key")
+            result[key] = value
+        return result
+
+    try:
+        mapping = json.loads(os.environ.get("NETBOX_PLATFORM_MAP", "{}"), object_pairs_hook=unique_pairs)
+        profiles = json.loads(os.environ.get("NETBOX_PLATFORM_PROFILES", "{}"), object_pairs_hook=unique_pairs)
+    except (ValueError, TypeError) as exc:
+        raise RuntimeError("Invalid platform mapping JSON") from exc
+    if not isinstance(mapping, dict) or not isinstance(profiles, dict):
+        raise RuntimeError("Platform mapping and profiles must be JSON objects")
+    if enabled == "false":
+        if mapping or profiles:
+            raise RuntimeError("Platform mapping data requires explicit opt-in")
+        return {}, {}
+    if not mapping or not profiles:
+        raise RuntimeError("Enabled platform mapping requires explicit slugs and profiles")
+    slug = re.compile(r"[a-z0-9][a-z0-9_-]{0,99}")
+    for name, profile in profiles.items():
+        if not isinstance(name, str) or not slug.fullmatch(name) or not isinstance(profile, dict) or set(profile) != {"group", "template"}:
+            raise RuntimeError("Invalid monitoring profile schema")
+        if any(not isinstance(v, str) or not v.strip() or len(v) > 255 or re.search(r"[\x00-\x1f\x7f$]", v)
+               for v in profile.values()):
+            raise RuntimeError("Invalid monitoring profile group/template name")
+    for platform, profile in mapping.items():
+        if not isinstance(platform, str) or not slug.fullmatch(platform) or not isinstance(profile, str) or profile not in profiles:
+            raise RuntimeError("Platform mapping references an invalid slug or unknown profile")
+    return mapping, profiles
+
+
+def resolve_monitoring_profile(obj: Any, mapping: dict[str, str]) -> str:
+    platform = obj.platform.slug if obj.platform else ""
+    if platform not in mapping:
+        raise RuntimeError(f"Unmapped or missing NetBox platform for {host_name(obj)}; no writes applied")
+    return mapping[platform]
+
+
+def primary_agent_interface(host: dict[str, Any]) -> dict[str, Any] | None:
+    interfaces = [i for i in host.get("interfaces", [])
+                  if str(i.get("type")) == "1" and str(i.get("main")) == "1"]
+    if len(interfaces) > 1:
+        raise RuntimeError("Ambiguous primary address interface; refusing reconciliation")
+    return interfaces[0] if interfaces else None
 
 
 def object_type(obj: Any) -> str:
@@ -92,8 +150,8 @@ def primary_ip(device: Device) -> str | None:
     return str(address.address.ip) if address else None
 
 
-def managed_tags(device: Device) -> list[dict[str, str]]:
-    return [
+def managed_tags(device: Device, profile: str | None = None) -> list[dict[str, str]]:
+    result = [
         {"tag": "source", "value": "netbox"},
         {"tag": "netbox_id", "value": str(device.pk)},
         {"tag": "netbox_object_type", "value": object_type(device)},
@@ -102,6 +160,9 @@ def managed_tags(device: Device) -> list[dict[str, str]]:
         {"tag": "netbox_role", "value": device.role.slug if device.role else ""},
         {"tag": "netbox_platform", "value": device.platform.slug if device.platform else ""},
     ]
+    if profile is not None:
+        result.append({"tag": "netbox_monitoring_profile", "value": profile})
+    return result
 
 
 def normalized(tags: list[dict[str, Any]]) -> list[tuple[str, str]]:
@@ -142,7 +203,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--validate-platform-config", action="store_true",
+                        help="Validate only profile JSON; no Django, credentials, network or writes")
     args = parser.parse_args()
+    if args.apply and args.validate_platform_config:
+        parser.error("--apply and --validate-platform-config are mutually exclusive")
+    platform_map, profile_config = load_platform_mapping()
+    if args.validate_platform_config:
+        return 0
     setup_netbox()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
@@ -167,6 +235,29 @@ def main() -> int:
         vm_groupid = unique_id(api, "hostgroup.get", "groupid", os.environ["NETBOX_VM_GROUP"])
         vm_templateid = unique_id(api, "template.get", "templateid", os.environ["NETBOX_VM_TEMPLATE"])
 
+    profiles = {name: {
+        "groupid": unique_id(api, "hostgroup.get", "groupid", config["group"]),
+        "templateid": unique_id(api, "template.get", "templateid", config["template"]),
+    } for name, config in profile_config.items()}
+    # This implementation manages the default address interface, not SNMP,
+    # IPMI or JMX transports. Resolve incompatibilities for ALL profiles before
+    # creating even the first host. No credential/interface auto-conversion.
+    for profile in profiles.values():
+        items = api.call("item.get", {"output": ["type"], "templateids": [profile["templateid"]]})
+        rules = api.call("discoveryrule.get", {"output": ["type"], "selectItems": ["type"],
+                                              "templateids": [profile["templateid"]]})
+        interface_items = items + rules + [i for rule in rules for i in rule.get("items", [])]
+        if not items or any(str(i["type"]) in {"1", "4", "6", "12", "16", "17", "20"} for i in interface_items):
+            raise RuntimeError("Mapped template requires an unsupported interface; only agent/ICMP profiles are supported")
+
+    def target(obj):
+        if profiles:
+            name = resolve_monitoring_profile(obj, platform_map)
+            return profiles[name]["groupid"], profiles[name]["templateid"], name
+        if object_type(obj) == "virtualization.virtualmachine":
+            return vm_groupid, vm_templateid, None
+        return groupid, templateid, None
+
     hosts = api.call("host.get", {
         "output": ["hostid", "host", "name", "status"],
         "selectTags": "extend", "selectInterfaces": "extend",
@@ -180,6 +271,8 @@ def main() -> int:
         if key in managed:
             raise RuntimeError("Multiple Zabbix hosts claim the same NetBox object")
         managed[key] = host
+    if not profiles and any(t.get("tag") == "netbox_monitoring_profile" for h in managed.values() for t in h.get("tags", [])):
+        raise RuntimeError("Refusing to silently remove installed platform mapping")
     by_name = {host["host"]: host for host in hosts}
     desired_ids: set[tuple[str, str]] = set()
     changes = 0
@@ -193,7 +286,14 @@ def main() -> int:
     objects = [obj for obj in devices + vms if not sites or (obj.site and obj.site.slug in sites)]
     # Preflight the entire set before any API or metadata write: no partial collision takeover.
     planned_names: dict[str, tuple[str, str]] = {}
+    planned_profiles = {}
     for obj in objects:
+        expected_group, expected_template, profile_name = target(obj)
+        planned_profiles[identity(obj)] = (expected_group, expected_template, profile_name)
+        if profile_name is not None:
+            LOG.debug("PROFILE host=%s platform=%s profile=%s group=%s template=%s", host_name(obj),
+                      obj.platform.slug, profile_name, profile_config[profile_name]["group"],
+                      profile_config[profile_name]["template"])
         name = host_name(obj)
         if name in planned_names and planned_names[name] != identity(obj):
             raise RuntimeError(f"Planned Zabbix host name collision: {name}")
@@ -206,24 +306,39 @@ def main() -> int:
         if stored and (not existing or stored != str(existing["hostid"])):
             raise RuntimeError(f"Conflicting stored Zabbix ID for {host_name(obj)}")
         if existing:
-            expected_group = vm_groupid if object_type(obj) == "virtualization.virtualmachine" else groupid
             if str(expected_group) not in {str(g["groupid"]) for g in existing.get("hostgroups", [])}:
                 raise RuntimeError("Existing managed host is outside the configured group")
-            expected_template = vm_templateid if object_type(obj) == "virtualization.virtualmachine" else templateid
             if str(expected_template) not in {str(t["templateid"]) for t in existing.get("parentTemplates", [])}:
                 raise RuntimeError("Existing host template differs; an explicit migration is required")
+            old_profile = next((t.get("value", "") for t in existing.get("tags", [])
+                                if t.get("tag") == "netbox_monitoring_profile"), None)
+            if old_profile is not None and old_profile != profile_name:
+                raise RuntimeError("Existing monitoring profile differs; an explicit migration is required")
+            interface = primary_agent_interface(existing)
+            if profiles and (interface is None or str(interface.get("port")) != "10050"
+                             or str(interface.get("useip")) != "1" or interface.get("dns", "") != ""):
+                raise RuntimeError("Existing profile address interface differs; explicit migration required")
     def in_scope(host: dict[str, Any], key: tuple[str, str]) -> bool:
         tags = {t["tag"]: t.get("value", "") for t in host.get("tags", [])}
-        group = vm_groupid if key[0] == "virtualization.virtualmachine" else groupid
-        return (not sites or tags.get("netbox_site") in sites) and str(group) in {
+        if sites and tags.get("netbox_site") not in sites:
+            return False
+        old_profile = tags.get("netbox_monitoring_profile")
+        if old_profile is not None:
+            if old_profile not in profiles:
+                raise RuntimeError("Managed host references an unknown monitoring profile")
+            group = profiles[old_profile]["groupid"]
+        else:
+            group = vm_groupid if key[0] == "virtualization.virtualmachine" else groupid
+        return str(group) in {
             str(g["groupid"]) for g in host.get("hostgroups", [])}
     if not include_vms and any(k[0] == "virtualization.virtualmachine" for k in managed):
         raise RuntimeError("Refusing to silently disable previously managed VM synchronization")
+    # Resolve orphan scope BEFORE any write too (including unknown old profiles).
+    scoped_managed = {key for key, host in managed.items() if in_scope(host, key)}
     ensure_custom_field(field_name, args.apply, include_vms)
     for device in objects:
         netbox_id = identity(device)
-        target_group = vm_groupid if netbox_id[0] == "virtualization.virtualmachine" else groupid
-        target_template = vm_templateid if netbox_id[0] == "virtualization.virtualmachine" else templateid
+        target_group, target_template, profile_name = planned_profiles[netbox_id]
         technical_name = host_name(device)
         desired_ids.add(netbox_id)
         ip = primary_ip(device)
@@ -236,7 +351,7 @@ def main() -> int:
                     api.call("host.update", {"hostid": existing["hostid"], "status": 1})
             continue
 
-        tags = managed_tags(device)
+        tags = managed_tags(device, profile_name)
         status = 0 if str(device.status) == "active" else 1
         if existing is None:
             changes += 1
@@ -263,8 +378,7 @@ def main() -> int:
         merged = preserved + tags
         if normalized(existing.get("tags", [])) != normalized(merged):
             update["tags"] = merged
-        interface = next((i for i in existing.get("interfaces", [])
-                          if str(i.get("type")) == "1" and str(i.get("main")) == "1"), None)
+        interface = primary_agent_interface(existing)
         changed = len(update) > 1 or interface is None or interface.get("ip") != ip
         if changed:
             changes += 1
@@ -282,7 +396,7 @@ def main() -> int:
             changes += 1
 
     for netbox_id, host in managed.items():
-        if in_scope(host, netbox_id) and netbox_id not in desired_ids and host["status"] != "1":
+        if netbox_id in scoped_managed and netbox_id not in desired_ids and host["status"] != "1":
             changes += 1
             LOG.info("DISABLE host=%s reason=tag-removed", host["host"])
             if args.apply:

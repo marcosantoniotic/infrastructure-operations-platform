@@ -16,10 +16,33 @@
       - not old_env.get('NETBOX_SITE_SLUGS', '') or old_env.NETBOX_SITE_SLUGS == (netbox_zabbix_sync_site_slugs | join(','))
       - old_env.get('NETBOX_INCLUDE_VMS', 'false') | string | lower != 'true' or old_env.get('NETBOX_VM_TEMPLATE') == netbox_zabbix_sync_vm_template
       - old_env.get('NETBOX_INCLUDE_VMS', 'false') | string | lower != 'true' or old_env.get('NETBOX_VM_GROUP') == netbox_zabbix_sync_vm_group
-    fail_msg: Preserve the installed TLS transport and network in private overrides before deploying.
+      - old_env.get('NETBOX_PLATFORM_MAPPING_ENABLED', 'false') | string | lower != 'true' or netbox_zabbix_sync_platform_mapping_enabled | default(false) | bool
+    fail_msg: Preserve installed TLS transport, VM/site scope and platform mapping in private overrides.
   vars:
     data: "{{ sync_installed_compose.content | b64decode | from_yaml }}"
     old_url: "{{ data.services['netbox-zabbix-sync'].get('environment', {}).get('ZABBIX_URL', '') }}"
     old_env: "{{ data.services['netbox-zabbix-sync'].get('environment', {}) }}"
   when: sync_installed_file.stat.exists
+  no_log: true
+
+- name: Refuse removal or silent change of installed platform rules and profiles
+  ansible.builtin.assert:
+    that:
+      - item.key in desired
+      - desired.get(item.key) | combine(item.value) == desired.get(item.key)
+    fail_msg: Preserve installed platform mappings and profiles; review migrations explicitly.
+    quiet: true
+  # Ansible expands loops before evaluating when. On a first installation (or
+  # a skipped role), do not dereference slurp content that does not exist yet.
+  loop: "{{ (installed | dict2items) if (sync_installed_file.stat.exists | default(false)) else [] }}"
+  vars:
+    data: "{{ sync_installed_compose.content | b64decode | from_yaml }}"
+    old_env: "{{ data.services['netbox-zabbix-sync'].get('environment', {}) }}"
+    installed: "{{ {'map': old_env.get('NETBOX_PLATFORM_MAP', '{}') | from_json, 'profiles': old_env.get('NETBOX_PLATFORM_PROFILES', '{}') | from_json} }}"
+    desired:
+      map: "{{ netbox_zabbix_sync_platform_map | default({}) }}"
+      profiles: "{{ netbox_zabbix_sync_platform_profiles | default({}) }}"
+  when:
+    - sync_installed_file.stat.exists
+    - old_env.get('NETBOX_PLATFORM_MAPPING_ENABLED', 'false') | string | lower == 'true'
   no_log: true

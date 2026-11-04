@@ -145,6 +145,22 @@
         dest: "{{ ci_output_dir }}/netbox_zabbix_sync/compose.vms.yaml"
         mode: "0644"
 
+    - name: Load sanitized optional platform mapping fixture
+      ansible.builtin.include_vars:
+        file: ../fixtures/netbox-platform-profiles.yml
+
+    - name: Render optional platform-mapped synchronization fixture
+      ansible.builtin.template:
+        src: ../../roles/netbox_zabbix_sync/templates/compose.yaml.j2
+        dest: "{{ ci_output_dir }}/netbox_zabbix_sync/compose.platforms.yaml"
+        mode: "0644"
+
+    - name: Reset optional platform fixture settings
+      ansible.builtin.set_fact:
+        netbox_zabbix_sync_platform_mapping_enabled: false
+        netbox_zabbix_sync_platform_map: {}
+        netbox_zabbix_sync_platform_profiles: {}
+
     - name: Reset optional VM fixture settings
       ansible.builtin.set_fact:
         netbox_zabbix_sync_include_vms: false

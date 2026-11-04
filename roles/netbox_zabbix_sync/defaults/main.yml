@@ -10,6 +10,9 @@ netbox_zabbix_sync_template: Linux by Zabbix agent active
 netbox_zabbix_sync_include_vms: false
 netbox_zabbix_sync_vm_group: Virtual machines
 netbox_zabbix_sync_vm_template: ""
+netbox_zabbix_sync_platform_mapping_enabled: false
+netbox_zabbix_sync_platform_map: {}
+netbox_zabbix_sync_platform_profiles: {}
 netbox_zabbix_sync_site_slugs: []
 netbox_zabbix_sync_tag_slug: zabbix
 netbox_zabbix_sync_hostid_field: zabbix_hostid

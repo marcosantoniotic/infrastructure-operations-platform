@@ -1,0 +1,47 @@
+{
+  "result": "PASS",
+  "scope": "isolated synthetic inventory only; not a LAB01 deployment",
+  "base_revision": "10876df",
+  "candidate_source_sha256": "809efdc7c637d3ed31961c0c0b43d3a8452679227d93ba591288f38780be7974",
+  "harness_sha256": "cbd1eca556049229d96bd3e6e798ca2560324e8c8b5410005c10f3240f53fb4c",
+  "last_api_stage_utc": "2026-11-04T19:27:01.108397+00:00",
+  "timezone": "America/Sao_Paulo",
+  "versions": {
+    "netbox": "4.6.10-Docker-5.0.2",
+    "zabbix": "7.4.13",
+    "topology_views": "4.5.1",
+    "qrcode": "0.0.21",
+    "ansible_core": "2.19.7",
+    "docker_engine": "29.9.3",
+    "docker_compose": "2.40.3"
+  },
+  "matrix": [
+    {"kind": "device", "platform": "rhel", "group": "Linux servers", "template": "Linux by Zabbix agent active"},
+    {"kind": "vm", "platform": "rhel", "group": "Linux servers", "template": "Linux by Zabbix agent active"},
+    {"kind": "device", "platform": "windows-server", "group": "Windows servers", "template": "Windows by Zabbix agent active"},
+    {"kind": "vm", "platform": "windows-server", "group": "Windows servers", "template": "Windows by Zabbix agent active"},
+    {"kind": "device", "platform": "routeros", "group": "Network devices", "template": "ICMP Ping"},
+    {"kind": "vm", "platform": "routeros", "group": "Network devices", "template": "ICMP Ping"}
+  ],
+  "real_api_stages": [
+    {"stage": "dry-run", "result": "PASS", "writes": 0},
+    {"stage": "matrix", "result": "PASS", "hosts": 6, "all_disabled": true},
+    {"stage": "idempotence", "result": "PASS", "additional_writes": 0},
+    {"stage": "ip-and-local-tag", "result": "PASS", "same_host_and_interface": true, "local_tag_preserved": true},
+    {"stage": "unknown-platform-before-writes", "result": "PASS", "additional_writes": 0},
+    {"stage": "migration-refused-before-writes", "result": "PASS", "additional_writes": 0},
+    {"stage": "guard-and-reapply", "result": "PASS", "additional_writes": 0},
+    {"stage": "outside-and-alerts", "result": "PASS", "non_owned_hosts_unchanged": true, "no_notification_media": true}
+  ],
+  "offline": {"legacy_cases": 19, "platform_cases": 21, "failures": 0},
+  "ansible": {"syntax": "PASS", "installed_guards": "PASS", "second_render_changed": 0, "disabled_default_byte_identical_to_base": true},
+  "compose": {"variants": 4, "ports_added": 0, "existing_networks_and_mounts_preserved": true},
+  "isolation": {"mocks_of_api_responses": false, "internal_docker_network": true, "application_ports_published": 0, "scheduled_sync": false, "production_data_reused": false},
+  "cleanup": {"owned_containers_removed": 8, "project_network_and_volumes_absent": true, "non_owned_containers_unchanged": true},
+  "limitations": [
+    "No actual Linux/Windows agent or ICMP target was exercised; hosts remained disabled",
+    "No LAB01 or OPS deployment or application access",
+    "GitHub CI job prepared but not executed remotely; no push or PR created",
+    "Guard/reapply tested; no migration or rollback of real templates/items was performed"
+  ]
+}

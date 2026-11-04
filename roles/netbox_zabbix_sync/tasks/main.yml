@@ -1,5 +1,5 @@
 ---
-- name: Protect installed API TLS settings
+- name: Protect installed API TLS and synchronization selection settings
   ansible.builtin.import_tasks: installed-guard.yml
   when: netbox_zabbix_sync_enabled | bool
 - name: Validate NetBox-Zabbix synchronization settings
@@ -14,6 +14,10 @@
       - not (netbox_zabbix_sync_include_vms | bool) or netbox_zabbix_sync_vm_template | length > 0
       - not (netbox_zabbix_sync_include_vms | bool) or netbox_zabbix_sync_vm_group | length > 0
       - netbox_zabbix_sync_site_slugs is sequence and netbox_zabbix_sync_site_slugs is not string
+      - netbox_zabbix_sync_platform_map is mapping
+      - netbox_zabbix_sync_platform_profiles is mapping
+      - (netbox_zabbix_sync_platform_mapping_enabled | bool) or (not netbox_zabbix_sync_platform_map and not netbox_zabbix_sync_platform_profiles)
+      - not (netbox_zabbix_sync_platform_mapping_enabled | bool) or (netbox_zabbix_sync_platform_map | length > 0 and netbox_zabbix_sync_platform_profiles | length > 0)
     fail_msg: Review the NetBox-Zabbix synchronization variables and Vault token.
     quiet: true
   no_log: true
@@ -84,6 +88,29 @@
   changed_when: false
   when:
     - netbox_zabbix_sync_enabled | bool
+    - not ansible_check_mode
+
+- name: Validate opt-in platform profile schema without API or database writes
+  ansible.builtin.command:
+    cmd: >-
+      docker compose --project-directory {{ netbox_zabbix_sync_project_dir }} run --rm
+      netbox-zabbix-sync /opt/netbox/venv/bin/python
+      /usr/local/libexec/netbox-zabbix-sync.py --validate-platform-config
+  changed_when: false
+  when:
+    - netbox_zabbix_sync_enabled | bool
+    - not ansible_check_mode
+
+- name: Preflight mapped hosts before replacing the scheduled synchronizer
+  ansible.builtin.command:
+    cmd: >-
+      docker compose --project-directory {{ netbox_zabbix_sync_project_dir }} run --rm
+      netbox-zabbix-sync /opt/netbox/venv/bin/python
+      /usr/local/libexec/netbox-zabbix-sync.py --verbose
+  changed_when: false
+  when:
+    - netbox_zabbix_sync_enabled | bool
+    - netbox_zabbix_sync_platform_mapping_enabled | bool
     - not ansible_check_mode
 
 - name: Deploy NetBox-Zabbix synchronization

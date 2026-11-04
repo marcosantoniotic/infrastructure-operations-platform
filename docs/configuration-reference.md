@@ -126,6 +126,16 @@ estável e a tag `netbox_object_type` evita colisões com IDs de dispositivos.
 Consulte o [procedimento de inclusão e rollback](deployment/netbox-zabbix-sync-implementation.md).
 Grupo e template são configurados por nome em `netbox_zabbix_sync_group` e
 `netbox_zabbix_sync_template`; IDs específicos de um ambiente não são aceitos.
+
+O mapeamento opcional por plataforma usa `netbox_zabbix_sync_platform_mapping_enabled`
+(padrao `false`), `netbox_zabbix_sync_platform_map` (slug exato → perfil) e
+`netbox_zabbix_sync_platform_profiles` (perfil → nomes de grupo/template).
+Aplica-se a Devices e VMs elegiveis, sem substituir o opt-in de VMs, site ou
+tag. Quando ativo, plataforma ausente/desconhecida e recusada; nao existe
+fallback para Linux. O grupo/template de hosts existentes nao e trocado
+automaticamente; sua migracao exige revisao explicita e preservacao dos IDs.
+Equipamentos de rede usam ICMP nesta etapa, sem SNMP ou credenciais adicionais.
+Ver [desenho, ativacao e rollback](deployment/netbox-zabbix-platform-mapping.md).
 O campo personalizado `zabbix_hostid` é criado de forma idempotente. A remoção
 da tag desabilita o host gerenciado no Zabbix, sem apagá-lo.
 

@@ -20,6 +20,11 @@ services:
       NETBOX_VM_GROUP: {{ netbox_zabbix_sync_vm_group | to_json }}
       NETBOX_VM_TEMPLATE: {{ netbox_zabbix_sync_vm_template | to_json }}
       NETBOX_SITE_SLUGS: {{ (netbox_zabbix_sync_site_slugs | join(',')) | to_json }}
+{% if netbox_zabbix_sync_platform_mapping_enabled | bool %}
+      NETBOX_PLATFORM_MAPPING_ENABLED: "true"
+      NETBOX_PLATFORM_MAP: {{ netbox_zabbix_sync_platform_map | to_json | to_json }}
+      NETBOX_PLATFORM_PROFILES: {{ netbox_zabbix_sync_platform_profiles | to_json | to_json }}
+{% endif %}
     command:
       - /bin/sh
       - -c
