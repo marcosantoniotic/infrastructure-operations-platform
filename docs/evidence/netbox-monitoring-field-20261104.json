@@ -1,0 +1,297 @@
+{
+  "schema_version": 1,
+  "result": "APPROVED_ISOLATED_SCOPE_ONLY",
+  "local_date": "2026-11-04",
+  "timezone": "America/Sao_Paulo",
+  "source": {
+    "base_revision": "5edd54052dfef3a8ef2335842078c3953deb34d5",
+    "state": "uncommitted working-copy candidate; not published",
+    "runtime_sha256": "2e904f8b82b15e199b306d76a5830c3f8fcd897e94732d434204eb9892db8627",
+    "harness_sha256": "4c2941cb4dd5491c74e59a28fc0e69186b4996f423cec37531e1f1f1928485b8",
+    "normalization": "LF text in the isolated portable copy; original local files unchanged"
+  },
+  "execution": {
+    "utc": "2026-11-05T00:02:33.588121+00:00",
+    "first_stage_utc": "2026-11-05T00:02:34.051689+00:00",
+    "last_stage_utc": "2026-11-05T00:03:04.243904+00:00",
+    "mocks": false,
+    "scheduled_synchronizer": false,
+    "hosts_disabled": true,
+    "ports_published": 0,
+    "netbox": "4.6.10-Docker-5.0.2",
+    "zabbix": "7.4.13",
+    "topology": "4.5.1",
+    "qrcode": "0.0.21",
+    "docker": "29.9.3",
+    "compose": "2.40.3",
+    "ansible_core": "2.19.7"
+  },
+  "offline": {
+    "legacy_tests": 19,
+    "platform_tests": 21,
+    "custom_field_tests": 21,
+    "historical_evidence_tests": 7,
+    "result": "PASS"
+  },
+  "render_and_guards": {
+    "ansible_syntax": "PASS",
+    "installed_guards": "PASS",
+    "legacy_compose_byte_compatibility": [
+      "default",
+      "vms",
+      "platform"
+    ],
+    "compose_variants": [
+      "default",
+      "vms",
+      "platform",
+      "custom-field"
+    ],
+    "service_artifacts": "PASS",
+    "render_repeat_changed": 0,
+    "promtool": "PASS",
+    "blackbox_configuration": "PASS"
+  },
+  "stages": [
+    {
+      "stage": "windows-services-capability",
+      "result": "PASS",
+      "observed": {
+        "official_template": "Windows by Zabbix agent active",
+        "active_service_discovery": true,
+        "service_state_prototypes": true,
+        "host_macro_filters": true,
+        "actual_windows_service_collection_tested": false,
+        "extra_ad_iis_sql_templates": false
+      },
+      "utc": "2026-11-05T00:02:34.051689+00:00"
+    },
+    {
+      "stage": "dry-run",
+      "result": "PASS",
+      "observed": {
+        "writes": 0
+      },
+      "utc": "2026-11-05T00:02:39.499831+00:00"
+    },
+    {
+      "stage": "matrix",
+      "result": "PASS",
+      "observed": {
+        "objects": [
+          {
+            "kind": "device",
+            "platform": "rhel",
+            "profile": "linux-active",
+            "group": "Linux servers",
+            "templates": [
+              "Linux by Zabbix agent active"
+            ]
+          },
+          {
+            "kind": "vm",
+            "platform": "rhel",
+            "profile": "linux-active",
+            "group": "Linux servers",
+            "templates": [
+              "Linux by Zabbix agent active"
+            ]
+          },
+          {
+            "kind": "device",
+            "platform": "windows-server",
+            "profile": "windows-active",
+            "group": "Windows servers",
+            "templates": [
+              "Windows by Zabbix agent active",
+              "ICMP Ping"
+            ]
+          },
+          {
+            "kind": "vm",
+            "platform": "windows-server",
+            "profile": "windows-active",
+            "group": "Windows servers",
+            "templates": [
+              "Windows by Zabbix agent active",
+              "ICMP Ping"
+            ]
+          },
+          {
+            "kind": "device",
+            "platform": "routeros",
+            "profile": "network-icmp",
+            "group": "Network devices",
+            "templates": [
+              "ICMP Ping"
+            ]
+          },
+          {
+            "kind": "vm",
+            "platform": "routeros",
+            "profile": "network-icmp",
+            "group": "Network devices",
+            "templates": [
+              "ICMP Ping"
+            ]
+          }
+        ],
+        "all_disabled": true
+      },
+      "utc": "2026-11-05T00:02:43.445341+00:00"
+    },
+    {
+      "stage": "idempotence",
+      "result": "PASS",
+      "observed": {
+        "additional_writes": 0
+      },
+      "utc": "2026-11-05T00:02:44.175250+00:00"
+    },
+    {
+      "stage": "ip-and-local-tag",
+      "result": "PASS",
+      "observed": {
+        "same_host_and_interface": true,
+        "local_tag_preserved": true,
+        "netbox_ip_after": "203.0.113.20/32",
+        "zabbix_ip_after": "203.0.113.20",
+        "matching_owned_hosts": 1
+      },
+      "utc": "2026-11-05T00:02:45.650120+00:00"
+    },
+    {
+      "stage": "unknown-platform-before-writes",
+      "result": "PASS",
+      "observed": {
+        "additional_writes": 0
+      },
+      "utc": "2026-11-05T00:02:46.907843+00:00"
+    },
+    {
+      "stage": "migration-refused-before-writes",
+      "result": "PASS",
+      "observed": {
+        "additional_writes": 0
+      },
+      "utc": "2026-11-05T00:02:48.362147+00:00"
+    },
+    {
+      "stage": "guard-and-reapply",
+      "result": "PASS",
+      "observed": {
+        "additional_writes": 0
+      },
+      "utc": "2026-11-05T00:02:49.440782+00:00"
+    },
+    {
+      "stage": "prepare-selection-schema-idempotent",
+      "result": "PASS",
+      "observed": {
+        "type": "select",
+        "object_types": 2,
+        "labels": [
+          "Linux",
+          "Windows",
+          "ICMP"
+        ],
+        "objects_not_seeded": true,
+        "token_not_needed": true
+      },
+      "utc": "2026-11-05T00:02:50.577761+00:00"
+    },
+    {
+      "stage": "schema-conflict-and-atomic-rollback",
+      "result": "PASS",
+      "observed": {
+        "conflict_not_overwritten": true,
+        "injected_post_save_fault_rolled_back": true,
+        "zabbix_writes": 0
+      },
+      "utc": "2026-11-05T00:02:50.619257+00:00"
+    },
+    {
+      "stage": "explicit-field-dry-run",
+      "result": "PASS",
+      "observed": {
+        "writes": 0
+      },
+      "utc": "2026-11-05T00:02:53.711402+00:00"
+    },
+    {
+      "stage": "explicit-field-adoption",
+      "result": "PASS",
+      "observed": {
+        "same_six_hosts": true,
+        "tag_only_updates": 6,
+        "interfaces_templates_groups_preserved": true
+      },
+      "utc": "2026-11-05T00:02:54.479601+00:00"
+    },
+    {
+      "stage": "explicit-field-idempotence",
+      "result": "PASS",
+      "observed": {
+        "additional_writes": 0
+      },
+      "utc": "2026-11-05T00:02:55.230870+00:00"
+    },
+    {
+      "stage": "field-migration-and-downgrade-guards",
+      "result": "PASS",
+      "observed": {
+        "blank_and_profile_change_refused": true,
+        "platform_downgrade_refused": true,
+        "additional_writes": 0
+      },
+      "utc": "2026-11-05T00:02:58.375293+00:00"
+    },
+    {
+      "stage": "real-netbox-edit-form",
+      "result": "PASS",
+      "observed": {
+        "http_status": 200,
+        "selection_present": true,
+        "labels": [
+          "Linux",
+          "Windows",
+          "ICMP"
+        ],
+        "ajax_choices_status": 200,
+        "rendered_by": "Django real view and DB; authenticated synthetic test client",
+        "screenshot_produced": false
+      },
+      "utc": "2026-11-05T00:03:04.174448+00:00"
+    },
+    {
+      "stage": "outside-and-alerts",
+      "result": "PASS",
+      "observed": {
+        "non_owned_hosts_unchanged": true,
+        "no_notification_media": true
+      },
+      "utc": "2026-11-05T00:03:04.243904+00:00"
+    }
+  ],
+  "cleanup": {
+    "success": true,
+    "non_owned_containers_unchanged": true,
+    "test_volumes_removed": true,
+    "owned_container_count_removed": 8,
+    "prior_stopped_containers_preserved": 3,
+    "disposable_vm_powered_off": true,
+    "initial_excluded_vms_still_running": 11,
+    "additional_out_of_scope_vms_observed": 5,
+    "out_of_scope_vm_commands_issued": false,
+    "vm_disks_and_image_caches_retained": true
+  },
+  "limits": [
+    "No actual Linux/Windows agent or ICMP collector target was exercised",
+    "No LAB01/OPS access; not a deployment acceptance test",
+    "No real Windows agent, service collection, LLD results or alerts tested",
+    "Form and AJAX endpoint exercised through an authenticated Django test client; no browser screenshot",
+    "No LAB01/OPS deployment, full role deployment, remote CI or publication",
+    "Template/profile changes for existing hosts still require an explicit migration",
+    "Atomic rollback test injects a failure in schema preparation; it is not a database restore test"
+  ]
+}

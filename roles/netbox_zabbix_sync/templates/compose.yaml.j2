@@ -24,6 +24,14 @@ services:
       NETBOX_PLATFORM_MAPPING_ENABLED: "true"
       NETBOX_PLATFORM_MAP: {{ netbox_zabbix_sync_platform_map | to_json | to_json }}
       NETBOX_PLATFORM_PROFILES: {{ netbox_zabbix_sync_platform_profiles | to_json | to_json }}
+{% if netbox_zabbix_sync_profile_source == 'custom-field' %}
+      NETBOX_PROFILE_SOURCE: "custom-field"
+      NETBOX_PROFILE_FIELD: {{ netbox_zabbix_sync_profile_field | to_json }}
+      NETBOX_PROFILE_FIELD_LABEL: {{ netbox_zabbix_sync_profile_field_label | to_json }}
+      NETBOX_PROFILE_CHOICE_SET: {{ netbox_zabbix_sync_profile_choice_set | to_json }}
+      NETBOX_PROFILE_VALUES: {{ netbox_zabbix_sync_profile_values | to_json | to_json }}
+      NETBOX_PROFILE_LABELS: {{ netbox_zabbix_sync_profile_labels | to_json | to_json }}
+{% endif %}
 {% endif %}
     command:
       - /bin/sh

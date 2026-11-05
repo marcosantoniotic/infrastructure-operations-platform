@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 def setup_netbox() -> None:
-    global Device, VirtualMachine, ContentType, CustomField
+    global Device, VirtualMachine, ContentType, CustomField, CustomFieldChoiceSet
     sys.path.insert(0, "/opt/netbox/netbox")
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "netbox.settings")
     import django
@@ -21,54 +21,142 @@ def setup_netbox() -> None:
     from dcim.models import Device
     from virtualization.models import VirtualMachine
     from django.contrib.contenttypes.models import ContentType
-    from extras.models import CustomField
+    from extras.models import CustomField, CustomFieldChoiceSet
 
 LOG = logging.getLogger("netbox-zabbix-sync")
 MANAGED_TAG_KEYS = {
     "source", "netbox_id", "netbox_status", "netbox_site", "netbox_role", "netbox_platform",
     "netbox_object_type",
     "netbox_monitoring_profile",
+    "netbox_monitoring_source",
 }
 
 
-def load_platform_mapping() -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+def unique_json(raw: str) -> Any:
+    def pairs(values):
+        result = {}
+        for key, value in values:
+            if key in result:
+                raise RuntimeError("Duplicate monitoring configuration JSON key")
+            result[key] = value
+        return result
+    try:
+        return json.loads(raw, object_pairs_hook=pairs)
+    except (ValueError, TypeError) as exc:
+        raise RuntimeError("Invalid monitoring configuration JSON") from exc
+
+
+def template_names(profile: dict[str, Any]) -> list[str]:
+    return [profile["template"]] if "template" in profile else profile["templates"]
+
+
+def valid_name(value: Any, maximum: int = 255) -> bool:
+    return isinstance(value, str) and bool(value.strip()) and len(value) <= maximum and not re.search(r"[\x00-\x1f\x7f$]", value)
+
+
+def load_platform_mapping() -> tuple[dict[str, str], dict[str, dict[str, Any]]]:
     """Exact inventory slugs only; never guess an OS or fall back to Linux."""
     enabled = os.environ.get("NETBOX_PLATFORM_MAPPING_ENABLED", "false")
     if enabled not in {"true", "false"}:
         raise RuntimeError("NETBOX_PLATFORM_MAPPING_ENABLED must be true or false")
 
-    def unique_pairs(pairs):
-        result = {}
-        for key, value in pairs:
-            if key in result:
-                raise RuntimeError("Duplicate platform mapping JSON key")
-            result[key] = value
-        return result
-
-    try:
-        mapping = json.loads(os.environ.get("NETBOX_PLATFORM_MAP", "{}"), object_pairs_hook=unique_pairs)
-        profiles = json.loads(os.environ.get("NETBOX_PLATFORM_PROFILES", "{}"), object_pairs_hook=unique_pairs)
-    except (ValueError, TypeError) as exc:
-        raise RuntimeError("Invalid platform mapping JSON") from exc
+    mapping = unique_json(os.environ.get("NETBOX_PLATFORM_MAP", "{}"))
+    profiles = unique_json(os.environ.get("NETBOX_PLATFORM_PROFILES", "{}"))
     if not isinstance(mapping, dict) or not isinstance(profiles, dict):
         raise RuntimeError("Platform mapping and profiles must be JSON objects")
     if enabled == "false":
         if mapping or profiles:
             raise RuntimeError("Platform mapping data requires explicit opt-in")
         return {}, {}
-    if not mapping or not profiles:
+    if not profiles or (os.environ.get("NETBOX_PROFILE_SOURCE", "platform") == "platform" and not mapping):
         raise RuntimeError("Enabled platform mapping requires explicit slugs and profiles")
     slug = re.compile(r"[a-z0-9][a-z0-9_-]{0,99}")
     for name, profile in profiles.items():
-        if not isinstance(name, str) or not slug.fullmatch(name) or not isinstance(profile, dict) or set(profile) != {"group", "template"}:
+        if (not isinstance(name, str) or not slug.fullmatch(name) or not isinstance(profile, dict)
+                or set(profile) not in ({"group", "template"}, {"group", "templates"})):
             raise RuntimeError("Invalid monitoring profile schema")
-        if any(not isinstance(v, str) or not v.strip() or len(v) > 255 or re.search(r"[\x00-\x1f\x7f$]", v)
-               for v in profile.values()):
+        names = template_names(profile)
+        if (not isinstance(names, list) or not 1 <= len(names) <= 16
+                or not valid_name(profile["group"]) or any(not valid_name(v) for v in names)):
             raise RuntimeError("Invalid monitoring profile group/template name")
+        if len(names) != len(set(names)):
+            raise RuntimeError("Duplicate template in monitoring profile")
     for platform, profile in mapping.items():
         if not isinstance(platform, str) or not slug.fullmatch(platform) or not isinstance(profile, str) or profile not in profiles:
             raise RuntimeError("Platform mapping references an invalid slug or unknown profile")
     return mapping, profiles
+
+
+def load_field_selection(profiles: dict[str, Any]) -> dict[str, Any] | None:
+    source = os.environ.get("NETBOX_PROFILE_SOURCE", "platform")
+    if source not in {"platform", "custom-field"}:
+        raise RuntimeError("NETBOX_PROFILE_SOURCE must be platform or custom-field")
+    values = unique_json(os.environ.get("NETBOX_PROFILE_VALUES", "{}"))
+    labels = unique_json(os.environ.get("NETBOX_PROFILE_LABELS", "{}"))
+    if not isinstance(values, dict) or not isinstance(labels, dict):
+        raise RuntimeError("Custom-field value maps and labels must be JSON objects")
+    if source == "platform":
+        if values or labels:
+            raise RuntimeError("Custom-field policy requires explicit custom-field source")
+        return None
+    if not profiles or not isinstance(values, dict) or not values:
+        raise RuntimeError("Custom-field selection requires enabled mapping and explicit values")
+    slug = re.compile(r"[a-z0-9][a-z0-9_-]{0,99}")
+    for value, profile in values.items():
+        if not isinstance(value, str) or not slug.fullmatch(value) or not isinstance(profile, str) or profile not in profiles:
+            raise RuntimeError("Custom-field value references an invalid or unknown monitoring profile")
+    if not isinstance(labels, dict) or set(labels) != set(values) or any(not valid_name(v, 100) for v in labels.values()):
+        raise RuntimeError("Custom-field choices must match the configured value map")
+    name = os.environ.get("NETBOX_PROFILE_FIELD", "monitoring_profile")
+    choice_set = os.environ.get("NETBOX_PROFILE_CHOICE_SET", "iop-monitoring-profiles")
+    label = os.environ.get("NETBOX_PROFILE_FIELD_LABEL", "Perfil de monitoramento")
+    if (not re.fullmatch(r"[a-z][a-z0-9_]{0,49}", name) or "__" in name
+            or name == os.environ.get("NETBOX_ZABBIX_HOSTID_FIELD", "zabbix_hostid")):
+        raise RuntimeError("Invalid or conflicting monitoring custom field name")
+    if not slug.fullmatch(choice_set) or not valid_name(label, 50):
+        raise RuntimeError("Invalid custom field choice set or label")
+    return {"name": name, "choice_set": choice_set, "label": label, "values": values, "labels": labels}
+
+
+def validate_profile_field(config: dict[str, Any], include_vms: bool) -> Any:
+    field = CustomField.objects.filter(name=config["name"]).first()
+    if field is None or field.type != "select" or not field.choice_set:
+        raise RuntimeError("Monitoring custom field must be prepared as a single selection before synchronization")
+    choices = list(field.choice_set.choices)
+    if (len(choices) != len(config["labels"]) or dict(choices) != config["labels"]
+            or field.choice_set.name != config["choice_set"] or field.default is not None
+            or field.label != config["label"]):
+        raise RuntimeError("Monitoring custom field choices/default differ; explicit schema migration required")
+    if field.ui_visible != "always" or field.ui_editable != "yes":
+        raise RuntimeError("Monitoring custom field must be visible and editable")
+    for model in ([Device, VirtualMachine] if include_vms else [Device]):
+        ct = ContentType.objects.get_for_model(model)
+        if not field.object_types.filter(pk=ct.pk).exists():
+            raise RuntimeError("Monitoring custom field is not assigned to a selected object type")
+    return field
+
+
+def prepare_profile_field(config: dict[str, Any]) -> dict[str, Any]:
+    """Explicit schema operation only; never seed objects or contact Zabbix."""
+    from django.db import transaction
+    with transaction.atomic():
+        field = CustomField.objects.select_for_update().filter(name=config["name"]).first()
+        choices = CustomFieldChoiceSet.objects.select_for_update().filter(name=config["choice_set"]).first()
+        if field is not None:
+            validate_profile_field(config, True)
+            return {"created": False, "field_id": field.pk, "choice_set_id": field.choice_set_id}
+        if choices is not None and (choices.base_choices or dict(choices.choices) != config["labels"]
+                                    or len(choices.choices) != len(config["labels"])):
+            raise RuntimeError("Existing choice set differs; refusing to overwrite it")
+        if choices is None:
+            choices = CustomFieldChoiceSet(name=config["choice_set"], description="IOP monitoring profile choices", extra_choices=list(config["labels"].items()))
+            choices.full_clean(); choices.save()
+        field = CustomField(name=config["name"], label=config["label"], type="select", choice_set=choices,
+                            description="Explicit monitoring profile; blank blocks selected objects. No OS inference.", required=False)
+        field.full_clean(); field.save()
+        field.object_types.add(*[ContentType.objects.get_for_model(model) for model in [Device, VirtualMachine]])
+        validate_profile_field(config, True)
+        return {"created": True, "field_id": field.pk, "choice_set_id": choices.pk}
 
 
 def resolve_monitoring_profile(obj: Any, mapping: dict[str, str]) -> str:
@@ -150,7 +238,7 @@ def primary_ip(device: Device) -> str | None:
     return str(address.address.ip) if address else None
 
 
-def managed_tags(device: Device, profile: str | None = None) -> list[dict[str, str]]:
+def managed_tags(device: Device, profile: str | None = None, source: str | None = None) -> list[dict[str, str]]:
     result = [
         {"tag": "source", "value": "netbox"},
         {"tag": "netbox_id", "value": str(device.pk)},
@@ -162,6 +250,8 @@ def managed_tags(device: Device, profile: str | None = None) -> list[dict[str, s
     ]
     if profile is not None:
         result.append({"tag": "netbox_monitoring_profile", "value": profile})
+    if source is not None:
+        result.append({"tag": "netbox_monitoring_source", "value": source})
     return result
 
 
@@ -205,15 +295,23 @@ def main() -> int:
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--validate-platform-config", action="store_true",
                         help="Validate only profile JSON; no Django, credentials, network or writes")
+    parser.add_argument("--prepare-monitoring-field", action="store_true",
+                        help="Explicitly prepare selection field/choices only; no object values or Zabbix operations")
     args = parser.parse_args()
-    if args.apply and args.validate_platform_config:
-        parser.error("--apply and --validate-platform-config are mutually exclusive")
+    if sum([args.apply, args.validate_platform_config, args.prepare_monitoring_field]) > 1:
+        parser.error("--apply, --validate-platform-config and --prepare-monitoring-field are mutually exclusive")
     platform_map, profile_config = load_platform_mapping()
+    field_config = load_field_selection(profile_config)
     if args.validate_platform_config:
         return 0
     setup_netbox()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
+    if args.prepare_monitoring_field:
+        if field_config is None:
+            parser.error("Field preparation requires custom-field profile source")
+        print(json.dumps(prepare_profile_field(field_config)))
+        return 0
 
     token = Path(os.environ["ZABBIX_API_TOKEN_FILE"]).read_text(encoding="utf-8").strip()
     if not token:
@@ -227,6 +325,8 @@ def main() -> int:
     if include_vms_raw not in {"true", "false"}:
         raise RuntimeError("NETBOX_INCLUDE_VMS must be true or false")
     include_vms = include_vms_raw == "true"
+    if field_config is not None:
+        validate_profile_field(field_config, include_vms)
     sites = {s.strip() for s in os.environ.get("NETBOX_SITE_SLUGS", "").split(",") if s.strip()}
     vm_groupid = vm_templateid = None
     if include_vms:
@@ -237,26 +337,44 @@ def main() -> int:
 
     profiles = {name: {
         "groupid": unique_id(api, "hostgroup.get", "groupid", config["group"]),
-        "templateid": unique_id(api, "template.get", "templateid", config["template"]),
+        "templateids": [unique_id(api, "template.get", "templateid", name) for name in template_names(config)],
     } for name, config in profile_config.items()}
     # This implementation manages the default address interface, not SNMP,
     # IPMI or JMX transports. Resolve incompatibilities for ALL profiles before
     # creating even the first host. No credential/interface auto-conversion.
     for profile in profiles.values():
-        items = api.call("item.get", {"output": ["type"], "templateids": [profile["templateid"]]})
-        rules = api.call("discoveryrule.get", {"output": ["type"], "selectItems": ["type"],
-                                              "templateids": [profile["templateid"]]})
-        interface_items = items + rules + [i for rule in rules for i in rule.get("items", [])]
-        if not items or any(str(i["type"]) in {"1", "4", "6", "12", "16", "17", "20"} for i in interface_items):
-            raise RuntimeError("Mapped template requires an unsupported interface; only agent/ICMP profiles are supported")
+        if len(profile["templateids"]) != len(set(profile["templateids"])):
+            raise RuntimeError("Duplicate resolved template identity in monitoring profile")
+        keys = {}
+        for tid in profile["templateids"]:
+            items = api.call("item.get", {"output": ["type", "key_", "itemid"], "templateids": [tid]})
+            rules = api.call("discoveryrule.get", {"output": ["type", "key_", "itemid"], "selectItems": ["type", "key_", "itemid"],
+                                                  "templateids": [tid]})
+            interface_items = items + rules + [i for rule in rules for i in rule.get("items", [])]
+            if not items or any(str(i["type"]) in {"1", "4", "6", "12", "16", "17", "20"} for i in interface_items):
+                raise RuntimeError("Mapped template requires an unsupported interface; only agent/ICMP profiles are supported")
+            for item in interface_items:
+                key = item.get("key_")
+                if len(profile["templateids"]) > 1 and (not key or not item.get("itemid")):
+                    raise RuntimeError("Multi-template preflight requires item keys and identities")
+                if key and key in keys and keys[key] != str(item.get("itemid")):
+                    raise RuntimeError("Mapped templates have duplicate item/discovery keys; explicit review required")
+                if key:
+                    keys[key] = str(item.get("itemid"))
 
     def target(obj):
         if profiles:
-            name = resolve_monitoring_profile(obj, platform_map)
-            return profiles[name]["groupid"], profiles[name]["templateid"], name
+            if field_config is None:
+                name = resolve_monitoring_profile(obj, platform_map)
+            else:
+                value = obj.custom_field_data.get(field_config["name"])
+                if not isinstance(value, str) or value not in field_config["values"]:
+                    raise RuntimeError(f"Missing or unmapped monitoring custom field for {host_name(obj)}; no writes applied")
+                name = field_config["values"][value]
+            return profiles[name]["groupid"], profiles[name]["templateids"], name
         if object_type(obj) == "virtualization.virtualmachine":
-            return vm_groupid, vm_templateid, None
-        return groupid, templateid, None
+            return vm_groupid, [vm_templateid], None
+        return groupid, [templateid], None
 
     hosts = api.call("host.get", {
         "output": ["hostid", "host", "name", "status"],
@@ -292,8 +410,8 @@ def main() -> int:
         planned_profiles[identity(obj)] = (expected_group, expected_template, profile_name)
         if profile_name is not None:
             LOG.debug("PROFILE host=%s platform=%s profile=%s group=%s template=%s", host_name(obj),
-                      obj.platform.slug, profile_name, profile_config[profile_name]["group"],
-                      profile_config[profile_name]["template"])
+                      obj.platform.slug if obj.platform else "", profile_name, profile_config[profile_name]["group"],
+                      ", ".join(template_names(profile_config[profile_name])))
         name = host_name(obj)
         if name in planned_names and planned_names[name] != identity(obj):
             raise RuntimeError(f"Planned Zabbix host name collision: {name}")
@@ -308,7 +426,7 @@ def main() -> int:
         if existing:
             if str(expected_group) not in {str(g["groupid"]) for g in existing.get("hostgroups", [])}:
                 raise RuntimeError("Existing managed host is outside the configured group")
-            if str(expected_template) not in {str(t["templateid"]) for t in existing.get("parentTemplates", [])}:
+            if not set(expected_template).issubset({str(t["templateid"]) for t in existing.get("parentTemplates", [])}):
                 raise RuntimeError("Existing host template differs; an explicit migration is required")
             old_profile = next((t.get("value", "") for t in existing.get("tags", [])
                                 if t.get("tag") == "netbox_monitoring_profile"), None)
@@ -335,6 +453,12 @@ def main() -> int:
         raise RuntimeError("Refusing to silently disable previously managed VM synchronization")
     # Resolve orphan scope BEFORE any write too (including unknown old profiles).
     scoped_managed = {key for key, host in managed.items() if in_scope(host, key)}
+    source_marker = "custom-field:" + field_config["name"] if field_config else None
+    for key in scoped_managed:
+        old_source = next((t.get("value", "") for t in managed[key].get("tags", [])
+                           if t.get("tag") == "netbox_monitoring_source"), None)
+        if old_source is not None and old_source != source_marker:
+            raise RuntimeError("Refusing to remove or change installed monitoring custom-field source")
     ensure_custom_field(field_name, args.apply, include_vms)
     for device in objects:
         netbox_id = identity(device)
@@ -351,7 +475,7 @@ def main() -> int:
                     api.call("host.update", {"hostid": existing["hostid"], "status": 1})
             continue
 
-        tags = managed_tags(device, profile_name)
+        tags = managed_tags(device, profile_name, source_marker)
         status = 0 if str(device.status) == "active" else 1
         if existing is None:
             changes += 1
@@ -359,7 +483,7 @@ def main() -> int:
             if args.apply:
                 result = api.call("host.create", {
                     "host": technical_name, "name": device.name, "status": status,
-                    "groups": [{"groupid": target_group}], "templates": [{"templateid": target_template}],
+                    "groups": [{"groupid": target_group}], "templates": [{"templateid": tid} for tid in target_template],
                     "interfaces": [{"type": 1, "main": 1, "useip": 1, "ip": ip, "dns": "", "port": "10050"}],
                     "tags": tags,
                 })

@@ -155,11 +155,25 @@
         dest: "{{ ci_output_dir }}/netbox_zabbix_sync/compose.platforms.yaml"
         mode: "0644"
 
-    - name: Reset optional platform fixture settings
+    - name: Load optional explicit monitoring field fixture
+      ansible.builtin.include_vars:
+        file: ../fixtures/netbox-monitoring-field.yml
+
+    - name: Render optional explicit monitoring field fixture
+      ansible.builtin.template:
+        src: ../../roles/netbox_zabbix_sync/templates/compose.yaml.j2
+        dest: "{{ ci_output_dir }}/netbox_zabbix_sync/compose.field.yaml"
+        mode: "0644"
+
+    - name: Reset optional platform and field fixture settings
       ansible.builtin.set_fact:
         netbox_zabbix_sync_platform_mapping_enabled: false
         netbox_zabbix_sync_platform_map: {}
         netbox_zabbix_sync_platform_profiles: {}
+        netbox_zabbix_sync_profile_source: platform
+        netbox_zabbix_sync_profile_values: {}
+        netbox_zabbix_sync_profile_labels: {}
+        netbox_zabbix_sync_manage_profile_field: false
 
     - name: Reset optional VM fixture settings
       ansible.builtin.set_fact:

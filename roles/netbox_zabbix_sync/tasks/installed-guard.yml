@@ -17,6 +17,9 @@
       - old_env.get('NETBOX_INCLUDE_VMS', 'false') | string | lower != 'true' or old_env.get('NETBOX_VM_TEMPLATE') == netbox_zabbix_sync_vm_template
       - old_env.get('NETBOX_INCLUDE_VMS', 'false') | string | lower != 'true' or old_env.get('NETBOX_VM_GROUP') == netbox_zabbix_sync_vm_group
       - old_env.get('NETBOX_PLATFORM_MAPPING_ENABLED', 'false') | string | lower != 'true' or netbox_zabbix_sync_platform_mapping_enabled | default(false) | bool
+      - old_env.get('NETBOX_PROFILE_SOURCE', 'platform') != 'custom-field' or netbox_zabbix_sync_profile_source | default('platform') == 'custom-field'
+      - old_env.get('NETBOX_PROFILE_SOURCE', 'platform') != 'custom-field' or old_env.get('NETBOX_PROFILE_FIELD') == netbox_zabbix_sync_profile_field | default('monitoring_profile')
+      - old_env.get('NETBOX_PROFILE_SOURCE', 'platform') != 'custom-field' or old_env.get('NETBOX_PROFILE_CHOICE_SET') == netbox_zabbix_sync_profile_choice_set | default('iop-monitoring-profiles')
     fail_msg: Preserve installed TLS transport, VM/site scope and platform mapping in private overrides.
   vars:
     data: "{{ sync_installed_compose.content | b64decode | from_yaml }}"
@@ -45,4 +48,24 @@
   when:
     - sync_installed_file.stat.exists
     - old_env.get('NETBOX_PLATFORM_MAPPING_ENABLED', 'false') | string | lower == 'true'
+  no_log: true
+
+- name: Refuse removal or remapping of installed custom-field values and labels
+  ansible.builtin.assert:
+    that:
+      - item.key in desired
+      - desired.get(item.key) | combine(item.value) == desired.get(item.key)
+    fail_msg: Preserve installed custom-field value mappings and labels; review schema migrations explicitly.
+    quiet: true
+  loop: "{{ (installed | dict2items) if (sync_installed_file.stat.exists | default(false)) else [] }}"
+  vars:
+    data: "{{ sync_installed_compose.content | b64decode | from_yaml }}"
+    old_env: "{{ data.services['netbox-zabbix-sync'].get('environment', {}) }}"
+    installed: "{{ {'values': old_env.get('NETBOX_PROFILE_VALUES', '{}') | from_json, 'labels': old_env.get('NETBOX_PROFILE_LABELS', '{}') | from_json} }}"
+    desired:
+      values: "{{ netbox_zabbix_sync_profile_values | default({}) }}"
+      labels: "{{ netbox_zabbix_sync_profile_labels | default({}) }}"
+  when:
+    - sync_installed_file.stat.exists
+    - old_env.get('NETBOX_PROFILE_SOURCE', 'platform') == 'custom-field'
   no_log: true

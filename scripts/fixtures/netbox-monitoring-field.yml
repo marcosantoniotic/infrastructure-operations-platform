@@ -1,0 +1,30 @@
+---
+# Fresh isolated example, not a migration inventory. Preserve installed maps/profiles.
+netbox_zabbix_sync_platform_mapping_enabled: true
+netbox_zabbix_sync_profile_source: custom-field
+netbox_zabbix_sync_profile_field: monitoring_profile
+netbox_zabbix_sync_profile_field_label: Perfil de monitoramento
+netbox_zabbix_sync_profile_choice_set: iop-monitoring-profiles
+netbox_zabbix_sync_profile_values:
+  linux: linux-active
+  windows: windows-active
+  icmp: network-icmp
+netbox_zabbix_sync_profile_labels:
+  linux: Linux
+  windows: Windows
+  icmp: ICMP
+# Explicit schema creation only. Does not fill field values or migrate hosts.
+netbox_zabbix_sync_manage_profile_field: true
+netbox_zabbix_sync_platform_map: {}
+netbox_zabbix_sync_platform_profiles:
+  linux-active:
+    group: Linux servers
+    template: Linux by Zabbix agent active
+  windows-active:
+    group: Windows servers
+    templates:
+      - Windows by Zabbix agent active
+      - ICMP Ping
+  network-icmp:
+    group: Network devices
+    template: ICMP Ping

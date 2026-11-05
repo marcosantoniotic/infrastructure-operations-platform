@@ -1,5 +1,9 @@
 # Mapeamento de plataformas NetBox → Zabbix
 
+Extensão opt-in: [seleção por campo personalizado e serviços Windows](netbox-monitoring-profile-field.md).
+O modo por plataforma descrito aqui continua compatível; os resultados históricos
+do PR #93 não comprovam a nova extensão.
+
 ## Escopo e estado
 
 Implementacao opt-in, validada em isolamento; ver [resultados e limites](../testing/netbox-platform-mapping-2026-11-04.md).

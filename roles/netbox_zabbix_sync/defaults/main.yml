@@ -13,6 +13,13 @@ netbox_zabbix_sync_vm_template: ""
 netbox_zabbix_sync_platform_mapping_enabled: false
 netbox_zabbix_sync_platform_map: {}
 netbox_zabbix_sync_platform_profiles: {}
+netbox_zabbix_sync_profile_source: platform
+netbox_zabbix_sync_profile_field: monitoring_profile
+netbox_zabbix_sync_profile_field_label: Perfil de monitoramento
+netbox_zabbix_sync_profile_choice_set: iop-monitoring-profiles
+netbox_zabbix_sync_profile_values: {}
+netbox_zabbix_sync_profile_labels: {}
+netbox_zabbix_sync_manage_profile_field: false
 netbox_zabbix_sync_site_slugs: []
 netbox_zabbix_sync_tag_slug: zabbix
 netbox_zabbix_sync_hostid_field: zabbix_hostid
