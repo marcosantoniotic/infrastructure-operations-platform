@@ -29,7 +29,7 @@ ZX = 'https://zabbix.functional.example.test/api_jsonrpc.php'
 CA = '/tls/ca.crt'
 PROFILES = {
     'linux-active': {'group': 'Linux servers', 'template': 'Linux by Zabbix agent active'},
-    'windows-active': {'group': 'Windows servers', 'template': 'Windows by Zabbix agent active'},
+    'windows-active': {'group': 'Windows servers', 'templates': ['Windows by Zabbix agent active', 'ICMP Ping']},
     'network-icmp': {'group': 'Network devices', 'template': 'ICMP Ping'},
 }
 MAPPING = {'rhel': 'linux-active', 'windows-server': 'windows-active', 'routeros': 'network-icmp'}
@@ -121,15 +121,28 @@ def main():
             found = [{'groupid': zx('hostgroup.create', dict(name=profile['group']))['groupids'][0]}]
         assert len(found) == 1
         group_ids[name] = found[0]['groupid']
-        templates = zx('template.get', dict(output=['templateid'], filter={'name': [profile['template']]}))
-        assert len(templates) == 1, profile['template']
-        template_ids[name] = templates[0]['templateid']
-        items = zx('item.get', dict(output=['type', 'key_'], templateids=[templates[0]['templateid']]))
-        assert items
-        if name == 'network-icmp':
-            assert all(i['type'] == '3' and i['key_'].startswith('icmpping') for i in items)
-        else:
-            assert any(i['type'] == '7' for i in items)
+        template_ids[name] = []
+        for template_name in profile.get('templates', [profile.get('template')]):
+            templates = zx('template.get', dict(output=['templateid'], filter={'name': [template_name]}))
+            assert len(templates) == 1, template_name
+            template_ids[name].append(templates[0]['templateid'])
+            items = zx('item.get', dict(output=['type', 'key_'], templateids=[templates[0]['templateid']]))
+            assert items
+            if template_name == 'ICMP Ping':
+                assert all(i['type'] == '3' and i['key_'].startswith('icmpping') for i in items)
+            else:
+                assert any(i['type'] == '7' for i in items)
+    windows_id = template_ids['windows-active'][0]
+    rules = zx('discoveryrule.get', dict(output=['itemid', 'key_', 'type'], templateids=[windows_id],
+        selectItems=['key_', 'type'], filter={'key_': ['service.discovery']}))
+    assert len(rules) == 1 and rules[0]['type'] == '7'
+    assert any(i['key_'].startswith('service.info[') and i['type'] == '7' for i in rules[0]['items'])
+    win = zx('template.get', dict(output=['templateid'], templateids=[windows_id], selectMacros=['macro']))
+    macro_names = {m['macro'] for m in win[0]['macros']}
+    assert {'{$SERVICE.NAME.MATCHES}', '{$SERVICE.NAME.NOT_MATCHES}'} <= macro_names
+    check('windows-services-capability', True, {'official_template': 'Windows by Zabbix agent active',
+        'active_service_discovery': True, 'service_state_prototypes': True, 'host_macro_filters': True,
+        'actual_windows_service_collection_tested': False, 'extra_ad_iis_sql_templates': False})
     legacy_group = zx('hostgroup.get', dict(output=['groupid'], filter={'name': ['Virtual machines']}))
     if not legacy_group:
         zx('hostgroup.create', dict(name='Virtual machines'))
@@ -210,10 +223,10 @@ def main():
         assert actual['primary_ip4']['address'] == record['ip'] + '/32'
         assert str(actual['custom_fields']['synthetic_platform_hostid']) == host['hostid']
         assert host['status'] == '1' and any(g['groupid'] == group_ids[profile] for g in host['hostgroups'])
-        assert any(t['templateid'] == template_ids[profile] for t in host['parentTemplates'])
+        assert set(template_ids[profile]) <= {t['templateid'] for t in host['parentTemplates']}
         assert host['interfaces'][0]['ip'] == record['ip']
         matrix.append(dict(kind=record['kind'], platform=record['slug'], profile=profile,
-            group=PROFILES[profile]['group'], template=PROFILES[profile]['template']))
+            group=PROFILES[profile]['group'], templates=PROFILES[profile].get('templates', [PROFILES[profile].get('template')])) )
     check('matrix', len(owned_hosts) == 6, {'objects': matrix, 'all_disabled': True})
     check('idempotence', reconcile() == [], {'additional_writes': 0})
     first = records[0]; hostid = owned_hosts[(first['type'], str(first['id']))]
@@ -263,6 +276,111 @@ def main():
         assert 'silently remove' in str(error)
     else: raise AssertionError('Mapping downgrade unexpectedly accepted')
     check('guard-and-reapply', len(writes) == checkpoint and reconcile() == [], {'additional_writes': 0})
+
+    # Explicit GUI profile migration on the same six owned hosts; preserve IDs/history.
+    field_env = dict(env, NETBOX_PROFILE_SOURCE='custom-field', NETBOX_PROFILE_FIELD='synthetic_monitoring_profile',
+        NETBOX_PROFILE_FIELD_LABEL='Perfil de monitoramento', NETBOX_PROFILE_CHOICE_SET='synthetic-monitoring-profiles',
+        NETBOX_PROFILE_VALUES=json.dumps({'linux':'linux-active','windows':'windows-active','icmp':'network-icmp'}),
+        NETBOX_PROFILE_LABELS=json.dumps({'linux':'Linux','windows':'Windows','icmp':'ICMP'}))
+    from extras.models import CustomField, CustomFieldChoiceSet
+    counts = (CustomField.objects.count(), CustomFieldChoiceSet.objects.count())
+    def prepare():
+        capture = io.StringIO()
+        with patch.dict(os.environ, dict(field_env, ZABBIX_API_TOKEN_FILE='/not-present-proof-schema-only')), \
+             patch('sys.argv', ['sync', '--prepare-monitoring-field']), patch('sys.stdout', capture):
+            assert sync['main']() == 0
+        return json.loads(capture.getvalue().strip().splitlines()[-1])
+    prepared = prepare(); assert prepared['created'] is True
+    assert (CustomField.objects.count(), CustomFieldChoiceSet.objects.count()) == (counts[0]+1, counts[1]+1)
+    again = prepare(); assert again['created'] is False and again['field_id'] == prepared['field_id']
+    field = CustomField.objects.get(pk=prepared['field_id'])
+    assert field.type == 'select' and field.default is None and not field.required
+    assert set(field.object_types.values_list('app_label', 'model')) == {('dcim','device'),('virtualization','virtualmachine')}
+    assert dict(field.choice_set.choices) == {'linux':'Linux','windows':'Windows','icmp':'ICMP'}
+    assert all(nb('GET', r['path']+str(r['id'])+'/')['custom_fields'].get('synthetic_monitoring_profile') is None for r in records)
+    check('prepare-selection-schema-idempotent', True, {'type':'select','object_types':2,
+        'labels':['Linux','Windows','ICMP'],'objects_not_seeded':True,'token_not_needed':True})
+    original_choices = copy.deepcopy(field.choice_set.extra_choices)
+    try:
+        CustomFieldChoiceSet.objects.filter(pk=prepared['choice_set_id']).update(extra_choices=[['linux','Changed']])
+        try: prepare()
+        except RuntimeError as error: assert 'custom field' in str(error)
+        else: raise AssertionError('Conflicting existing schema was overwritten')
+        assert CustomFieldChoiceSet.objects.get(pk=prepared['choice_set_id']).extra_choices == [['linux','Changed']]
+    finally:
+        CustomFieldChoiceSet.objects.filter(pk=prepared['choice_set_id']).update(extra_choices=original_choices)
+    with patch.dict(os.environ, field_env):
+        fault_config = dict(sync['load_field_selection'](PROFILES), name='synthetic_atomic_failure', choice_set='synthetic-atomic-failure')
+    before_fault = (CustomField.objects.count(), CustomFieldChoiceSet.objects.count())
+    with patch.dict(sync, validate_profile_field=lambda *args: (_ for _ in ()).throw(RuntimeError('synthetic schema fault'))):
+        try: sync['prepare_profile_field'](fault_config)
+        except RuntimeError as error: assert str(error)=='synthetic schema fault'
+        else: raise AssertionError('Synthetic transaction fault did not propagate')
+    assert (CustomField.objects.count(), CustomFieldChoiceSet.objects.count()) == before_fault
+    assert not CustomField.objects.filter(name=fault_config['name']).exists()
+    assert not CustomFieldChoiceSet.objects.filter(name=fault_config['choice_set']).exists()
+    check('schema-conflict-and-atomic-rollback', True, {'conflict_not_overwritten':True,
+        'injected_post_save_fault_rolled_back':True,'zabbix_writes':0})
+    checkpoint = len(writes)
+    def field_reconcile(apply=True, override=None):
+        return reconcile(apply, dict(field_env, **(override or {})))
+    try: field_reconcile()
+    except RuntimeError as error: assert 'monitoring custom field' in str(error)
+    else: raise AssertionError('Blank explicit profile was accepted')
+    assert len(writes) == checkpoint
+    for record in records:
+        value = {'rhel':'linux','windows-server':'windows','routeros':'icmp'}[record['slug']]
+        nb('PATCH', record['path']+str(record['id'])+'/', {'custom_fields':{'synthetic_monitoring_profile':value}})
+    before_field_hosts = copy.deepcopy(hosts())
+    check('explicit-field-dry-run', field_reconcile(False) == [], {'writes':0})
+    field_calls = field_reconcile()
+    assert len(field_calls) == 6 and all(c['method']=='host.update' and set(c['params'])=={'hostid','tags'} for c in field_calls)
+    current = hosts()
+    for prior in before_field_hosts:
+        if prior['hostid'] not in owned_hosts.values():
+            continue  # Non-owned volatile availability is handled by config_fingerprint below.
+        newer = next(h for h in current if h['hostid']==prior['hostid'])
+        for key in ['hostid','host','name','status','interfaces','hostgroups','parentTemplates','description']:
+            assert newer.get(key) == prior.get(key)
+        if prior['hostid'] in owned_hosts.values():
+            assert any(t['tag']=='netbox_monitoring_source' and t['value']=='custom-field:synthetic_monitoring_profile' for t in newer['tags'])
+    check('explicit-field-adoption', True, {'same_six_hosts':True,'tag_only_updates':6,'interfaces_templates_groups_preserved':True})
+    check('explicit-field-idempotence', field_reconcile()==[], {'additional_writes':0})
+    first_path = first['path']+str(first['id'])+'/'
+    checkpoint = len(writes)
+    nb('PATCH', first_path, {'custom_fields':{'synthetic_monitoring_profile':None}})
+    try: field_reconcile()
+    except RuntimeError as error: assert 'monitoring custom field' in str(error)
+    else: raise AssertionError('Empty field was accepted')
+    nb('PATCH', first_path, {'custom_fields':{'synthetic_monitoring_profile':'windows'}})
+    try: field_reconcile()
+    except RuntimeError as error: assert any(k in str(error) for k in ['group','template','profile'])
+    else: raise AssertionError('Existing profile was silently migrated')
+    nb('PATCH', first_path, {'custom_fields':{'synthetic_monitoring_profile':'linux'}})
+    try: reconcile()
+    except RuntimeError as error: assert 'custom-field source' in str(error)
+    else: raise AssertionError('Custom-field source was silently removed')
+    assert len(writes) == checkpoint
+    check('field-migration-and-downgrade-guards', field_reconcile()==[], {'blank_and_profile_change_refused':True,'platform_downgrade_refused':True,'additional_writes':0})
+    # Exercise the actual NetBox edit form, not a drawing or replacement screenshot.
+    from django.test import Client
+    client = Client(HTTP_HOST='netbox.functional.example.test')
+    client.force_login(get_user_model().objects.get(username='synthetic-admin'))
+    vm = next(r for r in records if r['kind']=='vm')
+    form = client.get('/virtualization/virtual-machines/'+str(vm['id'])+'/edit/', secure=True)
+    assert form.status_code == 200
+    html = form.content.decode()
+    (out/'monitoring-field-form.private.html').write_text(html)
+    assert 'cf_synthetic_monitoring_profile' in html and 'Perfil de monitoramento' in html
+    # APISelect deliberately renders only selected choices. Exercise its actual
+    # authenticated AJAX endpoint rather than requiring static option markup.
+    choice_url = '/api/extras/custom-field-choice-sets/'+str(prepared['choice_set_id'])+'/choices/'
+    assert choice_url in html
+    choice_response = client.get(choice_url, secure=True)
+    assert choice_response.status_code == 200
+    assert {row['id']:row['display'] for row in choice_response.json()['results']} == {'linux':'Linux','windows':'Windows','icmp':'ICMP'}
+    check('real-netbox-edit-form', True, {'http_status':200,'selection_present':True,'labels':['Linux','Windows','ICMP'],
+        'ajax_choices_status':200,'rendered_by':'Django real view and DB; authenticated synthetic test client','screenshot_produced':False})
     outside = [h for h in hosts() if h['hostid'] not in owned_hosts.values()]
     def config_fingerprint(values):
         values = copy.deepcopy(values)
@@ -278,6 +396,8 @@ def main():
           {'non_owned_hosts_unchanged': True, 'no_notification_media': True})
     save('platform-result.json', dict(result='PASS', stages=events, matrix=matrix,
         cleanup='Dedicated fixture teardown by verified Docker project IDs; do not delete by host name',
+        custom_field={'type':'select','labels':['Linux','Windows','ICMP'],'prepared':True,'migration_tag_only':True},
+        windows_services={'capability_verified':True,'actual_collection_tested':False},
         limitations=['No actual Linux/Windows agent or ICMP collector target was exercised',
                      'No LAB01/OPS access; not a deployment acceptance test']))
     token.delete()

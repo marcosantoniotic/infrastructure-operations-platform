@@ -26,7 +26,7 @@ for service in traefik cloudflare_tunnel zabbix netbox netbox_zabbix_sync portai
     config --quiet
 done
 
-for variant in compose.yaml compose.vms.yaml compose.platforms.yaml; do
+for variant in compose.yaml compose.vms.yaml compose.platforms.yaml compose.field.yaml; do
   docker compose --project-directory "${artifact_dir}/netbox_zabbix_sync" \
     --file "${artifact_dir}/netbox_zabbix_sync/${variant}" config --quiet
 done
@@ -48,6 +48,13 @@ assert json.loads(mapped['environment']['NETBOX_PLATFORM_MAP'])['routeros']=='ne
 assert json.loads(mapped['environment']['NETBOX_PLATFORM_PROFILES'])['windows-active']['template']=='Windows by Zabbix agent active'
 assert not mapped.get('ports')
 assert mapped['networks']==vms['networks'] and mapped['volumes']==vms['volumes']
+field=yaml.safe_load((p/'compose.field.yaml').read_text())['services']['netbox-zabbix-sync']
+assert 'NETBOX_PROFILE_SOURCE' not in mapped['environment']
+assert field['environment']['NETBOX_PROFILE_SOURCE']=='custom-field'
+assert field['environment']['NETBOX_PROFILE_FIELD']=='monitoring_profile'
+assert json.loads(field['environment']['NETBOX_PROFILE_LABELS'])=={'linux':'Linux','windows':'Windows','icmp':'ICMP'}
+assert json.loads(field['environment']['NETBOX_PLATFORM_PROFILES'])['windows-active']['templates']==['Windows by Zabbix agent active','ICMP Ping']
+assert not field.get('ports') and field['networks']==mapped['networks'] and field['volumes']==mapped['volumes']
 PY
 
 # Config rendering must preserve legacy storage and opt into existing external

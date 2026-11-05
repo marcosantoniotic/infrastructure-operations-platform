@@ -1,5 +1,11 @@
 # NetBox-Zabbix synchronization role
 
+Optional explicit selection: [monitoring profile custom field](../../docs/deployment/netbox-monitoring-profile-field.md).
+The default remains exact Platform slug mapping when enabled. The new opt-in
+supports a single-select field (Linux/Windows/ICMP), explicit transactional schema
+preparation and multiple templates per profile. It never silently retemplates an
+existing host, installs agents or overwrites local service-filter macros.
+
 Reconciles NetBox devices tagged `zabbix` with Zabbix hosts every 60 seconds.
 It creates and updates managed hosts, preserves unmanaged Zabbix tags, disables
 hosts whose NetBox tag was removed, and records the Zabbix host ID in NetBox.

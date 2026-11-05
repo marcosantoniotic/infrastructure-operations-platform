@@ -31,6 +31,11 @@
         netbox_zabbix_sync_platform_mapping_enabled: "{{ scenario.platforms | default(false) }}"
         netbox_zabbix_sync_platform_map: "{{ scenario.platform_map | default({}) }}"
         netbox_zabbix_sync_platform_profiles: "{{ scenario.profiles | default({}) }}"
+        netbox_zabbix_sync_profile_source: "{{ scenario.profile_source | default('platform') }}"
+        netbox_zabbix_sync_profile_field: "{{ scenario.profile_field | default('monitoring_profile') }}"
+        netbox_zabbix_sync_profile_choice_set: "{{ scenario.choice_set | default('iop-monitoring-profiles') }}"
+        netbox_zabbix_sync_profile_values: "{{ scenario.profile_values | default({}) }}"
+        netbox_zabbix_sync_profile_labels: "{{ scenario.profile_labels | default({}) }}"
         glpi_php_security_hardening: "{{ scenario.php | default(false) }}"
         glpi_https_cookie_hardening: false
         netbox_secure_cookies: "{{ scenario.cookies | default(false) }}"

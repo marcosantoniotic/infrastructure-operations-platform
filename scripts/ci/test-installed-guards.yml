@@ -75,6 +75,60 @@
           platforms: true
           profiles: {linux-active: {group: Linux servers, template: Linux active}}
           reject: true
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: &field_installed
+            services:
+              netbox-zabbix-sync:
+                environment:
+                  NETBOX_PLATFORM_MAPPING_ENABLED: 'true'
+                  NETBOX_PLATFORM_MAP: '{}'
+                  NETBOX_PLATFORM_PROFILES: '{"linux-active":{"group":"Linux servers","template":"Linux active"}}'
+                  NETBOX_PROFILE_SOURCE: custom-field
+                  NETBOX_PROFILE_FIELD: monitoring_profile
+                  NETBOX_PROFILE_CHOICE_SET: iop-monitoring-profiles
+                  NETBOX_PROFILE_VALUES: '{"linux":"linux-active"}'
+                  NETBOX_PROFILE_LABELS: '{"linux":"Linux"}'
+          platforms: true
+          profiles: {linux-active: {group: Linux servers, template: Linux active}}
+          reject: true
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: *field_installed
+          platforms: true
+          profiles: {linux-active: {group: Linux servers, template: Linux active}}
+          profile_source: custom-field
+          profile_values: {linux: linux-active}
+          profile_labels: {linux: Linux}
+          reject: false
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: *field_installed
+          platforms: true
+          profiles: {linux-active: {group: Linux servers, template: Linux active}}
+          profile_source: custom-field
+          profile_field: changed_field
+          profile_values: {linux: linux-active}
+          profile_labels: {linux: Linux}
+          reject: true
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: *field_installed
+          platforms: true
+          profiles: {linux-active: {group: Linux servers, template: Linux active}}
+          profile_source: custom-field
+          profile_values: {linux: other}
+          profile_labels: {linux: Linux}
+          reject: true
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: *field_installed
+          platforms: true
+          profiles: {linux-active: {group: Linux servers, template: Linux active}}
+          profile_source: custom-field
+          profile_values: {linux: linux-active}
+          profile_labels: {linux: Changed}
+          reject: true
         - role: glpi
           task: installed-guard.yml
           compose: {services: {glpi: {volumes: ['./security.ini:/usr/local/etc/php/conf.d/zzz-iop-security.ini:ro']}}}
