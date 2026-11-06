@@ -84,6 +84,7 @@ jobs:
           python scripts/tests/test_netbox_platform_mapping.py
           python scripts/tests/test_netbox_monitoring_field.py
           python scripts/tests/test_windows_service_policy.py
+          python scripts/tests/test_wsp_ci_observation.py
           python scripts/tests/test_netbox_sync_evidence.py
           python scripts/tests/test_netbox_proxy.py
           python scripts/tests/test_unifi_ocsp_policy.py
