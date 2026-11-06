@@ -83,6 +83,7 @@ jobs:
           python scripts/tests/test_netbox_vm_sync.py
           python scripts/tests/test_netbox_platform_mapping.py
           python scripts/tests/test_netbox_monitoring_field.py
+          python scripts/tests/test_windows_service_policy.py
           python scripts/tests/test_netbox_sync_evidence.py
           python scripts/tests/test_netbox_proxy.py
           python scripts/tests/test_unifi_ocsp_policy.py
@@ -186,6 +187,13 @@ jobs:
           --inventory localhost,
           scripts/ci/render-validation-artifacts.yml
 
+      - name: Test inert Windows service policy and installed opt-out guard
+        env:
+          IOP_DISPOSABLE_PLATFORM_TEST: '1'
+        run: >-
+          ansible-playbook --inventory localhost,
+          scripts/ci/test-windows-service-policy-role.yml
+
       - name: Test installed-state deployment refusal guards
         run: >-
           ansible-playbook
@@ -194,6 +202,36 @@ jobs:
 
       - name: Validate Compose and Prometheus artifacts
         run: ./scripts/ci/validate-service-artifacts.sh
+
+  windows-service-policy-review:
+    name: Blocking Windows service-policy review contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Refuse notification and ownership drift (draft blockers)
+        run: python scripts/tests/test_windows_service_policy_review.py
+
+  windows-service-policy-api:
+    name: Isolated Windows service-policy Zabbix engine (not native Windows)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prepare disposable test tooling
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/wsp-test-venv"
+          "$RUNNER_TEMP/wsp-test-venv/bin/pip" install --disable-pip-version-check ansible-core==2.19.7 PyYAML==6.0.3
+          "$RUNNER_TEMP/wsp-test-venv/bin/ansible-galaxy" collection install -p ./collections -r requirements.yml
+      - name: Exercise real API, synthetic PSK producer and rollback only in owned fixture
+        shell: bash
+        run: |
+          sudo env PATH="$RUNNER_TEMP/wsp-test-venv/bin:$PATH" IOP_DISPOSABLE_PLATFORM_TEST=1 \
+            "$RUNNER_TEMP/wsp-test-venv/bin/python" scripts/ci/test-windows-service-policy.py \
+            --workspace /tmp/iop-windows-service-policy-ci --revision "${{ github.sha }}"
 
   glpi-https:
     name: Isolated GLPI API and blackbox HTTPS migration

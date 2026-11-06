@@ -1,0 +1,49 @@
+---
+- name: Test opt-out and installed guards only in an isolated disposable runner
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: false
+  vars:
+    windows_service_policy_project_dir: /opt/iop-wsp-ci-guard
+  tasks:
+    - name: Require explicit disposable opt-in
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'IOP_DISPOSABLE_PLATFORM_TEST') == '1'
+    - name: Initial test directory must not exist
+      ansible.builtin.stat:
+        path: '{{ windows_service_policy_project_dir }}'
+      register: initial
+    - ansible.builtin.assert:
+        that: not initial.stat.exists
+    - name: Default role is inert
+      ansible.builtin.include_role:
+        name: windows_service_policy
+    - name: Verify opt-out created nothing
+      ansible.builtin.stat:
+        path: '{{ windows_service_policy_project_dir }}'
+      register: after
+    - ansible.builtin.assert:
+        that: not after.stat.exists
+    - name: Create owned synthetic installed-state fixture
+      ansible.builtin.file:
+        path: '{{ windows_service_policy_project_dir }}'
+        state: directory
+        mode: '0700'
+    - ansible.builtin.copy:
+        dest: '{{ windows_service_policy_project_dir }}/state.json'
+        content: '{"version":1,"fixture_owner":"windows-service-policy-ci"}'
+        mode: '0600'
+    - name: Installed opt-out must be refused
+      block:
+        - ansible.builtin.include_role:
+            name: windows_service_policy
+        - ansible.builtin.fail:
+            msg: Opt-out guard did not refuse installed state
+      rescue:
+        - ansible.builtin.assert:
+            that: ansible_failed_task.name == 'Refuse silent removal of an installed policy'
+    - name: Keep fixture private for test evidence (no application data)
+      ansible.builtin.debug:
+        msg: Default inert and installed-state guard passed; no API was contacted.
