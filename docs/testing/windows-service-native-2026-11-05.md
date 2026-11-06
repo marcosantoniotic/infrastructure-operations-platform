@@ -1,8 +1,10 @@
 # Agent 2 e leitores Windows — resultados nativos isolados
 
-**Gate posterior:** a [revisão de publicação](windows-service-policy-review-2026-11-05.md)
-reproduziu dois gaps offline não cobertos por este ensaio. O recorte funcional
-abaixo não os aprova; o candidato permanece bloqueado para merge e implantação.
+**Revisão posterior:** a [revisão de publicação](windows-service-policy-review-2026-11-05.md)
+reproduziu e corrigiu dois gaps de metadados não cobertos por este ensaio.
+Os novos guards são testados separadamente; o recorte nativo abaixo não foi
+reexecutado nem reclassificado como ensaio do código corrigido. PR em rascunho,
+sem aprovação de implantação.
 
 Data de operação: **05/11/2026, America/Sao_Paulo (UTC−03)**. Leituras e ensaios
 funcionais ocorreram aproximadamente entre 21:51 e 22:12, correspondendo a
@@ -139,8 +141,14 @@ não foram acessados ou alterados.
 
 ## Diff desta etapa
 
-O reconciliador e seus guards permaneceram inalterados. A execução nativa usou
-as mesmas definições do candidato anterior. Fixtures de serviço Windows estão
+Nesta etapa histórica, o reconciliador e seus guards permaneceram inalterados.
+SHA-256 LF do core efetivamente ensaiado:
+`8629898892d4e632bd237f25f621594c0dd0231d75ae4241842a7d599583005b`.
+A correção posterior dos guards de chamado/ownership modifica o hash do core,
+mas preserva as definições WMI, normalização e triggers. Não se alegam novos
+testes Windows dessa revisão: regressões offline e CI de API real são evidências
+separadas. A execução nativa usou as mesmas definições do candidato anterior.
+Fixtures de serviço Windows estão
 em `scripts/tests/windows/NativeServiceFixture.cs` e
 `scripts/tests/windows/Invoke-NativeServiceFixture.ps1`; orquestração e entradas
 privadas ficam fora do repositório. Documentação recebe resultados e referências

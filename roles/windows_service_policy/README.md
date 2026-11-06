@@ -55,6 +55,16 @@ requires manual inspection of partial state, not name-based adoption or cleanup.
 Rollback still validates scope/ownership/notification routing and can refuse if
 another writer changed those preconditions; do not erase the ledger to bypass it.
 
+Trigger-level `glpi=ticket` is refused on owned and legacy triggers in dry-run,
+observe, enforce and rollback, as is inherited host/template ticket eligibility.
+Every recorded item/trigger must still have its exact ID and one exact ownership
+tag. Missing, renamed or retagged objects are not recreated or adopted by name;
+unexpected name collisions and unrecorded owned objects also require inspection.
+Recorded partial creation can resume; an unrecorded/lost create response cannot.
+Harmless local tags remain untouched. All targets are re-read before the first
+ledger mutation; this narrows drift detection but is not a CAS or permission for
+multiple writers. Do not remove ticket tags just to bypass a refused rollback.
+
 ## Detection and limits
 
 - Native `wmi.getall`: readonly SELECT of two Win32_Service rows. Malformed,
@@ -87,7 +97,9 @@ Follow-up: [native Windows reader results](../../docs/testing/windows-service-na
 cover real Agent 2 WMI/SCM, cursor/permissions/rotation/reconnection and policy
 cutover/rollback on a non-domain disposable VM. This is a separate functional
 acceptance slice, not a LAB01 deployment approval or long-duration/default-window
-fault test. The production policy code and guards were not relaxed.
+fault test. The historical native run used the pre-guard-fix core; the later
+metadata guard corrections are covered separately by offline regressions and
+real isolated API tests. WMI, preprocessing and trigger definitions are unchanged.
 
 References: [Windows item keys](https://www.zabbix.com/documentation/7.4/en/manual/config/items/itemtypes/zabbix_agent/win_keys),
 [trigger update](https://www.zabbix.com/documentation/7.4/en/manual/api/reference/trigger/update).

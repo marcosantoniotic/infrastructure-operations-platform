@@ -1,9 +1,10 @@
 # Windows: política de serviços intermitentes (opt-in)
 
 **Candidato validado no motor e no recorte Windows nativo; aceite de implantação pendente.**
-**Bloqueado para merge:** a [revisão de publicação](../testing/windows-service-policy-review-2026-11-05.md)
-reproduziu gaps em elegibilidade de chamado na trigger e perda de ownership.
-Os dois contratos de regressão falham no candidato atual; não aplicar.
+**Em rascunho, sem aprovação de implantação.** Os dois gaps encontrados na
+[revisão de publicação](../testing/windows-service-policy-review-2026-11-05.md)
+foram corrigidos, com regressões obrigatórias e novos testes contra API isolada.
+Conferir o CI da revisão corrigida; não aplicar automaticamente após CI verde.
 Não aplicado no LAB01/OPS. Veja os [resultados e limites do ensaio](../testing/windows-service-policy-2026-11-05.md).
 Atualização: o [recorte funcional Windows nativo](../testing/windows-service-native-2026-11-05.md)
 foi executado com Agent 2 real e rollback; revisão de implantação e limites de
@@ -129,6 +130,15 @@ dedicado com `--apply --rollback` pelo runner aprovado. Desabilita somente as
 triggers novas registradas e restaura o status original das duas antigas. Não
 apaga itens, dados, eventos, volumes ou templates e não restaura banco/VM.
 Depois, voltar a `observe` explicitamente antes de outro corte.
+
+Os guards verificam `glpi=ticket` nas próprias triggers e nas duas legadas,
+além de host/templates, inclusive no rollback. Um ID registrado que desapareceu,
+mudou de nome ou perdeu ownership interrompe a execução: não há recriação,
+adoção por nome ou remoção automática. Tags locais inofensivas são preservadas.
+Inspecionar e revisar o drift antes de tentar novamente; nunca apagar o ledger
+ou retirar uma tag de chamado apenas para liberar o guard. Uma última barreira
+de leitura precede a primeira escrita do ledger, mas não é uma transação/CAS:
+o requisito de escritor único e janela controlada continua obrigatório.
 
 Referências: [chaves Windows](https://www.zabbix.com/documentation/7.4/en/manual/config/items/itemtypes/zabbix_agent/win_keys),
 [parâmetros de chaves](https://www.zabbix.com/documentation/7.4/en/manual/config/items/item/key),

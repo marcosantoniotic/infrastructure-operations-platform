@@ -228,6 +228,53 @@ def check_legacy(target, items, triggers):
     return result
 
 
+def check_trigger_scope(target, items, triggers, record, item_defs, trigger_defs):
+    """Refuse notification/ownership drift, including objects no longer tagged.
+
+    The ledger is authoritative for identity, never permission to adopt a row or
+    recreate a lost ID. Partial *recorded* creation is resumable, lost responses
+    and external deletion/retagging require inspection instead of replacement.
+    """
+    keys = {d['key_'] for d in item_defs}
+    names = {d['description'] for d in trigger_defs}
+    by_id = {t['triggerid']: t for t in triggers}
+    require(len(by_id) == len(triggers), "Ambiguous trigger IDs")
+    recorded_items = record.get('items', {}) if record else {}
+    recorded_triggers = record.get('triggers', {}) if record else {}
+    require(isinstance(recorded_items, dict) and isinstance(recorded_triggers, dict), "Invalid ownership ledger")
+    require(set(recorded_items) <= keys and set(recorded_triggers) <= names, "Unexpected recorded policy scope")
+    require(len(set(recorded_items.values())) == len(recorded_items) and
+            len(set(recorded_triggers.values())) == len(recorded_triggers), "Ambiguous recorded IDs")
+
+    def exact_owner(row):
+        return [{'tag': t['tag'], 'value': t.get('value', '')}
+                for t in row.get('tags', []) if t['tag'] == OWNER['tag']] == [OWNER]
+
+    for key, iid in recorded_items.items():
+        row = items.get(key)
+        require(row and row['itemid'] == iid and exact_owner(row),
+                "Recorded item missing or ownership changed; inspect before recreation")
+    for name, tid in recorded_triggers.items():
+        row = by_id.get(tid)
+        require(row and row.get('description') == name and exact_owner(row),
+                "Recorded trigger missing or ownership changed; inspect before recreation")
+    for key, row in items.items():
+        if owned(row):
+            require(key in keys and recorded_items.get(key) == row['itemid'] and exact_owner(row),
+                    "Unrecorded or ambiguous owned item; inspect partial state")
+    legacy_ids = {s['legacy_triggerid'] for s in target['services']}
+    for row in triggers:
+        name, tid = row.get('description'), row['triggerid']
+        if owned(row):
+            require(name in names and recorded_triggers.get(name) == tid and exact_owner(row),
+                    "Unrecorded or ambiguous owned trigger; inspect partial state")
+        elif name in names:
+            require(False, "Unowned policy trigger name collision; never adopt or duplicate")
+        if owned(row) or tid in legacy_ids or tid in recorded_triggers.values():
+            require(not any(t['tag'] == 'glpi' and t.get('value') == 'ticket' for t in row.get('tags', [])),
+                    "Ticket-eligible policy/legacy trigger requires a reviewed notification plan")
+
+
 def atomic_save(path, value):
     path = Path(path); path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(prefix='.wsp-', dir=path.parent)
@@ -262,6 +309,7 @@ def reconcile(api, config, ledger, persist=lambda value: None, apply=False, roll
         defs, td = definitions(target, config); expected_keys = {d['key_'] for d in defs}
         require(all(not owned(i) or k in expected_keys for k, i in actual.items()), "Unexpected installed owned item")
         record = ledger.get('hosts', {}).get(target['hostid']) if ledger else None
+        check_trigger_scope(target, actual, triggers, record, defs, td)
         for definition in defs:
             old = actual.get(definition['key_'])
             if old:
@@ -309,6 +357,13 @@ def reconcile(api, config, ledger, persist=lambda value: None, apply=False, roll
                         "Three distinct fresh source samples spanning two intervals required")
         if rollback: require(record, "No owned rollback ledger")
         plans.append((target, host, actual, triggers, legacy, defs, td, existing, record))
+    if apply:
+        # Recheck every target before even persisting the first ledger mutation.
+        # This is a final read barrier, not a CAS: a single writer is still required.
+        for target, before, _, _, _, defs, td, _, record in plans:
+            require(host_snapshot(api, target) == before, "Concurrent host/ownership edit")
+            latest_items, latest_triggers = current(api, target)
+            check_trigger_scope(target, latest_items, latest_triggers, record, defs, td)
     writes = changes = 0
     if apply and not ledger:
         ledger.update({'version': 1, 'fingerprint': fingerprint, 'hosts': {}}); persist(ledger)

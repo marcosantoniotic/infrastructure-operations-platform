@@ -138,6 +138,58 @@ def main():
     assert all(t['status']=='1' for t in zx('trigger.get',{'output':['status'],'hostids':[hid],'tags':[wsp.OWNER]}))
     check('observe-plan-apply-repeat',{'planned':25,'created':25,'repeat_writes':0,'replacement_triggers_disabled':True})
     defs,td=wsp.definitions(cfg['targets'][0],cfg);master=defs[0]['key_'];events=[i['key_'] for i in defs if i['key_'].startswith('eventlog.count[')]
+    # Negative guards against the real API, while replacement triggers are still
+    # disabled. All injected metadata belongs to this single fresh synthetic host.
+    # API writes below inject/restore the fixture only, never a policy mutation.
+    guard_tid=ledger['hosts'][hid]['triggers'][td[0]['description']]
+    trigger_selection={'output':['triggerid','description','status','expression'],
+                       'hostids':[hid],'selectTags':'extend'}
+    def trigger_snapshot():return canonical(zx('trigger.get',trigger_selection))
+    guard_before=trigger_snapshot()
+    guard_original=next(t for t in guard_before if t['triggerid']==guard_tid)
+    assert guard_original['status']=='1'
+    class AuditedAPI:
+        def __init__(self):self.writes=[]
+        def call(self,method,params):
+            if not method.endswith('.get'):
+                self.writes.append(method)
+                raise AssertionError('Guard attempted an API mutation: '+method)
+            return api.call(method,params)
+    guard_results=[]
+    for defect in ('ticket','lost-owner','wrong-owner'):
+        tags=copy.deepcopy(guard_original['tags'])
+        if defect=='ticket':tags.extend([{'tag':'glpi','value':'other'},{'tag':'glpi','value':'ticket'}])
+        elif defect=='lost-owner':tags=[t for t in tags if t['tag']!=wsp.OWNER['tag']]
+        else:
+            tags=[dict(t,value='wrong-owner') if t['tag']==wsp.OWNER['tag'] else t for t in tags]
+        zx('trigger.update',{'triggerid':guard_tid,'tags':tags})
+        try:
+            injected=trigger_snapshot()
+            for mode in ('dry-run','observe','enforce','rollback'):
+                candidate=copy.deepcopy(cfg)
+                if mode=='enforce':candidate.update(phase='enforce',cutover_approved=True)
+                audited=AuditedAPI();persisted=[];saved=copy.deepcopy(ledger)
+                saved_disk=(ROOT/'wsp-ledger.private.json').read_bytes()
+                try:
+                    wsp.reconcile(audited,candidate,ledger,persisted.append,
+                                  apply=mode!='dry-run',rollback=mode=='rollback')
+                except ValueError as exc:
+                    expected='Ticket-eligible' if defect=='ticket' else 'Recorded trigger missing or ownership changed'
+                    assert expected in str(exc),str(exc)
+                else:raise AssertionError('Guard accepted '+defect+' during '+mode)
+                assert not audited.writes and not persisted and ledger==saved
+                assert (ROOT/'wsp-ledger.private.json').read_bytes()==saved_disk
+                assert trigger_snapshot()==injected,'Guard changed a trigger or created a duplicate'
+                guard_results.append({'defect':defect,'mode':mode,'api_writes':0,'ledger_writes':0})
+        finally:
+            zx('trigger.update',{'triggerid':guard_tid,'tags':guard_original['tags']})
+        assert trigger_snapshot()==guard_before,'Fixture metadata was not exactly restored'
+    save('wsp-real-api-guards.private.json',guard_results)
+    check('trigger-ticket-guard-real-api',{'modes':4,'refused_before_api_or_ledger_write':True,'disabled_trigger_fixture_only':True})
+    check('recorded-trigger-ownership-guard-real-api',{'lost_or_wrong_owner_modes':8,'same_ids_no_duplicates':True,'metadata_restored':True})
+    # A harmless local tag must survive normal cutover, idempotence and rollback.
+    local_witness={'tag':'local-policy-witness','value':'preserve'}
+    zx('trigger.update',{'triggerid':guard_tid,'tags':guard_original['tags']+[local_witness]})
     normal=[{'Name':n,'DisplayName':d,'State':'Stopped','StartMode':'Auto','ExitCode':0,'ServiceSpecificExitCode':0} for n,d in [('AppXSvc','Synthetic AppX service'),('InventorySvc','Synthetic inventory service')]]
     def feed(sample=None, failure=0, include_master=True):
         values={k:0 for k in events};values[events[0]]=failure
@@ -270,6 +322,7 @@ def main():
     check('rediscovery-and-reapply',{'additional_synthetic_service_discovered':True,'unrelated_witness_trigger_stays_enabled':True,'old_generic_stays_retired':True,'writes':0})
     rb=wsp.reconcile(api,cfg,ledger,save_state,apply=True,rollback=True);assert rb['writes']==12
     assert wsp.reconcile(api,cfg,ledger,save_state,apply=True,rollback=True)['writes']==0
+    assert local_witness in next(t for t in trigger_snapshot() if t['triggerid']==guard_tid)['tags']
     assert {k:items()[k]['itemid'] for k in ownedids}==ownedids
     for key,iid in oldids.items():
         assert items()[key]['itemid']==iid
