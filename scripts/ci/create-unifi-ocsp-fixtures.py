@@ -30,7 +30,7 @@ def generate(destination):
         builder = (x509.CertificateBuilder().subject_name(subject)
                    .issuer_name(parent.subject if parent else subject)
                    .public_key(key.public_key()).serial_number(x509.random_serial_number())
-                   .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=7))
+                   .not_valid_before(now - timedelta(days=3)).not_valid_after(now + timedelta(days=7))
                    .add_extension(x509.BasicConstraints(ca=ca, path_length=0 if ca else None), True)
                    .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), False)
                    .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(
@@ -61,9 +61,10 @@ def generate(destination):
         path.chmod(0o600)
 
     def response(name, status=ocsp.OCSPCertStatus.GOOD, cert=None, parent=None,
-                 signer=None, this=None, next_time=None, omit_next=False, produced=None):
+                 signer=None, this=None, next_time=None, omit_next=False, produced=None,
+                 certid_algorithm=None, weak_signature=False):
         cert, parent, signer = cert or leaf[0], parent or issuer[0], signer or issuer
-        builder = (ocsp.OCSPResponseBuilder().add_response(cert, parent, hashes.SHA256(), status,
+        builder = (ocsp.OCSPResponseBuilder().add_response(cert, parent, certid_algorithm or hashes.SHA256(), status,
             this or now - timedelta(minutes=1), None if omit_next else next_time or now + timedelta(minutes=30),
             now - timedelta(minutes=2) if status == ocsp.OCSPCertStatus.REVOKED else None,
             x509.ReasonFlags.key_compromise if status == ocsp.OCSPCertStatus.REVOKED else None)
@@ -71,14 +72,18 @@ def generate(destination):
         if signer != issuer:
             builder = builder.certificates([signer[0]])
         der = builder.sign(signer[1], hashes.SHA256()).public_bytes(serialization.Encoding.DER)
-        if produced:
+        if produced or weak_signature:
             # Fixture-only mutation, then cryptographically re-sign. Never mock
             # a parsed timestamp: negative controls must have valid signatures.
             outer = asn1ocsp.OCSPResponse.load(der)
             basic = outer['response_bytes']['response'].parsed
-            basic['tbs_response_data']['produced_at'] = produced
+            if produced:
+                basic['tbs_response_data']['produced_at'] = produced
+            signature_hash = hashes.SHA1() if weak_signature else hashes.SHA256()
+            if weak_signature:
+                basic['signature_algorithm'] = {'algorithm': 'sha1_rsa'}
             basic['signature'] = signer[1].sign(basic['tbs_response_data'].dump(),
-                                               padding.PKCS1v15(), hashes.SHA256())
+                                               padding.PKCS1v15(), signature_hash)
             outer['response_bytes']['response'] = basic
             der = outer.dump()
         (destination / (name + '.der')).write_bytes(der)
@@ -101,12 +106,36 @@ def generate(destination):
     response('next-before-this', next_time=now - timedelta(minutes=2))
     (destination / 'bad-signature.der').write_bytes(good[:-1] + bytes([good[-1] ^ 1]))
     (destination / 'malformed.der').write_bytes(b'not an OCSP response')
+    # Repeat identity/signature/status/time controls for SHA-1 CertID. All normal
+    # responses remain signed with SHA-256; weak-signature is a negative fixture.
+    for suffix, algorithm in [('sha256', hashes.SHA256()), ('sha1', hashes.SHA1())]:
+        for name, kwargs in {
+            'good': {}, 'delegated-good': {'signer': delegate},
+            'revoked': {'status': ocsp.OCSPCertStatus.REVOKED},
+            'unknown': {'status': ocsp.OCSPCertStatus.UNKNOWN},
+            'unauthorized': {'signer': unauthorized},
+            'wrong-serial': {'cert': rotated[0]}, 'wrong-issuer': {'parent': wrong_issuer[0]},
+            'rotated-good': {'cert': rotated[0]},
+            'expired': {'this': now-timedelta(hours=2), 'next_time': now-timedelta(minutes=1)},
+            'future-this-update': {'this': now+timedelta(minutes=10)},
+            'future-produced-at': {'produced': now+timedelta(minutes=10)},
+            'incoherent-produced-at': {'produced': now-timedelta(minutes=10)},
+            'missing-next-update': {'omit_next': True},
+            'next-before-this': {'next_time': now-timedelta(minutes=2)},
+            'old-produced-at': {'produced': now-timedelta(hours=3)},
+            'age-2h': {'this': now-timedelta(hours=2), 'produced': now-timedelta(hours=2)},
+            'age-25h': {'this': now-timedelta(hours=25), 'produced': now-timedelta(hours=25)},
+            'weak-signature': {'weak_signature': True},
+        }.items():
+            response(name+'-'+suffix, certid_algorithm=algorithm, **kwargs)
+        strong=(destination/('good-'+suffix+'.der')).read_bytes()
+        (destination/('bad-signature-'+suffix+'.der')).write_bytes(strong[:-1]+bytes([strong[-1]^1]))
     manifest = {'fictitious_only': True, 'created_at': now.isoformat(),
                 'hostname': 'controller.example.test', 'files': {
         p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(destination.iterdir())}}
     (destination / 'manifest.json').write_text(json.dumps(manifest, indent=2))
     print(json.dumps({'destination': str(destination), 'fictitious_only': True,
-                      'certificates': 6, 'responses': 17}))
+                      'certificates': 6, 'responses': len(list(destination.glob('*.der')))}))
 
 
 if __name__ == '__main__':

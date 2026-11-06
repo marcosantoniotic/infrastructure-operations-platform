@@ -34,7 +34,22 @@ class Denied(Exception):
         super().__init__('unifi_ocsp_' + reason)
 
 
-def validate_response(data, leaf, issuer, now, skew=120, max_age=3600):
+def policy_options(config):
+    """Keep in parity with the dependency-free inventory guard (tested)."""
+    algorithm = config.get('certid_hash_algorithm', 'sha256')
+    profile = config.get('freshness_profile', 'strict')
+    accepted = config.get('freshness_risk_accepted', False)
+    age = config.get('max_age_seconds', 3600)
+    if (algorithm not in ('sha256', 'sha1') or profile not in ('strict', 'bounded-24h') or
+            type(accepted) is not bool or not isinstance(age, int) or isinstance(age, bool) or
+            (profile == 'strict' and (accepted or not 1 <= age <= 3600)) or
+            (profile == 'bounded-24h' and (not accepted or 'max_age_seconds' not in config or
+                                          not 3600 < age <= 86400))):
+        raise Denied('config')
+    return algorithm, profile, age
+
+
+def validate_response(data, leaf, issuer, now, skew=120, max_age=3600, certid_hash_algorithm=None):
     """Authenticate a single CertID response before interpreting status/times."""
     try:
         response = ocsp.load_der_ocsp_response(data)
@@ -44,6 +59,9 @@ def validate_response(data, leaf, issuer, now, skew=120, max_age=3600):
         if len(singles) != 1:
             raise Denied('identity')
         single = singles[0]
+        if (single.hash_algorithm.name not in ('sha256', 'sha1') or
+                (certid_hash_algorithm is not None and single.hash_algorithm.name != certid_hash_algorithm)):
+            raise Denied('identity')
         if response.extensions:
             if any(e.critical for e in response.extensions):
                 raise Denied('malformed')
@@ -128,14 +146,14 @@ class Policy:
         self.limit = config.get('response_limit', 65536)
         self.entries = config.get('cache_entries', 128)
         self.skew = config.get('clock_skew_seconds', 120)
-        self.max_age = config.get('max_age_seconds', 3600)
+        self.certid_hash_algorithm, self.freshness_profile, self.max_age = policy_options(config)
         self.cache_ttl = config.get('cache_ttl_seconds', 300)
         if (self.endpoint.scheme not in ('http', 'https') or not self.endpoint.hostname or
                 self.endpoint.username or self.endpoint.password or self.endpoint.fragment or
                 self.endpoint.query or not self.endpoint.path or
                 not 0 < self.timeout <= 10 or not 0 < self.limit <= 65536 or
                 not 0 < self.entries <= 128 or not 0 <= self.skew <= 120 or
-                not 0 < self.cache_ttl <= self.max_age <= 3600):
+                not 0 < self.cache_ttl <= min(self.max_age, 300)):
             raise Denied('config')
         self.endpoint.port  # reject malformed ports before any connection
         if not self.state.is_file():
@@ -313,17 +331,22 @@ class Policy:
             cached = state['cache'].get(key)
             if cached and now.timestamp() < cached['deadline']:
                 try:
-                    validate_response(base64.b64decode(cached['der'], validate=True), leaf, self.issuer, now, self.skew, self.max_age)
+                    validate_response(base64.b64decode(cached['der'], validate=True), leaf, self.issuer, now,
+                                      self.skew, self.max_age, self.certid_hash_algorithm)
                     state['last_clock'] = now.timestamp()
                     self.save(state)
                     return 'cache'
                 except Denied:
                     del state['cache'][key]
-            request = ocsp.OCSPRequestBuilder().add_certificate(leaf, self.issuer, hashes.SHA256()).build().public_bytes(serialization.Encoding.DER)
+            # CertID digest is not the response signature algorithm. Never retry
+            # another digest automatically, and never change deny/cache identity.
+            digest_algorithm = {'sha256': hashes.SHA256, 'sha1': hashes.SHA1}[self.certid_hash_algorithm]()
+            request = ocsp.OCSPRequestBuilder().add_certificate(leaf, self.issuer, digest_algorithm).build().public_bytes(serialization.Encoding.DER)
             try:
                 data = self.fetch(request)
                 now = datetime.now(timezone.utc)
-                deadline = validate_response(data, leaf, self.issuer, now, self.skew, self.max_age)
+                deadline = validate_response(data, leaf, self.issuer, now, self.skew, self.max_age,
+                                             self.certid_hash_algorithm)
             except Denied as error:
                 if error.reason == 'revoked':
                     if len(state['revoked']) >= 4096:

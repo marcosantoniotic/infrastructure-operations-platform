@@ -5,6 +5,21 @@ import re
 from urllib.parse import urlsplit
 
 
+def options(settings):
+    """Explicit compatibility, never negotiation or an automatic age increase."""
+    algorithm = settings.get('certid_hash_algorithm', 'sha256')
+    profile = settings.get('freshness_profile', 'strict')
+    accepted = settings.get('freshness_risk_accepted', False)
+    age = settings.get('max_age_seconds', 3600)
+    if (algorithm not in ('sha256', 'sha1') or profile not in ('strict', 'bounded-24h') or
+            type(accepted) is not bool or not isinstance(age, int) or isinstance(age, bool) or
+            (profile == 'strict' and (accepted or not 1 <= age <= 3600)) or
+            (profile == 'bounded-24h' and (not accepted or 'max_age_seconds' not in settings or
+                                          not 3600 < age <= 86400))):
+        raise ValueError('Explicit CertID and reviewed bounded freshness profile required')
+    return algorithm, profile, age
+
+
 def policy(enabled, poller, verify, image, url, settings):
     if not isinstance(enabled, bool):
         raise ValueError('OCSP opt-in must be a boolean')
@@ -25,13 +40,14 @@ def policy(enabled, poller, verify, image, url, settings):
             raise ValueError('Explicit unicast destination addresses required')
     origin.port
     responder.port
+    options(settings)
     for name, low, high in [('timeout_seconds', 1, 5), ('response_limit', 1, 65536),
                             ('cache_entries', 1, 128), ('clock_skew_seconds', 0, 120),
-                            ('max_age_seconds', 1, 3600), ('cache_ttl_seconds', 1, 300)]:
+                            ('cache_ttl_seconds', 1, 300)]:
         value = settings.get(name)
         if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
             raise ValueError('Missing or excessive bounded OCSP policy')
-    if settings['cache_ttl_seconds'] > settings['max_age_seconds']:
+    if settings['cache_ttl_seconds'] > settings.get('max_age_seconds', 3600):
         raise ValueError('Cache cannot outlive response age policy')
     return True
 

@@ -1,4 +1,5 @@
-FROM iop-isolated/unpoller-ocsp:3.4.1-candidate
+ARG OCSP_RUNTIME_IMAGE=iop-isolated/unpoller-ocsp:3.4.1-candidate
+FROM ${OCSP_RUNTIME_IMAGE}
 USER root
 RUN pip install --no-cache-dir asn1crypto==1.5.1
 USER 10001:10001

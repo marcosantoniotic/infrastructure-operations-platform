@@ -19,6 +19,8 @@ import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
+from cryptography.x509 import ocsp
+from cryptography.hazmat.primitives import serialization
 
 ROOT = Path(__file__).resolve().parents[2]
 FILES = ROOT / 'roles/observability/files'
@@ -54,7 +56,7 @@ def serve(handler, tls=None):
         worker.join(3)
 
 
-def main(fixture, binary):
+def main(fixture, binary, certid_hash='sha256', extended=False):
     fixture = fixture.resolve()
     if 'ocsp-private' not in fixture.parts or not (fixture / 'manifest.json').is_file():
         raise ValueError('Disposable test fixtures required')
@@ -68,9 +70,15 @@ def main(fixture, binary):
             pass
         def do_POST(self):
             body = self.rfile.read(int(self.headers.get('Content-Length', 0)))
+            request_hash = ocsp.load_der_ocsp_request(body).hash_algorithm.name
             observed['ocsp'].append({'body': base64.b64encode(body).decode(),
+                                     'certid_hash': request_hash,
                                      'credentials': bool(self.headers.get('Authorization') or self.headers.get('Cookie'))})
             mode = observed['mode']
+            if mode == 'sha256-internal-error' and request_hash == 'sha256':
+                data=ocsp.OCSPResponseBuilder.build_unsuccessful(ocsp.OCSPResponseStatus.INTERNAL_ERROR).public_bytes(serialization.Encoding.DER)
+                self.send_response(500); self.end_headers(); self.wfile.write(data); return
+            if mode == 'sha256-internal-error':mode='good'
             if mode == 'timeout':
                 time.sleep(2)
             if mode == 'redirect':
@@ -78,7 +86,13 @@ def main(fixture, binary):
                 self.send_header('Location', 'http://not-allowed.example.test/')
                 self.end_headers()
                 return
-            data = b'x' * 65537 if mode == 'oversized' else (fixture / ((mode if mode not in ('timeout', 'http') else 'good') + '.der')).read_bytes()
+            selected=mode if mode not in ('timeout','http') else 'good'
+            if mode=='wrong-certid-hash':selected='good'
+            # Every signed fixture reflects the request CertID, except the
+            # explicit wrong-hash negative. Transport malformed bytes stay raw.
+            digest=request_hash if mode!='wrong-certid-hash' else ('sha1' if request_hash=='sha256' else 'sha256')
+            filename=selected+'.der' if selected=='malformed' else selected+'-'+digest+'.der'
+            data = b'x' * 65537 if mode == 'oversized' else (fixture / filename).read_bytes()
             self.send_response(503 if mode == 'http' else 200)
             self.send_header('Content-Type', 'application/ocsp-response')
             self.send_header('Content-Length', str(len(data)))
@@ -137,7 +151,7 @@ def main(fixture, binary):
             policy = {'issuer_file': str(fixture / 'issuer.pem'), 'state_file': str(state),
                       'responder_url': 'http://ocsp.example.test:' + str(responder.server_port) + '/ocsp',
                       'responder_address': '127.0.0.1', 'timeout_seconds': 0.4,
-                      'cache_ttl_seconds': 60,
+                      'cache_ttl_seconds': 60, 'certid_hash_algorithm': certid_hash,
                       'collector': 'unpoller' if name.startswith('unpoller') else 'ap_counts',
                       'metrics_file': str(fixture / (name + '-' + str(counter) + '-metrics.prom'))}
             policy_path = fixture / (name + '-' + str(counter) + '-policy.json')
@@ -207,6 +221,39 @@ def main(fixture, binary):
                  'old-produced-at', 'incoherent-produced-at', 'missing-next-update', 'next-before-this',
                  'malformed', 'oversized', 'redirect', 'http', 'timeout']
         for kind in ['python', 'unpoller']:
+            if extended:
+                for mode,extra,expected in [
+                    ('sha256-internal-error',{},certid_hash=='sha1'),
+                    ('wrong-certid-hash',{},False), ('weak-signature',{},False),
+                    ('age-2h',{},False),
+                    ('age-2h',{'freshness_profile':'bounded-24h','freshness_risk_accepted':True,'max_age_seconds':86400},True),
+                    ('age-25h',{'freshness_profile':'bounded-24h','freshness_risk_accepted':True,'max_age_seconds':86400},False),
+                ]:
+                    observed['mode']=mode;path,policy=config_for(kind+'-options-'+mode)
+                    policy.update(extra);path.write_text(json.dumps(policy))
+                    before=len(observed['requests']);queries=len(observed['ocsp'])
+                    passed,text=run(kind,path)
+                    assert passed==expected,(kind,mode,extra,text[-1000:])
+                    if not expected:assert len(observed['requests'])==before
+                    assert all(q['certid_hash']==certid_hash for q in observed['ocsp'][queries:]),'Silent hash fallback'
+                    results.append({'collector':kind,'case':mode,'profile':extra.get('freshness_profile','strict'),'pass':True})
+                # Cached GOOD is revalidated after tightening the profile; deny
+                # identity is independent of CertID and survives its change.
+                observed['mode']='age-2h';path,policy=config_for(kind+'-tighten')
+                policy.update(freshness_profile='bounded-24h',freshness_risk_accepted=True,max_age_seconds=86400)
+                path.write_text(json.dumps(policy));assert run(kind,path)[0]
+                policy.update(freshness_profile='strict',freshness_risk_accepted=False,max_age_seconds=3600)
+                path.write_text(json.dumps(policy));before=len(observed['requests'])
+                assert not run(kind,path)[0] and len(observed['requests'])==before
+                results.append({'collector':kind,'case':'tighten-rejects-old-cached-good','pass':True})
+                observed['mode']='revoked';path,policy=config_for(kind+'-deny-change')
+                assert not run(kind,path)[0];deny=json.loads(Path(policy['state_file']).read_text())['revoked'];assert deny
+                policy.update(certid_hash_algorithm='sha1' if certid_hash=='sha256' else 'sha256',
+                              freshness_profile='bounded-24h',freshness_risk_accepted=True,max_age_seconds=86400)
+                path.write_text(json.dumps(policy));observed['mode']='good';before=len(observed['requests']);queries=len(observed['ocsp'])
+                assert not run(kind,path)[0] and len(observed['requests'])==before and len(observed['ocsp'])==queries
+                assert json.loads(Path(policy['state_file']).read_text())['revoked']==deny
+                results.append({'collector':kind,'case':'revocation-survives-digest-and-profile-change','pass':True})
             for mode in modes:
                 observed['mode'] = mode
                 policy_path, _ = config_for(kind + '-' + mode)
@@ -290,7 +337,8 @@ def main(fixture, binary):
     output = {'real_tls_and_ocsp_network': True, 'actual_unpoller_binary': True,
               'python_inspect_input_substituted': True, 'operational_access': False,
               'cases': results, 'ocsp_received_credentials': False}
-    (fixture / 'connection-results.json').write_text(json.dumps(output, indent=2))
+    output.update(certid_hash_algorithm=certid_hash,extended=extended)
+    (fixture / ('connection-results-'+certid_hash+'.json')).write_text(json.dumps(output, indent=2))
     print('RESULT', len(results), 'cases passed', flush=True)
 
 
@@ -298,5 +346,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--fixture', type=Path, required=True)
     parser.add_argument('--binary', type=Path, required=True)
+    parser.add_argument('--certid-hash', choices=['sha256','sha1'], default='sha256')
+    parser.add_argument('--extended', action='store_true')
     args = parser.parse_args()
-    main(args.fixture, args.binary.resolve())
+    main(args.fixture, args.binary.resolve(), args.certid_hash, args.extended)

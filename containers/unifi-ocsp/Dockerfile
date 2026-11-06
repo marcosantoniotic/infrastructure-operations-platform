@@ -14,11 +14,14 @@ RUN python3 /build/iop/scripts/ci/patch-unifi-ocsp.py /build/unifi && \
 
 FROM python:3.13.12-alpine3.23
 RUN apk add --no-cache ca-certificates && pip install --no-cache-dir cryptography==50.0.2
-COPY --from=builder /build/unpoller-bin /usr/bin/unpoller
-COPY containers/unifi-ocsp/up.conf /etc/unpoller/up.conf
+RUN mkdir -p /opt/iop /etc/unpoller && chmod 0755 /opt/iop /etc/unpoller
+COPY --from=builder --chmod=0755 /build/unpoller-bin /usr/bin/unpoller
+COPY --chmod=0644 containers/unifi-ocsp/up.conf /etc/unpoller/up.conf
 LABEL io.iop.ocsp.enforcement="connection-v1"
-COPY roles/observability/files/unifi_ocsp.py /opt/iop/unifi_ocsp.py
-COPY roles/observability/files/unifi-ap-counts.py /opt/iop/unifi-ap-counts.py
+LABEL io.iop.ocsp.policy-options="certid-freshness-v1"
+COPY --chmod=0644 roles/observability/files/unifi_ocsp.py /opt/iop/unifi_ocsp.py
+COPY --chmod=0644 roles/observability/files/unifi-ap-counts.py /opt/iop/unifi-ap-counts.py
 ENV IOP_UNIFI_OCSP_PYTHON=/usr/local/bin/python3 IOP_UNIFI_OCSP_VERIFIER=/opt/iop/unifi_ocsp.py
 USER 10001:10001
+RUN test -r /opt/iop/unifi_ocsp.py && test -r /opt/iop/unifi-ap-counts.py && test -x /usr/bin/unpoller
 ENTRYPOINT ["/usr/bin/unpoller"]

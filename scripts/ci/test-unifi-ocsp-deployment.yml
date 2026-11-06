@@ -14,14 +14,13 @@
     - name: Refuse operational hosts or destinations
       ansible.builtin.assert:
         that:
-          - ansible_hostname == 'iop-netbox-security-test'
-          - test_project_dir in ['/tmp/iop-unifi-ocsp-acceptance-v2', '/tmp/iop-unifi-ocsp-pr91-acceptance']
-          - "'/ocsp-private/' in test_fixture_dir"
+          - (ansible_hostname == 'iop-netbox-security-test' and test_project_dir in ['/tmp/iop-unifi-ocsp-acceptance-v2', '/tmp/iop-unifi-ocsp-pr91-acceptance']) or (ansible_hostname == 'iop-platform-mapping-test-rocky9' and test_project_dir == '/tmp/iop-unifi-ocsp-options-20261106')
+          - "'/ocsp-private/' in test_fixture_dir and test_fixture_dir.startswith('/home/')"
     - name: Load role defaults
       ansible.builtin.include_vars: ../../roles/observability/defaults/main.yml
     - name: Select explicitly attested local test image
       ansible.builtin.command:
-        argv: [docker, image, inspect, iop-isolated/unpoller-ocsp:3.4.1-candidate]
+        argv: [docker, image, inspect, "{{ test_image | default('iop-isolated/unpoller-ocsp:3.4.1-candidate') }}"]
       register: image
       changed_when: false
     - name: Set only fictitious fixture variables
@@ -51,6 +50,13 @@
           clock_skew_seconds: 120
           max_age_seconds: 3600
           cache_ttl_seconds: 60
+    - name: Limit optional compatibility overrides to policy controls only
+      ansible.builtin.assert:
+        that:
+          - (test_policy_options | default({})).keys() | difference(['certid_hash_algorithm', 'freshness_profile', 'freshness_risk_accepted', 'max_age_seconds']) | length == 0
+    - name: Select explicit synthetic policy options without changing destinations
+      ansible.builtin.set_fact:
+        observability_unifi_ocsp_policy: "{{ observability_unifi_ocsp_policy | combine(test_policy_options | default({})) }}"
     - name: Create fixture directories
       ansible.builtin.file:
         path: "{{ observability_project_dir }}/{{ item }}"

@@ -27,6 +27,15 @@
     that:
       - (unifi_ocsp_image_inspect.stdout | from_json | first).Config.Labels['io.iop.ocsp.enforcement'] == 'connection-v1'
 
+- name: Require explicit image capability before using non-default OCSP policy
+  ansible.builtin.assert:
+    that:
+      - ((unifi_ocsp_image_inspect.stdout | from_json | first).Config.Labels | default({})).get('io.iop.ocsp.policy-options', '') == 'certid-freshness-v1'
+    fail_msg: Non-default CertID/freshness requires a separately tested immutable capable image; never deploy options into the old verifier.
+  when: >-
+    observability_unifi_ocsp_policy.certid_hash_algorithm | default('sha256') != 'sha256'
+    or observability_unifi_ocsp_policy.freshness_profile | default('strict') != 'strict'
+
 - name: Require current controller and account to match the reviewed inventory
   ansible.builtin.assert:
     that:

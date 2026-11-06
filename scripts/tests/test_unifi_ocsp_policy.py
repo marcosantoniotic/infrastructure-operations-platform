@@ -46,6 +46,22 @@ class PolicyTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 self.validate(settings=dict(self.settings, **{key: value}))
 
+    def test_explicit_certid_and_freshness_defaults_and_bounds(self):
+        self.assertEqual(guard.options({}), ('sha256', 'strict', 3600))
+        self.assertEqual(guard.options({'certid_hash_algorithm': 'sha1'}), ('sha1', 'strict', 3600))
+        self.assertTrue(self.validate(settings=dict(self.settings, freshness_profile='bounded-24h',
+                        freshness_risk_accepted=True, max_age_seconds=7200)))
+        for change in [dict(certid_hash_algorithm='md5'), dict(certid_hash_algorithm='SHA1'),
+                       dict(freshness_profile='auto'), dict(max_age_seconds=3601),
+                       dict(freshness_risk_accepted=True),
+                       dict(freshness_profile='bounded-24h'),
+                       dict(freshness_profile='bounded-24h', freshness_risk_accepted='true', max_age_seconds=7200),
+                       dict(freshness_profile='bounded-24h', freshness_risk_accepted=True, max_age_seconds=3600),
+                       dict(freshness_profile='bounded-24h', freshness_risk_accepted=True, max_age_seconds=86401),
+                       dict(max_age_seconds=True), dict(max_age_seconds=3600.0)]:
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.validate(settings=dict(self.settings, **change))
+
     def test_semantic_patch_preserves_other_services_and_networks(self):
         original = copy.deepcopy(self.compose)
         patched = guard.compose_patch(original, self.image)
