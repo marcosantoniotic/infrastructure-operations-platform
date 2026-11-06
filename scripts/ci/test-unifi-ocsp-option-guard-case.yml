@@ -1,0 +1,32 @@
+---
+- name: Select only fictitious inventory for a negative image-capability test
+  ansible.builtin.set_fact:
+    guard_was_rejected: false
+    observability_unifi_ocsp_enabled: true
+    observability_unifi_poller_enabled: true
+    observability_unifi_verify_ssl: true
+    observability_unifi_ocsp_change_approved: true
+    observability_unifi_ocsp_backup_confirmed: true
+    observability_unifi_ocsp_ca_certificate: 'BEGIN CERTIFICATE - fixture placeholder, never written'
+    observability_unifi_ocsp_issuer_certificate: 'BEGIN CERTIFICATE - fixture placeholder, never written'
+    observability_unifi_url: https://controller.example.test:41443
+    observability_unifi_ocsp_image: '{{ (old_image.stdout | from_json | first).Id }}'
+    observability_unifi_ocsp_policy: >-
+      {{ {'controller_address': '127.0.0.1', 'responder_address': '127.0.0.1',
+          'responder_url': 'http://ocsp.example.test:41089/ocsp', 'timeout_seconds': 2,
+          'response_limit': 65536, 'cache_entries': 16, 'clock_skew_seconds': 120,
+          'max_age_seconds': 3600, 'cache_ttl_seconds': 60} | combine(test_option) }}
+- name: Exercise the actual role and require its exact capability refusal
+  block:
+    - ansible.builtin.include_role:
+        name: observability
+        tasks_from: unifi-ocsp.yml
+    - ansible.builtin.fail:
+        msg: Missing image capability was not refused
+  rescue:
+    - ansible.builtin.assert:
+        that: ansible_failed_task.name == 'Require explicit image capability before using non-default OCSP policy'
+    - ansible.builtin.set_fact:
+        guard_was_rejected: true
+- ansible.builtin.assert:
+    that: guard_was_rejected

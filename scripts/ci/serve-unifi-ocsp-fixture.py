@@ -29,12 +29,15 @@ def main(root, certificate='leaf'):
         def log_message(self, *args):
             pass
         def do_POST(self):
-            self.rfile.read(int(self.headers.get('Content-Length', 0)))
+            body=self.rfile.read(int(self.headers.get('Content-Length', 0)))
             if self.path == '/ocsp':
+                from cryptography.x509 import ocsp as ocsp_parser
+                digest=ocsp_parser.load_der_ocsp_request(body).hash_algorithm.name
                 mode = (root / 'responder-mode.txt').read_text().strip() if (root / 'responder-mode.txt').exists() else 'good'
                 if certificate == 'rotated' and mode in ('good', 'revoked'):
                     mode = 'rotated-' + mode
-                data = (root / (mode + '.der')).read_bytes()
+                path=root/(mode+'-'+digest+'.der')
+                data = (path if path.exists() else root/(mode+'.der')).read_bytes()
                 content_type = 'application/ocsp-response'
             elif self.path == '/api/auth/login':
                 data = b'{"meta":{"rc":"ok"},"data":[]}'

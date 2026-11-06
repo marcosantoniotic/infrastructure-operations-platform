@@ -1,0 +1,41 @@
+---
+- name: Refuse unsupported compatibility images before any policy write
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+  vars:
+    test_project_dir: /tmp/iop-unifi-ocsp-options-20261106
+    observability_project_dir: '{{ test_project_dir }}'
+  tasks:
+    - name: Require this disposable fixture and explicit opt-in
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'IOP_DISPOSABLE_PLATFORM_TEST') == '1'
+          - ansible_hostname == 'iop-platform-mapping-test-rocky9'
+          - test_project_dir == '/tmp/iop-unifi-ocsp-options-20261106'
+    - name: Snapshot both policy files before the expected refusal
+      ansible.builtin.slurp:
+        src: '{{ test_project_dir }}/unifi-ocsp/{{ item }}/policy.json'
+      loop: [unpoller, ap]
+      register: before_policy
+    - name: Inspect an old-capability fixture image, not an operational image
+      ansible.builtin.command:
+        argv: [docker, image, inspect, iop-isolated/unifi-ocsp-options:20261106-old-capability]
+      changed_when: false
+      register: old_image
+    - name: Refuse both non-default policy dimensions on an old-capability image
+      ansible.builtin.include_tasks: test-unifi-ocsp-option-guard-case.yml
+      loop:
+        - {certid_hash_algorithm: sha1}
+        - {freshness_profile: bounded-24h, freshness_risk_accepted: true, max_age_seconds: 86400}
+      loop_control:
+        loop_var: test_option
+    - name: Snapshot policies after refused operations
+      ansible.builtin.slurp:
+        src: '{{ test_project_dir }}/unifi-ocsp/{{ item }}/policy.json'
+      loop: [unpoller, ap]
+      register: after_policy
+    - name: Verify neither installed policy changed
+      ansible.builtin.assert:
+        that: before_policy.results | map(attribute='content') | list == after_policy.results | map(attribute='content') | list

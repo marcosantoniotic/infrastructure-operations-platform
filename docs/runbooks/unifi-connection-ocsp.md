@@ -1,5 +1,65 @@
 # Coordinated UniFi OCSP: candidate operation and safe rollback
 
+## Local compatibility candidate: CertID and bounded freshness
+
+Not rollout approval. Defaults remain SHA-256 CertID, `strict` freshness with
+maximum response age 3600 seconds, cache TTL at most 300 seconds and clock skew
+at most 120 seconds. No automatic digest fallback, stale-cache grace, CRL
+fallback or TLS relaxation is introduced. These options are shared by both
+collectors, not configured differently per collector.
+
+```yaml
+# Add to observability_unifi_ocsp_policy only after isolated acceptance/review.
+certid_hash_algorithm: sha256       # sha256 (default) or explicitly selected sha1
+freshness_profile: strict          # default; maximum age cannot exceed 3600
+freshness_risk_accepted: false      # default; boolean, never a string
+max_age_seconds: 3600
+cache_ttl_seconds: 300
+```
+
+SHA-1 here identifies the OCSP **CertID**, not the OCSP response signature, CA,
+TLS signature or cache/deny identity. Response signatures still require
+SHA-256/384/512. A SHA-256 HTTP 500/internalError is a failure, never permission
+to retry with SHA-1. A signed response using a different CertID digest is refused.
+
+An explicitly reviewed candidate profile is available for responders with a
+longer signed publication cadence:
+
+```yaml
+certid_hash_algorithm: sha1         # only if independently justified
+freshness_profile: bounded-24h
+freshness_risk_accepted: true
+max_age_seconds: 86400             # explicit: >3600 and <=86400; not a recommendation
+cache_ttl_seconds: 300             # not expanded with the age profile
+```
+
+This is a **proposal for review**, not a choice of operational inventory values.
+Choose the smallest justified limit only after reviewing the publication cadence
+and revocation exposure. Accepting older signed status increases the possible
+delay in learning revocation; signature validity alone is insufficient. If that
+risk is unacceptable, retain strict and leave collection blocked until a fresh
+response is available. Responses older than 24 hours still fail this candidate.
+Skew is never an age extension. `nextUpdate`, temporal ordering and all signer,
+issuer and leaf validity checks remain mandatory, with no grace after expiry.
+
+The maximum accepted age applies independently to `producedAt` and `thisUpdate`.
+Effective cache life remains the minimum of those age deadlines, `nextUpdate`,
+certificate validity and receipt plus TTL. Tightening the profile revalidates
+cached DER; it cannot retain an older GOOD merely because its stored cache
+deadline has not expired. Digest/profile changes never clear revocation history.
+
+Non-default options require an immutable tested image with both
+`io.iop.ocsp.enforcement=connection-v1` and
+`io.iop.ocsp.policy-options=certid-freshness-v1`. The dedicated role refuses an
+older image without that capability before rendering new policy. Labels alone
+are not provenance: record image ID/digests and packaged source hashes.
+
+Rollback must retain an OCSP-capable image, trust, both journals and lock files.
+Restore only reviewed configuration, never journal/snapshot-era GOOD state.
+Returning to SHA-256 or strict can legitimately block collection again; do not
+disable verification to force availability. A confirmed revocation must remain
+blocked under either digest/profile and after process/container recreation.
+
 Status: isolated implementation candidate. NOT approved for publication or
 operational rollout. See [evidence and limitations](../testing/unifi-ocsp-implementation-20261028.md).
 

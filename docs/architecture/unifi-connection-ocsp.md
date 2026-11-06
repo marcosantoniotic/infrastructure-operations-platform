@@ -80,6 +80,10 @@ Auth credentials, cookies and API tokens never enter OCSP requests.
   maximum age 1 hour; request timeout 5 seconds; response maximum 64 KiB;
   cache maximum 128 entries; no redirects. These are design candidates, not
   operational defaults already applied.
+  A later [local compatibility candidate](../testing/unifi-ocsp-options-20261106.md)
+  keeps that strict default and proposes a separately acknowledged, bounded
+  age profile; it is not operational approval. CertID selection is explicit,
+  never automatic fallback, and does not permit weak response signatures.
 - Require thisUpdate, producedAt and nextUpdate, timezone-aware. Reject future
   thisUpdate/producedAt beyond skew, nextUpdate <= thisUpdate, nextUpdate
   preceding producedAt beyond skew, missing times and stale responses.

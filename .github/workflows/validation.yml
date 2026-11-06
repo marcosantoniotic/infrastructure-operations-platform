@@ -295,5 +295,9 @@ jobs:
               python scripts/ci/create-unifi-ocsp-fixtures.py --destination .validation/ocsp-private/collector-ci
               python scripts/tests/test_unifi_ocsp_durability.py
               python scripts/tests/test_unifi_ocsp_policy.py
-              python scripts/ci/test-unifi-ocsp-connections.py --fixture .validation/ocsp-private/collector-ci --binary /usr/bin/unpoller
+              IOP_OCSP_FIXTURE_DIR="$PWD/.validation/ocsp-private/collector-ci" python scripts/tests/test_unifi_ocsp_options.py
+              for algorithm in sha256 sha1; do
+                python scripts/ci/create-unifi-ocsp-fixtures.py --destination .validation/ocsp-private/collector-ci-$algorithm
+                python scripts/ci/test-unifi-ocsp-connections.py --fixture .validation/ocsp-private/collector-ci-$algorithm --binary /usr/bin/unpoller --certid-hash "$algorithm" --extended
+              done
             '

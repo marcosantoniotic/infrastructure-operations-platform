@@ -10,15 +10,20 @@ import socket
 import subprocess
 import time
 
-assert socket.gethostname() == 'iop-netbox-security-test' and os.geteuid() == 0
+assert socket.gethostname() in ('iop-netbox-security-test', 'iop-platform-mapping-test-rocky9') and os.geteuid() == 0
 parser = argparse.ArgumentParser()
-parser.add_argument('--project', choices=['/tmp/iop-unifi-ocsp-acceptance-v2', '/tmp/iop-unifi-ocsp-pr91-acceptance'],
+parser.add_argument('--project', choices=['/tmp/iop-unifi-ocsp-acceptance-v2', '/tmp/iop-unifi-ocsp-pr91-acceptance', '/tmp/iop-unifi-ocsp-options-20261106'],
                     default='/tmp/iop-unifi-ocsp-acceptance-v2')
 parser.add_argument('--fixture', type=Path,
                     default=Path('/home/automation/unifi-ocsp-isolated-20261028/.validation/ocsp-private/ansible-fixture'))
 args = parser.parse_args()
 root, fixture = Path(args.project), args.fixture.resolve()
-assert 'ocsp-private' in fixture.parts and fixture.is_relative_to('/home/automation')
+if socket.gethostname() == 'iop-platform-mapping-test-rocky9':
+    assert str(root) == '/tmp/iop-unifi-ocsp-options-20261106'
+    assert fixture.is_relative_to('/home/vagrant/iop-ocsp-options-20261106/.validation/ocsp-private')
+else:
+    assert str(root) != '/tmp/iop-unifi-ocsp-options-20261106' and fixture.is_relative_to('/home/automation')
+assert 'ocsp-private' in fixture.parts
 assert root.is_dir() and json.loads((fixture / 'manifest.json').read_text())['fictitious_only']
 command = ['docker', 'compose', '--project-directory', str(root)]
 
