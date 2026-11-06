@@ -1,0 +1,97 @@
+---
+- name: Validate bounded policy directory
+  ansible.builtin.assert:
+    that:
+      - windows_service_policy_project_dir is match('^/opt/[A-Za-z0-9][A-Za-z0-9_.-]+$')
+      - windows_service_policy_enabled is boolean
+      - windows_service_policy_cutover_approved is boolean
+
+- name: Inspect installed policy ledger without changing it
+  ansible.builtin.stat:
+    path: '{{ windows_service_policy_project_dir }}/state.json'
+  register: wsp_installed
+
+- name: Refuse silent removal of an installed policy
+  ansible.builtin.assert:
+    that:
+      - windows_service_policy_enabled or not wsp_installed.stat.exists
+    fail_msg: Preserve installed service policy; use its explicit reviewed rollback first.
+
+- name: Stage opt-in Windows service policy only
+  when: windows_service_policy_enabled
+  block:
+    - name: Require explicit authenticated verified API transport
+      ansible.builtin.assert:
+        that:
+          - windows_service_policy_api_url.startswith('https://')
+          - windows_service_policy_api_token_file.startswith('/')
+          - windows_service_policy_ca_file.startswith('/')
+          - windows_service_policy_targets | length > 0
+          - windows_service_policy_phase in ['observe', 'enforce']
+          - windows_service_policy_phase != 'enforce' or windows_service_policy_cutover_approved
+        quiet: true
+      no_log: true
+
+    - name: Create private policy directory
+      ansible.builtin.file:
+        path: '{{ windows_service_policy_project_dir }}'
+        state: directory
+        mode: '0700'
+
+    - name: Store reviewed policy reconciler
+      ansible.builtin.copy:
+        src: windows_service_policy.py
+        dest: '{{ windows_service_policy_project_dir }}/windows_service_policy.py'
+        mode: '0600'
+
+    - name: Render policy without embedded secrets
+      ansible.builtin.copy:
+        content: >-
+          {{ {'enabled': windows_service_policy_enabled, 'phase': windows_service_policy_phase,
+          'cutover_approved': windows_service_policy_cutover_approved, 'targets': windows_service_policy_targets,
+          'interval': windows_service_policy_interval, 'fault_window': windows_service_policy_fault_window,
+          'stuck_window': windows_service_policy_stuck_window, 'stale_window': windows_service_policy_stale_window} | to_nice_json }}
+        dest: '{{ windows_service_policy_project_dir }}/config.json'
+        mode: '0600'
+      no_log: true
+
+    - name: Validate schema without API writes
+      ansible.builtin.command:
+        argv:
+          - '{{ ansible_python_interpreter | default("/usr/bin/python3") }}'
+          - '{{ windows_service_policy_project_dir }}/windows_service_policy.py'
+          - --config
+          - '{{ windows_service_policy_project_dir }}/config.json'
+          - --state
+          - '{{ windows_service_policy_project_dir }}/state.json'
+          - --validate-only
+      changed_when: false
+
+    - name: Plan explicit-host policy before any API changes
+      tags: [wsp_api]
+      ansible.builtin.command:
+        argv: &wsp_argv
+          - '{{ ansible_python_interpreter | default("/usr/bin/python3") }}'
+          - '{{ windows_service_policy_project_dir }}/windows_service_policy.py'
+          - --config
+          - '{{ windows_service_policy_project_dir }}/config.json'
+          - --state
+          - '{{ windows_service_policy_project_dir }}/state.json'
+          - --url
+          - '{{ windows_service_policy_api_url }}'
+          - --token-file
+          - '{{ windows_service_policy_api_token_file }}'
+          - --ca-file
+          - '{{ windows_service_policy_ca_file }}'
+      changed_when: false
+      no_log: true
+
+    - name: Apply only explicitly opted-in service policy
+      tags: [wsp_api]
+      ansible.builtin.command:
+        argv: '{{ wsp_command + ["--apply"] }}'
+      vars:
+        wsp_command: *wsp_argv
+      register: wsp_applied
+      changed_when: (wsp_applied.stdout | from_json).writes | int > 0
+      no_log: true

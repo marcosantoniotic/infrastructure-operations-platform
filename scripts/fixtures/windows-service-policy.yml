@@ -1,0 +1,21 @@
+---
+# Entirely fictitious example. Never copy these IDs over an installed environment.
+# Requires one separately selected windows_service_policy_runner inventory host.
+windows_service_policy_enabled: true
+windows_service_policy_phase: observe
+windows_service_policy_cutover_approved: false
+windows_service_policy_api_url: https://zabbix.example.test/api_jsonrpc.php
+windows_service_policy_api_token_file: /run/iop-policy/zabbix-token
+windows_service_policy_ca_file: /run/iop-policy/public-ca.crt
+windows_service_policy_targets:
+  - hostid: '12345'
+    host: synthetic-win-a
+    netbox_id: '42'
+    object_type: virtualization.virtualmachine
+    services:
+      - name: AppXSvc
+        display_name: Synthetic AppX service
+        legacy_triggerid: '90001'
+      - name: InventorySvc
+        display_name: Synthetic inventory service
+        legacy_triggerid: '90002'

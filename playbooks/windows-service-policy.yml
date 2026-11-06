@@ -1,0 +1,14 @@
+---
+# Dedicated run on the explicitly selected API runner; never part of site.yml.
+# Example: --limit policy-runner --extra-vars @<PRIVATE_POLICY_FILE>
+- name: Reconcile explicitly opted-in Windows service policy
+  hosts: windows_service_policy_runner
+  become: true
+  gather_facts: false
+  pre_tasks:
+    - name: Require exactly one explicit API runner
+      ansible.builtin.assert:
+        that:
+          - groups['windows_service_policy_runner'] | length == 1
+  roles:
+    - role: windows_service_policy

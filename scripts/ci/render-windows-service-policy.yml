@@ -1,0 +1,19 @@
+---
+# Stage/schema test only. API tasks deliberately skipped by the disposable caller.
+- name: Render fictitious enabled policy without contacting an API
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../fixtures/windows-service-policy.yml
+  vars:
+    windows_service_policy_project_dir: /opt/iop-wsp-ci-render
+    ansible_python_interpreter: '{{ ansible_playbook_python }}'
+  pre_tasks:
+    - ansible.builtin.assert:
+        that:
+          - lookup('env', 'IOP_DISPOSABLE_PLATFORM_TEST') == '1'
+          - "'wsp_api' in ansible_skip_tags"
+  roles:
+    - windows_service_policy

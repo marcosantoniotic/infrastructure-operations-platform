@@ -1,0 +1,13 @@
+---
+windows_service_policy_enabled: false
+windows_service_policy_phase: observe
+windows_service_policy_cutover_approved: false
+windows_service_policy_targets: []
+windows_service_policy_interval: 60
+windows_service_policy_fault_window: 600
+windows_service_policy_stuck_window: 600
+windows_service_policy_stale_window: 300
+windows_service_policy_api_url: ''
+windows_service_policy_api_token_file: ''
+windows_service_policy_ca_file: ''
+windows_service_policy_project_dir: /opt/iop-windows-service-policy
