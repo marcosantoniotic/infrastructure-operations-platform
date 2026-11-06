@@ -13,6 +13,7 @@ import subprocess
 import time
 
 import requests
+from wsp_ci_observation import failure_report, wait_next_second
 
 ROOT = Path('/fixture'); CA = '/tls/ca.crt'
 URL = 'https://zabbix.functional.example.test/api_jsonrpc.php'
@@ -76,11 +77,13 @@ def main():
 
     def items():
         return {i['key_']:i for i in zx('item.get',{'output':['itemid','key_','lastvalue','lastclock','state','error','type'],'hostids':[hid]})}
+    source_clocks={}
     def send(values):
         nonlocal sequence
-        data=[]; lookup=items()
+        data=[]; lookup=items();sample_ns=time.time_ns();sample_clock=sample_ns//1000000000
         for key,value in values.items():
-            sequence+=1; data.append({'id':sequence,'itemid':int(lookup[key]['itemid']),'clock':int(time.time()),'ns':time.time_ns()%1000000000,'value':str(value)})
+            sequence+=1; data.append({'id':sequence,'itemid':int(lookup[key]['itemid']),'clock':sample_clock,'ns':sample_ns%1000000000,'value':str(value)})
+            source_clocks[key]=sample_clock
         result=protocol({'request':'agent data','host':host,'session':session,'version':'7.4.13','variant':2,'data':data})
         return result
     def await_condition(fn, label, timeout=100):
@@ -211,7 +214,12 @@ def main():
            ('renamed-display',json.dumps(renamed),'Localized display name changed'),('malformed','{bad json','json')]
     pp_results=[]
     for name,value,expected_error in cases:
-        sent=int(time.time());reply=send({master:value,**{k:0 for k in events}})
+        # lastclock is second-resolution. Fence against ALL prior submissions,
+        # including accepted but not yet visible samples, not just item.get.
+        previous=source_clocks[master]
+        wait_next_second(previous)
+        reply=send({master:value,**{k:0 for k in events}});sent=source_clocks[master]
+        assert sent > previous,'source_clock_regressed'
         assert 'failed: 0;' in reply.get('info','')
         def processed():
             row=items()[master]
@@ -220,7 +228,7 @@ def main():
         result=await_condition(processed,'actual preprocessing '+name,timeout=60)
         if not expected_error:
             parsed=json.loads(result['lastvalue'])
-            assert {s:parsed[s]['present'] for s in ['AppXSvc','InventorySvc']}=={s:int(name=='clean') for s in ['AppXSvc','InventorySvc']}
+            assert {s:parsed[s]['present'] for s in ['AppXSvc','InventorySvc']}=={s:int(name=='clean') for s in ['AppXSvc','InventorySvc']},'preprocessing_presence_mismatch'
         pp_results.append({'name':name,'expected_error':expected_error,'response':result,'active_data_reply':reply})
         save('wsp-preprocessing.private.json',pp_results)
     for _ in range(4):feed();time.sleep(1)
@@ -345,4 +353,12 @@ def main():
         'limitations':['No real Windows WMI/eventlog source tested','Synthetic authenticated active-agent protocol into real Zabbix preprocessing/LLD/trigger engine','Accelerated 1-second sample interval; 8-second fault/12-second transition windows; 30-second nodata','No LAB01 or OPS access','No real service start/stop or crashes induced']})
 
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    try:
+        main()
+    except Exception as error:
+        # The surrounding runner keeps full logs private. Publish only safe
+        # exception location metadata after its owned-resource teardown.
+        path=ROOT/'evidence/wsp-ci-failure.sanitized.json'
+        path.write_text(json.dumps(failure_report(error)));path.chmod(0o600)
+        raise
