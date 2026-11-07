@@ -1,0 +1,18 @@
+---
+- name: Prepare profile visualization artifacts
+  ansible.builtin.import_tasks: prepare.yml
+
+- name: Recreate only Grafana with the managed overlay
+  community.docker.docker_compose_v2:
+    project_src: "{{ grafana_profiles_project_dir }}"
+    files: [compose.yaml, compose.override.yaml]
+    services: [grafana]
+    dependencies: false
+    pull: never
+    state: present
+    wait: true
+    wait_timeout: 120
+  when: not ansible_check_mode
+
+- name: Validate the deployed profile visualization contract
+  ansible.builtin.import_tasks: validate.yml

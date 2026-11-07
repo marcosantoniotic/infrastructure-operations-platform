@@ -1,0 +1,62 @@
+{
+  "scope": "LAB01 delivery and subsequent offline publication review",
+  "date": "2026-11-07",
+  "timezone": "America/Sao_Paulo",
+  "historical_lab_validation": {
+    "base_revision": "55fb64c9290be56414986dcdf7d6d2c537b7db0d",
+    "selected_existing_hosts": 5,
+    "profile_counts": {"Linux": 2, "Windows": 1, "ICMP": 2},
+    "other_hosts_preserved": 2,
+    "host_ids_interfaces_templates_and_local_groups_preserved": true,
+    "second_reconciliation_changes": 0,
+    "pending": 0,
+    "new_dashboards": 4,
+    "existing_dashboards_preserved": 6,
+    "populated_data_panels": 29,
+    "plugin": {"version": "6.10.2", "signature": "valid"},
+    "source_health": "OK",
+    "read_only_reader_scoped_to_eligible_hosts": true,
+    "https_chain_and_hostname_validation_preserved": true,
+    "visual_review": {
+      "real_authenticated_browser": true,
+      "four_dashboards_checked": true,
+      "profile_and_equipment_selectors_checked": true,
+      "windows_service_rows": 65,
+      "rows_per_page": 10,
+      "second_page_checked": true,
+      "service_history_and_queries_unchanged": true
+    },
+    "final_grafana_reapplication_changes": 0,
+    "containers_running": 23,
+    "configured_healthchecks_healthy": true,
+    "recovered_mysql_mount_preserved": true,
+    "ticket_count_unchanged": true,
+    "ticket_action_alerts_during_window": 0,
+    "bridge_and_action_restored": true,
+    "prechange_backups_and_postchange_configs_verified": true
+  },
+  "publication_review": {
+    "environment_access": false,
+    "new_deployment": false,
+    "offline_tests_passed": 84,
+    "yaml_files_parsed": 8,
+    "synthetic_copy_artifacts_rendered": 8,
+    "original_base_compose_template_unchanged": true,
+    "ci_includes_new_test_suite": true,
+    "follow_up_guards_not_applied_to_lab": [
+      "Administrative endpoint must be HTTPS or loopback HTTP",
+      "Source adoption must retain the expected identity and TLS settings",
+      "Unowned provider, dashboard directory and folder are rejected",
+      "Installed ownership marker must list the expected dashboard identities"
+    ]
+  },
+  "limitations": [
+    "Publication rendering uses synthetic inputs and is not a new Ansible or Compose runtime test",
+    "The historical live validation preceded the follow-up publication guards",
+    "CI and an isolated Ansible adoption and failure matrix remain review gates",
+    "The role consumes a prepared signed-plugin image and reader account; it does not create or distribute them",
+    "Full VM restoration and live rollback were not exercised",
+    "Private logs, backups, credentials, certificates, host identities and screenshots are not included"
+  ],
+  "ops_accessed_or_modified": false
+}

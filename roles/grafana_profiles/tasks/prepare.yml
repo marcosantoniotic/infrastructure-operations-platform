@@ -1,0 +1,190 @@
+---
+- name: Require explicit approval and complete secure configuration
+  ansible.builtin.assert:
+    that:
+      - grafana_profiles_enabled | bool
+      - grafana_profiles_change_approved | bool
+      - grafana_profiles_backup_confirmed | bool
+      - grafana_profiles_plugin_image | grafana_profiles_policy(grafana_profiles_tls_network, grafana_profiles_api_url, grafana_profiles_ca_certificate, grafana_profiles_reader_username, grafana_profiles_reader_password)
+      - grafana_profiles_admin_password | length >= 16
+      - grafana_profiles_admin_url | grafana_profiles_admin_endpoint
+  no_log: true
+
+- name: Inspect existing overlay ownership
+  ansible.builtin.stat:
+    path: "{{ grafana_profiles_project_dir }}/grafana-profiles-state.json"
+  register: grafana_profiles_state
+
+- name: Inspect existing override
+  ansible.builtin.stat:
+    path: "{{ grafana_profiles_project_dir }}/compose.override.yaml"
+  register: grafana_profiles_overlay
+
+- name: Read an installed ownership marker
+  ansible.builtin.slurp:
+    src: "{{ grafana_profiles_project_dir }}/grafana-profiles-state.json"
+  register: grafana_profiles_marker
+  when: grafana_profiles_state.stat.exists
+
+- name: Validate installed ownership
+  ansible.builtin.assert:
+    that:
+      - (grafana_profiles_marker.content | b64decode | from_json).version == 1
+      - (grafana_profiles_marker.content | b64decode | from_json).source == 'iop-zabbix-readonly'
+      - (grafana_profiles_marker.content | b64decode | from_json).folder == 'iop-profiles'
+      - (grafana_profiles_marker.content | b64decode | from_json).dashboards | sort == ['iop-profiles-icmp', 'iop-profiles-linux', 'iop-profiles-overview', 'iop-profiles-windows']
+      - (grafana_profiles_marker.content | b64decode | from_json).phase | default('legacy') in ['legacy', 'preparing', 'validated']
+  when: grafana_profiles_state.stat.exists
+
+- name: Refuse an unowned override
+  ansible.builtin.assert:
+    that: not grafana_profiles_overlay.stat.exists or grafana_profiles_state.stat.exists
+
+- name: Inspect the dedicated source
+  ansible.builtin.stat:
+    path: "{{ grafana_profiles_project_dir }}/grafana/provisioning/datasources/zabbix.yaml"
+  register: grafana_profiles_source
+
+- name: Require explicit adoption of a previously prepared source
+  ansible.builtin.assert:
+    that: not grafana_profiles_source.stat.exists or grafana_profiles_state.stat.exists or grafana_profiles_adopt_existing | bool
+
+- name: Inspect other profile artifacts before taking ownership
+  ansible.builtin.stat:
+    path: "{{ grafana_profiles_project_dir }}/{{ item }}"
+  loop:
+    - grafana/provisioning/dashboards/profiles.yaml
+    - grafana/profile-dashboards
+  register: grafana_profiles_existing_artifacts
+
+- name: Refuse unowned providers or dashboard files
+  ansible.builtin.assert:
+    that: grafana_profiles_state.stat.exists or not item.stat.exists
+  loop: "{{ grafana_profiles_existing_artifacts.results }}"
+
+- name: Inspect the source identity before adoption
+  ansible.builtin.uri:
+    url: "{{ grafana_profiles_admin_url }}/api/datasources/uid/iop-zabbix-readonly"
+    user: "{{ grafana_profiles_admin_user }}"
+    password: "{{ grafana_profiles_admin_password }}"
+    force_basic_auth: true
+    status_code: [200, 404]
+  register: grafana_profiles_existing_source
+  no_log: true
+
+- name: Refuse an incompatible existing source
+  ansible.builtin.assert:
+    that:
+      - grafana_profiles_state.stat.exists or grafana_profiles_adopt_existing | bool
+      - grafana_profiles_existing_source.json.type == 'alexanderzobnin-zabbix-datasource'
+      - grafana_profiles_existing_source.json.url == grafana_profiles_api_url
+      - grafana_profiles_existing_source.json.jsonData.username == grafana_profiles_reader_username
+      - not grafana_profiles_existing_source.json.jsonData.tlsSkipVerify | default(true) | bool
+      - grafana_profiles_existing_source.json.jsonData.tlsAuthWithCACert | default(false) | bool
+  when: grafana_profiles_existing_source.status == 200
+  no_log: true
+
+- name: Inspect the target folder before adoption
+  ansible.builtin.uri:
+    url: "{{ grafana_profiles_admin_url }}/api/folders/iop-profiles"
+    user: "{{ grafana_profiles_admin_user }}"
+    password: "{{ grafana_profiles_admin_password }}"
+    force_basic_auth: true
+    status_code: [200, 404]
+  register: grafana_profiles_existing_folder
+  no_log: true
+
+- name: Refuse an unowned folder
+  ansible.builtin.assert:
+    that: grafana_profiles_state.stat.exists or grafana_profiles_existing_folder.status == 404
+
+- name: Check candidate dashboard identities before taking ownership
+  ansible.builtin.uri:
+    url: "{{ grafana_profiles_admin_url }}/api/dashboards/uid/iop-profiles-{{ item }}"
+    user: "{{ grafana_profiles_admin_user }}"
+    password: "{{ grafana_profiles_admin_password }}"
+    force_basic_auth: true
+    status_code: [200, 404]
+  loop: [overview, linux, windows, icmp]
+  register: grafana_profiles_collisions
+  no_log: true
+
+- name: Refuse to overwrite dashboards not previously owned
+  ansible.builtin.assert:
+    that: grafana_profiles_state.stat.exists or item.status == 404
+  loop: "{{ grafana_profiles_collisions.results }}"
+  no_log: true
+
+- name: Claim the validated namespace before the first artifact write
+  ansible.builtin.copy:
+    content: '{"version":1,"phase":"preparing","source":"iop-zabbix-readonly","folder":"iop-profiles","dashboards":["iop-profiles-overview","iop-profiles-linux","iop-profiles-windows","iop-profiles-icmp"]}'
+    dest: "{{ grafana_profiles_project_dir }}/grafana-profiles-state.json"
+    mode: "0600"
+  when: not grafana_profiles_state.stat.exists
+
+- name: Create only the profile dashboard directory
+  ansible.builtin.file:
+    path: "{{ grafana_profiles_project_dir }}/grafana/profile-dashboards"
+    state: directory
+    mode: "0755"
+
+- name: Provision the dedicated source without pruning other sources
+  ansible.builtin.copy:
+    content: >-
+      {{ {'apiVersion': 1, 'prune': false, 'datasources': [{
+        'uid': 'iop-zabbix-readonly', 'name': 'IOP Zabbix read only',
+        'type': 'alexanderzobnin-zabbix-datasource', 'access': 'proxy',
+        'url': grafana_profiles_api_url, 'isDefault': false, 'editable': false,
+        'jsonData': {'username': grafana_profiles_reader_username,
+          'authType': 'userLogin', 'tlsSkipVerify': false, 'tlsAuthWithCACert': true,
+          'dbConnectionEnable': false, 'disableReadOnlyUsersAck': true, 'cacheTTL': '1m'},
+        'secureJsonData': {'password': grafana_profiles_reader_password,
+          'tlsCACert': grafana_profiles_ca_certificate}}]} | to_nice_json }}
+    dest: "{{ grafana_profiles_project_dir }}/grafana/provisioning/datasources/zabbix.yaml"
+    owner: "472"
+    group: root
+    mode: "0400"
+    unsafe_writes: true
+  no_log: true
+
+- name: Install a separate dashboard provider
+  ansible.builtin.copy:
+    content: |
+      apiVersion: 1
+      providers:
+        - name: IOP monitoring profiles
+          orgId: 1
+          folder: IOP Perfis
+          folderUid: iop-profiles
+          type: file
+          disableDeletion: true
+          allowUiUpdates: false
+          updateIntervalSeconds: 10
+          options:
+            path: /var/lib/grafana/profile-dashboards
+    dest: "{{ grafana_profiles_project_dir }}/grafana/provisioning/dashboards/profiles.yaml"
+    mode: "0644"
+
+- name: Render the four profile dashboards without synthetic labels
+  ansible.builtin.copy:
+    content: "{{ lookup('file', role_path ~ '/../../technical-dashboards/' ~ item ~ '.json') | from_json | grafana_profile_dashboard(grafana_profiles_label) | to_nice_json }}"
+    dest: "{{ grafana_profiles_project_dir }}/grafana/profile-dashboards/{{ item }}.json"
+    mode: "0644"
+  loop: [overview, linux, windows, icmp]
+
+- name: Render the additive overlay
+  ansible.builtin.copy:
+    content: >-
+      {{ {'services': {'grafana': {'image': grafana_profiles_plugin_image,
+          'environment': {'GF_PATHS_PLUGINS': '/opt/grafana/plugins'},
+          'networks': {'profile_tls': {}},
+          'volumes': ['./grafana/profile-dashboards:/var/lib/grafana/profile-dashboards:ro,Z']}},
+          'networks': {'profile_tls': {'external': true, 'name': grafana_profiles_tls_network}}} | to_nice_json }}
+    dest: "{{ grafana_profiles_project_dir }}/compose.override.yaml"
+    mode: "0640"
+
+- name: Validate the combined Compose without starting services
+  ansible.builtin.command:
+    argv: [docker, compose, --project-directory, "{{ grafana_profiles_project_dir }}", -f, "{{ grafana_profiles_project_dir }}/compose.yaml", -f, "{{ grafana_profiles_project_dir }}/compose.override.yaml", config, --quiet]
+  changed_when: false
+  when: not ansible_check_mode
