@@ -24,6 +24,10 @@ services:
       NETBOX_PLATFORM_MAPPING_ENABLED: "true"
       NETBOX_PLATFORM_MAP: {{ netbox_zabbix_sync_platform_map | to_json | to_json }}
       NETBOX_PLATFORM_PROFILES: {{ netbox_zabbix_sync_platform_profiles | to_json | to_json }}
+{% if netbox_zabbix_sync_technical_groups_enabled | default(false) | bool %}
+      NETBOX_TECHNICAL_GROUPS_ENABLED: "true"
+      NETBOX_TECHNICAL_GROUPS: {{ netbox_zabbix_sync_technical_groups | to_json | to_json }}
+{% endif %}
 {% if netbox_zabbix_sync_profile_source == 'custom-field' %}
       NETBOX_PROFILE_SOURCE: "custom-field"
       NETBOX_PROFILE_FIELD: {{ netbox_zabbix_sync_profile_field | to_json }}
@@ -31,6 +35,10 @@ services:
       NETBOX_PROFILE_CHOICE_SET: {{ netbox_zabbix_sync_profile_choice_set | to_json }}
       NETBOX_PROFILE_VALUES: {{ netbox_zabbix_sync_profile_values | to_json | to_json }}
       NETBOX_PROFILE_LABELS: {{ netbox_zabbix_sync_profile_labels | to_json | to_json }}
+{% if netbox_zabbix_sync_profile_transitions | default([]) | length > 0 %}
+      NETBOX_PROFILE_TRANSITIONS: {{ netbox_zabbix_sync_profile_transitions | to_json | to_json }}
+      NETBOX_PROFILE_READY: {{ netbox_zabbix_sync_profile_ready | to_json | to_json }}
+{% endif %}
 {% endif %}
 {% endif %}
     command:

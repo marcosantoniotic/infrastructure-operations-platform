@@ -1,0 +1,318 @@
+{
+  "result": "PASS",
+  "execution": "2026-11-07",
+  "timezone": "UTC",
+  "base_revision": "60162d49b5749049aa288b4d2a08b69850dc63ac",
+  "provenance": "Historical isolated candidate execution before PR portability review; not CI/deployment acceptance",
+  "functional_checks": 41,
+  "stages": [
+    {
+      "stage": "windows-services-capability",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:13.741583+00:00"
+    },
+    {
+      "stage": "dry-run",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:19.966495+00:00"
+    },
+    {
+      "stage": "matrix",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:24.036178+00:00"
+    },
+    {
+      "stage": "idempotence",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:24.558882+00:00"
+    },
+    {
+      "stage": "ip-and-local-tag",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:25.947450+00:00"
+    },
+    {
+      "stage": "unknown-platform-before-writes",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:26.998760+00:00"
+    },
+    {
+      "stage": "migration-refused-before-writes",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:28.602388+00:00"
+    },
+    {
+      "stage": "guard-and-reapply",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:29.659605+00:00"
+    },
+    {
+      "stage": "prepare-selection-schema-idempotent",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:31.084109+00:00"
+    },
+    {
+      "stage": "schema-conflict-and-atomic-rollback",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:31.124192+00:00"
+    },
+    {
+      "stage": "explicit-field-dry-run",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:34.396248+00:00"
+    },
+    {
+      "stage": "explicit-field-adoption",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:35.161418+00:00"
+    },
+    {
+      "stage": "explicit-field-idempotence",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:35.685228+00:00"
+    },
+    {
+      "stage": "field-migration-and-downgrade-guards",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:38.772985+00:00"
+    },
+    {
+      "stage": "technical-adopt-dry-run",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:39.817901+00:00"
+    },
+    {
+      "stage": "technical-adopt-all-owned",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:40.803909+00:00"
+    },
+    {
+      "stage": "technical-idempotent-before-transition",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:41.461985+00:00"
+    },
+    {
+      "stage": "grafana-official-signature",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:41.566042+00:00"
+    },
+    {
+      "stage": "grafana-reader-tls-health",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:55.736997+00:00"
+    },
+    {
+      "stage": "grafana-wrong-ca-blocked",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:55.893991+00:00"
+    },
+    {
+      "stage": "grafana-wrong-hostname-blocked",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:56.010474+00:00"
+    },
+    {
+      "stage": "grafana-reader-write-refused",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:56.054265+00:00"
+    },
+    {
+      "stage": "grafana-four-import-six-preserved",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:56.927352+00:00"
+    },
+    {
+      "stage": "grafana-group-linux-active-before-transition",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:57.173833+00:00"
+    },
+    {
+      "stage": "grafana-group-windows-active-before-transition",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:57.353989+00:00"
+    },
+    {
+      "stage": "grafana-group-network-icmp-before-transition",
+      "result": "PASS",
+      "utc": "2026-11-07T04:38:57.546805+00:00"
+    },
+    {
+      "stage": "transition-readiness-blocked",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:26.321323+00:00"
+    },
+    {
+      "stage": "transition-dry-run",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:27.064672+00:00"
+    },
+    {
+      "stage": "transition-same-host-history",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:28.804378+00:00"
+    },
+    {
+      "stage": "transition-idempotence",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:29.501228+00:00"
+    },
+    {
+      "stage": "technical-transition-preserves-history-local-groups",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:29.501776+00:00"
+    },
+    {
+      "stage": "technical-feature-removal-guard",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:30.077666+00:00"
+    },
+    {
+      "stage": "transition-pending-isolated",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:31.537228+00:00"
+    },
+    {
+      "stage": "transition-recovery",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:32.525869+00:00"
+    },
+    {
+      "stage": "transition-feature-removal-guard",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:33.121398+00:00"
+    },
+    {
+      "stage": "real-netbox-edit-form",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:40.508860+00:00"
+    },
+    {
+      "stage": "grafana-group-linux-active-after-transition",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:42.735223+00:00"
+    },
+    {
+      "stage": "grafana-group-windows-active-after-transition",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:42.891990+00:00"
+    },
+    {
+      "stage": "grafana-group-network-icmp-after-transition",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:42.981081+00:00"
+    },
+    {
+      "stage": "grafana-six-still-preserved",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:43.148809+00:00"
+    },
+    {
+      "stage": "outside-and-alerts",
+      "result": "PASS",
+      "utc": "2026-11-07T04:45:43.177681+00:00"
+    }
+  ],
+  "key_observations": {
+    "technical-adopt-all-owned": {
+      "hosts": 6,
+      "writes": 6
+    },
+    "technical-idempotent-before-transition": {
+      "writes": 0
+    },
+    "grafana-official-signature": {
+      "version": "6.10.2",
+      "signature": "valid"
+    },
+    "grafana-reader-tls-health": {
+      "status": "OK"
+    },
+    "grafana-wrong-ca-blocked": {
+      "status": 400
+    },
+    "grafana-wrong-hostname-blocked": {
+      "status": 400
+    },
+    "grafana-reader-write-refused": {
+      "status": 403
+    },
+    "grafana-four-import-six-preserved": {
+      "new": 4,
+      "preserved": 6
+    },
+    "transition-same-host-history": {
+      "objects": 2,
+      "same_host_interface_item_ids": true,
+      "old_item_retention_and_local_tags_macros_preserved": true,
+      "real_history_value": 42,
+      "templates_unlinked_or_cleared": 0,
+      "actual_windows_agent_tested": false
+    },
+    "technical-transition-preserves-history-local-groups": {
+      "same_host_ids": true,
+      "one_technical_group": true,
+      "local_group_preserved": true,
+      "actual_history_retained": true
+    },
+    "transition-idempotence": {
+      "writes": 0
+    },
+    "grafana-group-linux-active-after-transition": {
+      "expected_hosts": 2,
+      "returned_hosts": 2,
+      "no_hostTags": true
+    },
+    "grafana-group-windows-active-after-transition": {
+      "expected_hosts": 4,
+      "returned_hosts": 4,
+      "no_hostTags": true
+    },
+    "grafana-group-network-icmp-after-transition": {
+      "expected_hosts": 0,
+      "returned_hosts": 0,
+      "no_hostTags": true
+    },
+    "outside-and-alerts": {
+      "non_owned_hosts_unchanged": true,
+      "no_notification_media": true
+    }
+  },
+  "cleanup": {
+    "owned_fixture_removed": true,
+    "non_owned_containers_unchanged": true
+  },
+  "lab01_access": false,
+  "ops_access": false,
+  "limitations": [
+    "No actual Linux/Windows agent or ICMP collector target was exercised",
+    "No LAB01/OPS access; not a deployment acceptance test",
+    "Synthetic PostgreSQL fixture disables durable sync during schema initialization; no crash-durability or database-backup acceptance claimed"
+  ],
+  "images": {
+    "overview.jpg": {
+      "sha256": "c702fb645940054d96e4c04b08bdebfca8a0dc839adcae3e578be8f251ea6b15",
+      "bytes": 85399,
+      "synthetic_data_only": true
+    },
+    "linux.jpg": {
+      "sha256": "b03f70ea0ebc310d5128a236f1db71bbf3e45489cf8475a94e9e5a81cd280b1b",
+      "bytes": 94395,
+      "synthetic_data_only": true
+    },
+    "windows.jpg": {
+      "sha256": "ca48af57b49014fee72681bdea1bc06a41076d61562426e477b4d9ee9ecab5e2",
+      "bytes": 99832,
+      "synthetic_data_only": true
+    },
+    "icmp.jpg": {
+      "sha256": "0123a6ceeff954e40eaa8b8469db014b9fc4f476a50173e8be269d332223d61b",
+      "bytes": 88818,
+      "synthetic_data_only": true
+    },
+    "windows-services.jpg": {
+      "sha256": "66fd7e20ebb8f8c257dd63c9ffd8e4a882d125e051c9fdfa8f9d578788cae16c",
+      "bytes": 78145,
+      "synthetic_data_only": true
+    }
+  }
+}

@@ -129,6 +129,35 @@
           profile_values: {linux: linux-active}
           profile_labels: {linux: Changed}
           reject: true
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: &transitions_installed
+            services:
+              netbox-zabbix-sync:
+                environment:
+                  NETBOX_PROFILE_TRANSITIONS: '[{"from":"icmp","to":"windows"}]'
+                  NETBOX_PROFILE_READY: '{"virtualization.virtualmachine:1":{"profile":"windows","hostid":"123"}}'
+          reject: true
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: *transitions_installed
+          profile_transitions: [{from: icmp, to: windows}]
+          profile_ready: {virtualization.virtualmachine:1: {profile: windows, hostid: '123'}}
+          reject: false
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: *transitions_installed
+          profile_transitions: [{from: icmp, to: windows}]
+          profile_ready: {virtualization.virtualmachine:1: {profile: windows, hostid: '999'}}
+          # An attestation may be revoked/replaced. The runtime still requires
+          # exact ownership/backreference/hostid and secure agent transport.
+          reject: false
+        - role: netbox_zabbix_sync
+          task: installed-guard.yml
+          compose: *transitions_installed
+          profile_transitions: [{from: icmp, to: windows}]
+          profile_ready: {}
+          reject: false
         - role: glpi
           task: installed-guard.yml
           compose: {services: {glpi: {volumes: ['./security.ini:/usr/local/etc/php/conf.d/zzz-iop-security.ini:ro']}}}

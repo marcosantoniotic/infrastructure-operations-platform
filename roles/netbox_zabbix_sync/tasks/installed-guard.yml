@@ -20,6 +20,9 @@
       - old_env.get('NETBOX_PROFILE_SOURCE', 'platform') != 'custom-field' or netbox_zabbix_sync_profile_source | default('platform') == 'custom-field'
       - old_env.get('NETBOX_PROFILE_SOURCE', 'platform') != 'custom-field' or old_env.get('NETBOX_PROFILE_FIELD') == netbox_zabbix_sync_profile_field | default('monitoring_profile')
       - old_env.get('NETBOX_PROFILE_SOURCE', 'platform') != 'custom-field' or old_env.get('NETBOX_PROFILE_CHOICE_SET') == netbox_zabbix_sync_profile_choice_set | default('iop-monitoring-profiles')
+      - old_env.get('NETBOX_PROFILE_TRANSITIONS', '[]') | from_json | difference(netbox_zabbix_sync_profile_transitions | default([])) | length == 0
+      - old_env.get('NETBOX_TECHNICAL_GROUPS_ENABLED', 'false') | string | lower != 'true' or netbox_zabbix_sync_technical_groups_enabled | default(false) | bool
+      - old_env.get('NETBOX_TECHNICAL_GROUPS_ENABLED', 'false') | string | lower != 'true' or ((netbox_zabbix_sync_technical_groups | default({})) | combine(old_env.get('NETBOX_TECHNICAL_GROUPS', '{}') | from_json)) == (netbox_zabbix_sync_technical_groups | default({}))
     fail_msg: Preserve installed TLS transport, VM/site scope and platform mapping in private overrides.
   vars:
     data: "{{ sync_installed_compose.content | b64decode | from_yaml }}"

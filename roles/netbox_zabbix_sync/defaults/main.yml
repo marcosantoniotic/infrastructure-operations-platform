@@ -20,6 +20,13 @@ netbox_zabbix_sync_profile_choice_set: iop-monitoring-profiles
 netbox_zabbix_sync_profile_values: {}
 netbox_zabbix_sync_profile_labels: {}
 netbox_zabbix_sync_manage_profile_field: false
+# Opt-in, additive transitions only. Readiness is an operator attestation after
+# validating the real active agent and its encrypted transport, not an OS guess.
+netbox_zabbix_sync_profile_transitions: []
+netbox_zabbix_sync_profile_ready: {}
+# Dedicated visualization groups only; catalogue must already exist.
+netbox_zabbix_sync_technical_groups_enabled: false
+netbox_zabbix_sync_technical_groups: {}
 netbox_zabbix_sync_site_slugs: []
 netbox_zabbix_sync_tag_slug: zabbix
 netbox_zabbix_sync_hostid_field: zabbix_hostid

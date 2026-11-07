@@ -1,0 +1,27 @@
+---
+- name: Render technical group opt in without deployment
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - ansible.builtin.include_vars: ../../roles/netbox_zabbix_sync/defaults/main.yml
+    - ansible.builtin.set_fact:
+        old_default: "{{ lookup('template','../../roles/netbox_zabbix_sync/templates/compose.yaml.j2') }}"
+    - ansible.builtin.assert:
+        that:
+          - "'NETBOX_TECHNICAL_GROUPS' not in old_default"
+    - ansible.builtin.set_fact:
+        netbox_zabbix_sync_platform_mapping_enabled: true
+        netbox_zabbix_sync_profile_source: custom-field
+        netbox_zabbix_sync_technical_groups_enabled: true
+        netbox_zabbix_sync_platform_profiles:
+          linux-active: {group: Linux servers, template: Linux by Zabbix agent active}
+        netbox_zabbix_sync_technical_groups: {linux-active: IOP - Linux}
+    - ansible.builtin.set_fact:
+        enabled: "{{ lookup('template','../../roles/netbox_zabbix_sync/templates/compose.yaml.j2') | from_yaml }}"
+    - ansible.builtin.assert:
+        that:
+          - enabled.services['netbox-zabbix-sync'].environment.NETBOX_TECHNICAL_GROUPS_ENABLED == 'true'
+          - enabled.services['netbox-zabbix-sync'].environment.NETBOX_TECHNICAL_GROUPS | from_json == netbox_zabbix_sync_technical_groups
+          - not enabled.services['netbox-zabbix-sync'].get('ports')
+          - "'NETBOX_TECHNICAL_GROUPS' not in old_default"

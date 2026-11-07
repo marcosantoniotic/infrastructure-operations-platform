@@ -1,0 +1,32 @@
+---
+- name: Exercise technical group preservation guards in private fixtures
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    fixture_root: "{{ lookup('env', 'CI_ARTIFACT_DIR') }}/technical-group-guards"
+    installed:
+      services:
+        netbox-zabbix-sync:
+          environment:
+            NETBOX_TECHNICAL_GROUPS_ENABLED: 'true'
+            NETBOX_TECHNICAL_GROUPS: '{"linux-active":"IOP - Linux"}'
+  tasks:
+    - ansible.builtin.assert:
+        that:
+          - fixture_root.startswith('/tmp/')
+          - fixture_root.endswith('/technical-group-guards')
+    - ansible.builtin.file:
+        path: "{{ fixture_root }}"
+        state: directory
+        mode: '0700'
+    - ansible.builtin.include_tasks: test-installed-guard-case.yml
+      loop:
+        - {role: netbox_zabbix_sync, task: installed-guard.yml, absent: true, reject: false}
+        - {role: netbox_zabbix_sync, task: installed-guard.yml, compose: "{{ installed }}", reject: true}
+        - {role: netbox_zabbix_sync, task: installed-guard.yml, compose: "{{ installed }}", technical_enabled: true, reject: true}
+        - {role: netbox_zabbix_sync, task: installed-guard.yml, compose: "{{ installed }}", technical_enabled: true, technical_groups: {linux-active: Changed}, reject: true}
+        - {role: netbox_zabbix_sync, task: installed-guard.yml, compose: "{{ installed }}", technical_enabled: true, technical_groups: {linux-active: IOP - Linux}, reject: false}
+        - {role: netbox_zabbix_sync, task: installed-guard.yml, compose: "{{ installed }}", technical_enabled: true, technical_groups: {linux-active: IOP - Linux, windows-active: IOP - Windows}, reject: false}
+      loop_control:
+        loop_var: scenario

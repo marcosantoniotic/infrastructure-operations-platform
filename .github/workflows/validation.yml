@@ -83,6 +83,9 @@ jobs:
           python scripts/tests/test_netbox_vm_sync.py
           python scripts/tests/test_netbox_platform_mapping.py
           python scripts/tests/test_netbox_monitoring_field.py
+          python scripts/tests/test_netbox_profile_transitions.py
+          python scripts/tests/test_technical_profile_groups.py
+          python scripts/tests/test_technical_grafana_contract.py
           python scripts/tests/test_windows_service_policy.py
           python scripts/tests/test_wsp_ci_observation.py
           python scripts/tests/test_netbox_sync_evidence.py
@@ -201,6 +204,11 @@ jobs:
           --inventory localhost,
           scripts/ci/test-installed-guards.yml
 
+      - name: Test technical profile group guards and rendering without deployment
+        run: |
+          ansible-playbook --inventory localhost, scripts/ci/test-technical-group-guards.yml
+          ansible-playbook --inventory localhost, scripts/ci/test-technical-group-render.yml
+
       - name: Validate Compose and Prometheus artifacts
         run: ./scripts/ci/validate-service-artifacts.sh
 
@@ -265,6 +273,26 @@ jobs:
           sudo env PATH="$RUNNER_TEMP/platform-test-venv/bin:$PATH" IOP_DISPOSABLE_PLATFORM_TEST=1 \
             "$RUNNER_TEMP/platform-test-venv/bin/python" scripts/ci/test-netbox-platform-mapping.py \
             --workspace /tmp/iop-platform-mapping-ci --revision "${{ github.sha }}"
+
+  grafana-technical-groups:
+    name: Isolated signed-plugin technical profile groups
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prepare disposable test tooling
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/technical-grafana-venv"
+          "$RUNNER_TEMP/technical-grafana-venv/bin/pip" install --disable-pip-version-check ansible-core==2.19.7 PyYAML==6.0.3
+          "$RUNNER_TEMP/technical-grafana-venv/bin/ansible-galaxy" collection install -p ./collections -r requirements.yml
+      - name: Exercise synthetic APIs and signed plugin without browser or deployment
+        shell: bash
+        run: |
+          sudo env PATH="$RUNNER_TEMP/technical-grafana-venv/bin:$PATH" IOP_DISPOSABLE_PLATFORM_TEST=1 \
+            "$RUNNER_TEMP/technical-grafana-venv/bin/python" scripts/ci/test-technical-grafana.py \
+            --workspace /tmp/iop-technical-grafana-ci --revision "${{ github.sha }}"
 
   unifi-ocsp:
     name: Isolated non-root UniFi OCSP collector acceptance

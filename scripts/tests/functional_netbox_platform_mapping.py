@@ -3,7 +3,8 @@
 
 Uses the existing disposable fixture builder, never an existing application DB.
 No mocks of NetBox models or API responses. A forwarding write guard restricts
-the actual reconciler to the exact newly created IDs. All hosts stay disabled.
+the actual reconciler to the exact newly created IDs. Hosts are disabled during
+reconciliation; only synthetic history-witness setup briefly enables owned hosts.
 """
 import copy
 from datetime import datetime, timezone
@@ -16,6 +17,7 @@ import os
 from pathlib import Path
 import runpy
 import sys
+import time
 from unittest.mock import patch
 
 if not __debug__:
@@ -113,7 +115,8 @@ def main():
         harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         netbox=str(settings.VERSION), zabbix=zx('apiinfo.version', {}, False), images=manifest['images'],
         topology=importlib.metadata.version('netbox-topology-views'), qrcode=importlib.metadata.version('netbox-qrcode'),
-        scheduled_sync=False, all_test_hosts_disabled=True, ports_published=0, mocks=False))
+        scheduled_sync=False, all_test_hosts_disabled_at_initial_snapshot=True,
+        history_witness_setup_temporarily_enables_owned_hosts=True, ports_published=0, mocks=False))
     group_ids, template_ids = {}, {}
     for name, profile in PROFILES.items():
         found = zx('hostgroup.get', dict(output=['groupid'], filter={'name': [profile['group']]}))
@@ -362,6 +365,91 @@ def main():
     else: raise AssertionError('Custom-field source was silently removed')
     assert len(writes) == checkpoint
     check('field-migration-and-downgrade-guards', field_reconcile()==[], {'blank_and_profile_change_refused':True,'platform_downgrade_refused':True,'additional_writes':0})
+    # Additive migration on actual APIs; no live agent or Windows OS is simulated.
+    icmp_records = [r for r in records if r['slug'] == 'routeros']
+    transition_env = dict(field_env, NETBOX_PROFILE_TRANSITIONS=json.dumps([
+        {'from':'network-icmp','to':'windows-active'}]), NETBOX_PROFILE_READY='{}')
+    def transition_run(expected=0, apply=True):
+        previous = len(writes)
+        with patch.dict(os.environ, transition_env), patch('sys.argv', ['sync'] + (['--apply'] if apply else [])):
+            assert sync['main']() == expected
+        return writes[previous:]
+    preserved = {}
+    for record in icmp_records:
+        hid = owned_hosts[(record['type'], str(record['id']))]
+        host = next(h for h in hosts() if h['hostid'] == hid)
+        # Bootstrap setup only in this wholly synthetic fixture, never in the reconciler.
+        tags = [{'tag':t['tag'],'value':t['value']} for t in host['tags']] + [{'tag':'local-transition-owner','value':run}]
+        zx('host.update', dict(hostid=hid, tags=tags, macros=[{'macro':'{$SYNTHETIC.LOCAL}','value':'preserve'}],
+            tls_accept=2, tls_psk_identity='synthetic-'+hid, tls_psk='ab'*32))
+        item = zx('item.create', dict(hostid=hid, name='Synthetic history witness',
+            key_='synthetic.profile.history', type=2, value_type=3, delay='0', history='30d', trends='30d'))['itemids'][0]
+        # history.push needs an enabled trapper item. No media/integration exists here.
+        zx('host.update', dict(hostid=hid, status=0))
+        # Configuration cache is asynchronous. Keep every response; do not fake
+        # history or treat an HTTP/JSON-RPC success as accepted item data.
+        attempts=[]; deadline=time.monotonic()+90
+        while True:
+            pushed = zx('history.push', [{'itemid':item, 'clock':int(time.time()), 'value':'42'}])
+            attempts.append(pushed);save('history-push-'+hid+'.private.json',attempts)
+            errors=[row['error'] for row in pushed['data'] if row.get('error')]
+            if not errors:
+                assert len(pushed['data'])==1 and str(pushed['data'][0]['itemid'])==str(item)
+                break
+            # Only newly-created, confirmed owned entities, with admin API auth.
+            # Any other failure is immediate; persistent cache/permission errors fail.
+            assert all(message in {'No permissions to referred object or it does not exist.',
+                'Host is not monitored.', 'Item is disabled.'} for message in errors), errors
+            assert time.monotonic()<deadline, errors
+            time.sleep(3)
+        zx('host.update', dict(hostid=hid, status=1))
+        preserved[hid] = dict(host=next(h for h in hosts() if h['hostid']==hid),
+            items=zx('item.get',dict(output=['itemid','key_','templateid','history','trends'],hostids=[hid])),
+            macros=zx('usermacro.get',dict(output=['macro','value'],hostids=[hid])), witness=item)
+        nb('PATCH', record['path']+str(record['id'])+'/', {'custom_fields':{'synthetic_monitoring_profile':'windows'}})
+    check('transition-readiness-blocked', transition_run(2)==[], {'target_hosts':2,'writes':0})
+    transition_env['NETBOX_PROFILE_READY'] = json.dumps({r['type']+':'+str(r['id']):
+        {'profile':'windows-active','hostid':owned_hosts[(r['type'],str(r['id']))]} for r in icmp_records})
+    check('transition-dry-run', transition_run(apply=False)==[], {'writes':0})
+    changed = transition_run()
+    assert len(changed)==2 and all(c['method']=='host.update' and
+        set(c['params'])=={'hostid','groups','templates','tags'} for c in changed)
+    for hid, prior in preserved.items():
+        after = next(h for h in hosts() if h['hostid']==hid)
+        assert after['hostid']==prior['host']['hostid'] and after['interfaces']==prior['host']['interfaces']
+        assert group_ids['windows-active'] in {g['groupid'] for g in after['hostgroups']}
+        assert group_ids['network-icmp'] not in {g['groupid'] for g in after['hostgroups']}
+        assert set(template_ids['windows-active']) <= {t['templateid'] for t in after['parentTemplates']}
+        assert any(t['tag']=='local-transition-owner' and t['value']==run for t in after['tags'])
+        items_after = zx('item.get',dict(output=['itemid','key_','templateid','history','trends'],hostids=[hid]))
+        assert all(row in items_after for row in prior['items'])
+        assert zx('usermacro.get',dict(output=['macro','value'],hostids=[hid]))==prior['macros']
+        deadline=time.monotonic()+30
+        while not zx('history.get',dict(output='extend',history=3,itemids=[prior['witness']])):
+            assert time.monotonic()<deadline
+            time.sleep(1)
+        history=zx('history.get',dict(output='extend',history=3,itemids=[prior['witness']]))
+        assert any(row['value']=='42' for row in history)
+    check('transition-same-host-history', True, {'objects':2,'same_host_interface_item_ids':True,
+        'old_item_retention_and_local_tags_macros_preserved':True,'real_history_value':42,
+        'templates_unlinked_or_cleared':0,'actual_windows_agent_tested':False})
+    check('transition-idempotence', transition_run()==[], {'writes':0})
+    # Unsupported removal affects only its object. The second object's rename still reconciles.
+    one,two=icmp_records
+    nb('PATCH',one['path']+str(one['id'])+'/',{'custom_fields':{'synthetic_monitoring_profile':'icmp'}})
+    nb('PATCH',two['path']+str(two['id'])+'/',{'name':two['name']+'-renamed'})
+    transition_env['NETBOX_PROFILE_TRANSITIONS']=json.dumps([
+        {'from':'network-icmp','to':'windows-active'},{'from':'windows-active','to':'network-icmp'}])
+    partial=transition_run(2)
+    assert len(partial)==1 and partial[0]['params']['hostid']==owned_hosts[(two['type'],str(two['id']))]
+    check('transition-pending-isolated',True,{'removal_blocked':True,'unrelated_rename_applied':True,'pending_host_not_disabled':True})
+    nb('PATCH',one['path']+str(one['id'])+'/',{'custom_fields':{'synthetic_monitoring_profile':'windows'}})
+    check('transition-recovery',transition_run()==[],{'writes':0})
+    checkpoint=len(writes)
+    try: field_reconcile()
+    except RuntimeError as error: assert 'installed profile reconciliation' in str(error)
+    else: raise AssertionError('Installed reconciliation guard was bypassed')
+    check('transition-feature-removal-guard',len(writes)==checkpoint,{'writes':0})
     # Exercise the actual NetBox edit form, not a drawing or replacement screenshot.
     from django.test import Client
     client = Client(HTTP_HOST='netbox.functional.example.test')
