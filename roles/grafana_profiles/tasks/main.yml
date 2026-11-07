@@ -14,26 +14,5 @@
     wait_timeout: 120
   when: not ansible_check_mode
 
-- name: Validate official plugin signature and version
-  ansible.builtin.uri:
-    url: "{{ grafana_profiles_admin_url }}/api/plugins/alexanderzobnin-zabbix-app/settings"
-    user: "{{ grafana_profiles_admin_user }}"
-    password: "{{ grafana_profiles_admin_password }}"
-    force_basic_auth: true
-  register: grafana_profiles_plugin
-  failed_when: >-
-    grafana_profiles_plugin.json.signature != 'valid' or
-    grafana_profiles_plugin.json.info.version != grafana_profiles_plugin_version
-  no_log: true
-  when: not ansible_check_mode
-
-- name: Validate the read only HTTPS source
-  ansible.builtin.uri:
-    url: "{{ grafana_profiles_admin_url }}/api/datasources/uid/iop-zabbix-readonly/health"
-    user: "{{ grafana_profiles_admin_user }}"
-    password: "{{ grafana_profiles_admin_password }}"
-    force_basic_auth: true
-  register: grafana_profiles_health
-  failed_when: grafana_profiles_health.json.status != 'OK'
-  no_log: true
-  when: not ansible_check_mode
+- name: Validate the deployed profile visualization contract
+  ansible.builtin.import_tasks: validate.yml

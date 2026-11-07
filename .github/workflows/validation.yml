@@ -215,6 +215,11 @@ jobs:
           IOP_DISPOSABLE_PLATFORM_TEST: '1'
         run: python scripts/ci/test-netbox-sync-validation.py --workspace /tmp/iop-sync-return-contracts
 
+      - name: Test Grafana profile role recovery and both validation paths in isolation
+        env:
+          IOP_DISPOSABLE_PLATFORM_TEST: '1'
+        run: python scripts/ci/test-grafana-profile-role.py --workspace /tmp/iop-grafana-profile-role
+
       - name: Validate Compose and Prometheus artifacts
         run: ./scripts/ci/validate-service-artifacts.sh
 

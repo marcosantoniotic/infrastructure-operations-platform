@@ -82,3 +82,20 @@ source adoption, unowned providers/directories/folders, and incorrect ownership
 markers. They were not applied to LAB01 or OPS during publication preparation.
 Keep the PR in draft until CI and an isolated Ansible adoption/failure matrix
 have been reviewed. See the [sanitized evidence record](../evidence/grafana-profile-delivery-20261107.sanitized.json).
+
+## Follow up recovery and shared validation corrections
+
+The follow-up revision claims a `preparing` ownership journal after collision
+checks and before artifact creation, then commits `validated` only after plugin
+and source checks succeed. The general observability path now invokes that same
+post-deployment validation. These changes are not deployed to LAB01 or OPS.
+
+The new CI matrix runs actual Ansible preparation and validation against private
+temporary directories and a synthetic loopback API, with an inert Compose task.
+It covers clean delivery, idempotence, partial artifact/configuration failures and
+retry, signature/version/health refusal and recovery, explicit source adoption,
+and refusal of foreign override/provider/directory/folder/dashboard resources.
+It checks that six prior dashboard fixtures, the prior source and a data sentinel
+remain unchanged. The final result is recorded by the CI job in
+`grafana-profile-role-evidence.json`; no synthetic keys or credentials are uploaded.
+This matrix must not be described as a fresh real Grafana/TLS integration test.

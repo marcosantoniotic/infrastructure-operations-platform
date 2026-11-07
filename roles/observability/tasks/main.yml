@@ -399,6 +399,14 @@
     wait_timeout: 420
   when: not ansible_check_mode
 
+- name: Validate opted in Grafana profiles after the observability deployment
+  ansible.builtin.include_role:
+    name: grafana_profiles
+    tasks_from: validate
+  when:
+    - grafana_profiles_enabled | default(false) | bool
+    - not ansible_check_mode
+
 - name: Reload changed blackbox trust and modules without restarting other collectors
   community.docker.docker_compose_v2:
     project_src: "{{ observability_project_dir }}"

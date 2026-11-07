@@ -34,6 +34,21 @@ class Profiles(unittest.TestCase):
         for guard in ['Refuse unowned providers or dashboard files','Refuse an incompatible existing source','Refuse an unowned folder','Refuse to overwrite dashboards']:
             self.assertLess(prepare.index(guard),first_write)
 
+    def test_journal_is_claimed_before_artifacts_and_committed_after_health(self):
+        prepare=(ROOT/'roles/grafana_profiles/tasks/prepare.yml').read_text()
+        self.assertLess(prepare.index('Claim the validated namespace'),prepare.index('Create only the profile dashboard directory'))
+        self.assertIn('"phase":"preparing"',prepare)
+        validate=(ROOT/'roles/grafana_profiles/tasks/validate.yml').read_text()
+        self.assertLess(validate.index('Validate the read only HTTPS source'),validate.index('Commit the validated ownership journal'))
+        self.assertIn('"phase":"validated"',validate)
+
+    def test_both_deployment_paths_use_shared_validation(self):
+        main=(ROOT/'roles/grafana_profiles/tasks/main.yml').read_text()
+        self.assertIn('ansible.builtin.import_tasks: validate.yml',main)
+        general=(ROOT/'roles/observability/tasks/main.yml').read_text()
+        self.assertLess(general.index('name: Deploy observability project'),general.index('name: Validate opted in Grafana profiles'))
+        self.assertIn('tasks_from: validate',general)
+
     def test_four_dashboards_keep_identity_and_queries(self):
         for path in (ROOT / 'technical-dashboards').glob('*.json'):
             before = json.loads(path.read_text(encoding='utf-8'))

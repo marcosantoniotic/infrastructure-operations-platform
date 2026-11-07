@@ -55,3 +55,23 @@ Publication review added stricter source/folder/provider adoption checks and
 administrative endpoint validation. These follow-up guards are tested offline;
 they were not reapplied to LAB01 or OPS during PR preparation. Confirm CI and
 an isolated Ansible adoption/failure matrix before considering promotion.
+
+The role claims its already-validated namespace with a `preparing` journal
+before creating the first artifact. A failed write, Compose validation or health
+check leaves that claim available for a controlled retry; successful shared
+validation commits `validated`. Existing version-1 markers without a phase are
+accepted for compatibility. The journal never authorizes adopting a foreign
+namespace on the first run: collision checks precede the claim.
+
+Both the dedicated playbook and the observability deployment call the same
+`validate.yml` after deployment. Invalid signature/version or source health
+therefore fails either path before committing validation. A retry still requires
+the explicit approval and backup flags. The journal is not a transaction or an
+automatic rollback of application data.
+
+`scripts/ci/test-grafana-profile-role.py` exercises the real Ansible file, guard,
+URI and journal tasks on a disposable Linux runner. Only Compose deployment,
+API responses, fixture UID/GID and deliberate failure injection are substituted.
+It does not contact a Docker daemon, a real Zabbix API, LAB01 or OPS. Its synthetic
+API checks control-flow failures, not cryptographic validation or live plugin
+acceptance; the independent signed-plugin integration job retains that scope.

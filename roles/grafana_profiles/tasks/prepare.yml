@@ -33,6 +33,7 @@
       - (grafana_profiles_marker.content | b64decode | from_json).source == 'iop-zabbix-readonly'
       - (grafana_profiles_marker.content | b64decode | from_json).folder == 'iop-profiles'
       - (grafana_profiles_marker.content | b64decode | from_json).dashboards | sort == ['iop-profiles-icmp', 'iop-profiles-linux', 'iop-profiles-overview', 'iop-profiles-windows']
+      - (grafana_profiles_marker.content | b64decode | from_json).phase | default('legacy') in ['legacy', 'preparing', 'validated']
   when: grafana_profiles_state.stat.exists
 
 - name: Refuse an unowned override
@@ -114,6 +115,13 @@
   loop: "{{ grafana_profiles_collisions.results }}"
   no_log: true
 
+- name: Claim the validated namespace before the first artifact write
+  ansible.builtin.copy:
+    content: '{"version":1,"phase":"preparing","source":"iop-zabbix-readonly","folder":"iop-profiles","dashboards":["iop-profiles-overview","iop-profiles-linux","iop-profiles-windows","iop-profiles-icmp"]}'
+    dest: "{{ grafana_profiles_project_dir }}/grafana-profiles-state.json"
+    mode: "0600"
+  when: not grafana_profiles_state.stat.exists
+
 - name: Create only the profile dashboard directory
   ansible.builtin.file:
     path: "{{ grafana_profiles_project_dir }}/grafana/profile-dashboards"
@@ -174,12 +182,6 @@
           'networks': {'profile_tls': {'external': true, 'name': grafana_profiles_tls_network}}} | to_nice_json }}
     dest: "{{ grafana_profiles_project_dir }}/compose.override.yaml"
     mode: "0640"
-
-- name: Record ownership without secrets
-  ansible.builtin.copy:
-    content: '{"version":1,"source":"iop-zabbix-readonly","folder":"iop-profiles","dashboards":["iop-profiles-overview","iop-profiles-linux","iop-profiles-windows","iop-profiles-icmp"]}'
-    dest: "{{ grafana_profiles_project_dir }}/grafana-profiles-state.json"
-    mode: "0600"
 
 - name: Validate the combined Compose without starting services
   ansible.builtin.command:
