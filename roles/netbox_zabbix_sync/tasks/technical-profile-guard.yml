@@ -1,0 +1,18 @@
+---
+- name: Inspect the applied technical group contract
+  ansible.builtin.stat:
+    path: "{{ netbox_zabbix_sync_project_dir }}/technical-groups-state.json"
+  register: netbox_technical_contract
+
+- name: Read the applied technical group contract
+  ansible.builtin.slurp:
+    src: "{{ netbox_zabbix_sync_project_dir }}/technical-groups-state.json"
+  register: netbox_technical_contract_data
+  when: netbox_technical_contract.stat.exists
+
+- name: Refuse to remove or remap an applied technical group contract
+  ansible.builtin.assert:
+    that:
+      - netbox_zabbix_sync_technical_groups_enabled | default(false) | bool
+      - netbox_zabbix_sync_technical_groups == (netbox_technical_contract_data.content | b64decode | from_json).profile_to_group
+  when: netbox_technical_contract.stat.exists

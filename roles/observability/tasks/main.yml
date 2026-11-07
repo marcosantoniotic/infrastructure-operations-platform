@@ -1,4 +1,13 @@
 ---
+- name: Inspect installed Grafana profile protection before changing files
+  ansible.builtin.stat:
+    path: "{{ observability_project_dir }}/grafana-profiles-state.json"
+  register: observability_profile_protection
+
+- name: Refuse removal of installed Grafana profile protection
+  ansible.builtin.assert:
+    that: not observability_profile_protection.stat.exists or grafana_profiles_enabled | default(false) | bool
+
 - name: Preserve installed collector-only OCSP protection
   ansible.builtin.import_tasks: unifi-ocsp-preserve.yml
 
@@ -317,6 +326,12 @@
     mode: "0640"
     unsafe_writes: true
 
+- name: Prepare the opted in Grafana profile overlay
+  ansible.builtin.include_role:
+    name: grafana_profiles
+    tasks_from: prepare
+  when: grafana_profiles_enabled | default(false) | bool
+
 - name: Validate rendered observability Compose configuration
   ansible.builtin.command:
     cmd: docker compose --project-directory {{ observability_project_dir }} config --quiet
@@ -376,8 +391,7 @@
 - name: Deploy observability project
   community.docker.docker_compose_v2:
     project_src: "{{ observability_project_dir }}"
-    files:
-      - compose.yaml
+    files: "{{ ['compose.yaml', 'compose.override.yaml'] if grafana_profiles_enabled | default(false) | bool else ['compose.yaml'] }}"
     state: present
     pull: missing
     remove_orphans: true

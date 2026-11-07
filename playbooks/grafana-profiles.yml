@@ -1,0 +1,7 @@
+---
+- name: Deploy only the signed plugin source and profile dashboards
+  hosts: platform
+  gather_facts: false
+  become: true
+  roles:
+    - role: grafana_profiles

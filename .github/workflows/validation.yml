@@ -86,6 +86,7 @@ jobs:
           python scripts/tests/test_netbox_profile_transitions.py
           python scripts/tests/test_technical_profile_groups.py
           python scripts/tests/test_technical_grafana_contract.py
+          python scripts/tests/test_grafana_profiles.py
           python scripts/tests/test_windows_service_policy.py
           python scripts/tests/test_wsp_ci_observation.py
           python scripts/tests/test_netbox_sync_evidence.py

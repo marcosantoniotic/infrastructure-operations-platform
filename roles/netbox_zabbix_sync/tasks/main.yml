@@ -1,4 +1,7 @@
 ---
+- name: Preserve an applied technical group contract
+  ansible.builtin.import_tasks: technical-profile-guard.yml
+
 - name: Protect installed API TLS and synchronization selection settings
   ansible.builtin.import_tasks: installed-guard.yml
   when: netbox_zabbix_sync_enabled | bool

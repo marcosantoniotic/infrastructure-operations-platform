@@ -1,0 +1,17 @@
+---
+grafana_profiles_enabled: false
+grafana_profiles_change_approved: false
+grafana_profiles_backup_confirmed: false
+grafana_profiles_adopt_existing: false
+grafana_profiles_project_dir: /opt/observability
+grafana_profiles_plugin_image: ""
+grafana_profiles_plugin_version: "6.10.2"
+grafana_profiles_tls_network: ""
+grafana_profiles_api_url: ""
+grafana_profiles_ca_certificate: ""
+grafana_profiles_reader_username: ""
+grafana_profiles_reader_password: ""
+grafana_profiles_label: "PERFIS DE MONITORAMENTO · PLUGIN OFICIAL ASSINADO"
+grafana_profiles_admin_url: http://127.0.0.1:3000
+grafana_profiles_admin_user: admin
+grafana_profiles_admin_password: ""
