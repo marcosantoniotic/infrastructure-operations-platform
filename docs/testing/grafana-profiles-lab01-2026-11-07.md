@@ -96,6 +96,8 @@ It covers clean delivery, idempotence, partial artifact/configuration failures a
 retry, signature/version/health refusal and recovery, explicit source adoption,
 and refusal of foreign override/provider/directory/folder/dashboard resources.
 It checks that six prior dashboard fixtures, the prior source and a data sentinel
-remain unchanged. The final result is recorded by the CI job in
-`grafana-profile-role-evidence.json`; no synthetic keys or credentials are uploaded.
+remain unchanged. The final sanitized result is emitted in the CI log and job
+summary, with a private workspace copy in `evidence.sanitized.json`. No fixture
+keys or credentials are uploaded. The runner does not change permissions on
+artifact directories created by other steps.
 This matrix must not be described as a fresh real Grafana/TLS integration test.

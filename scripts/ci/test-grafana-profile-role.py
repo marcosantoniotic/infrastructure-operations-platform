@@ -247,12 +247,15 @@ def main():
               'real_tls_or_plugin_runtime_test': False, 'prior_six_dashboards_source_and_data_preserved': True,
               'real_environment_access': False}
     (work/'evidence.sanitized.json').write_text(json.dumps(result, indent=2))
-    artifact = os.environ.get('CI_ARTIFACT_DIR')
-    if artifact:
-        destination = Path(artifact).resolve(); assert str(destination).startswith('/tmp/')
-        destination.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(work/'evidence.sanitized.json', destination/'grafana-profile-role-evidence.json')
-    print(json.dumps({'result': 'PASS', 'ansible_runs': len(evidence)}))
+    # Other Ansible steps can own CI_ARTIFACT_DIR as root. Do not broaden those
+    # permissions: keep fixtures private and export only sanitized job output.
+    summary = os.environ.get('GITHUB_STEP_SUMMARY')
+    if summary:
+        target = Path(summary).resolve()
+        assert target.is_relative_to(Path(os.environ['RUNNER_TEMP']).resolve())
+        with target.open('a') as stream:
+            stream.write('## Isolated Grafana role matrix\n\n```json\n'+json.dumps(result, indent=2)+'\n```\n')
+    print(json.dumps(result))
 
 
 if __name__ == '__main__':
