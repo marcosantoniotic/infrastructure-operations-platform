@@ -209,6 +209,11 @@ jobs:
           ansible-playbook --inventory localhost, scripts/ci/test-technical-group-guards.yml
           ansible-playbook --inventory localhost, scripts/ci/test-technical-group-render.yml
 
+      - name: Test real synchronizer validation task with inert return codes
+        env:
+          IOP_DISPOSABLE_PLATFORM_TEST: '1'
+        run: python scripts/ci/test-netbox-sync-validation.py --workspace /tmp/iop-sync-return-contracts
+
       - name: Validate Compose and Prometheus artifacts
         run: ./scripts/ci/validate-service-artifacts.sh
 

@@ -163,13 +163,12 @@
       docker compose --project-directory {{ netbox_zabbix_sync_project_dir }} run --rm
       netbox-zabbix-sync /opt/netbox/venv/bin/python
       /usr/local/libexec/netbox-zabbix-sync.py
-  register: netbox_zabbix_sync_dry_run
-  failed_when: netbox_zabbix_sync_dry_run.rc not in ([0, 2] if netbox_zabbix_sync_profile_transitions | length > 0 else [0])
-  changed_when: false
   register: netbox_zabbix_sync_validation
+  failed_when: netbox_zabbix_sync_validation.rc not in ([0, 2] if netbox_zabbix_sync_profile_transitions | length > 0 else [0])
+  changed_when: false
   retries: 10
   delay: 10
-  until: netbox_zabbix_sync_validation.rc == 0
+  until: netbox_zabbix_sync_validation.rc in ([0, 2] if netbox_zabbix_sync_profile_transitions | length > 0 else [0])
   when:
     - netbox_zabbix_sync_enabled | bool
     - not ansible_check_mode
