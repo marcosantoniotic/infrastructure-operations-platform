@@ -19,6 +19,15 @@
       - netbox_zabbix_sync_profile_source in ['platform', 'custom-field']
       - netbox_zabbix_sync_profile_values is mapping
       - netbox_zabbix_sync_profile_labels is mapping
+      - netbox_zabbix_sync_profile_transitions is sequence and netbox_zabbix_sync_profile_transitions is not string and netbox_zabbix_sync_profile_transitions is not mapping
+      - netbox_zabbix_sync_profile_ready is mapping
+      - netbox_zabbix_sync_technical_groups is mapping
+      - (netbox_zabbix_sync_technical_groups_enabled | bool) or not netbox_zabbix_sync_technical_groups
+      - not (netbox_zabbix_sync_technical_groups_enabled | bool) or (netbox_zabbix_sync_profile_source == 'custom-field' and netbox_zabbix_sync_platform_mapping_enabled | bool)
+      - not (netbox_zabbix_sync_technical_groups_enabled | bool) or (netbox_zabbix_sync_technical_groups.keys() | list | sort == netbox_zabbix_sync_platform_profiles.keys() | list | sort)
+      - not (netbox_zabbix_sync_technical_groups_enabled | bool) or (netbox_zabbix_sync_technical_groups.values() | list | unique | length == netbox_zabbix_sync_technical_groups | length)
+      - not netbox_zabbix_sync_profile_transitions or netbox_zabbix_sync_profile_source == 'custom-field'
+      - not netbox_zabbix_sync_profile_ready or netbox_zabbix_sync_profile_transitions | length > 0
       - netbox_zabbix_sync_profile_source != 'custom-field' or netbox_zabbix_sync_platform_mapping_enabled | bool
       - netbox_zabbix_sync_profile_source != 'custom-field' or (netbox_zabbix_sync_profile_values | length > 0 and netbox_zabbix_sync_profile_labels | length > 0)
       - netbox_zabbix_sync_profile_source != 'platform' or (not netbox_zabbix_sync_profile_values and not netbox_zabbix_sync_profile_labels and not netbox_zabbix_sync_manage_profile_field | bool)
@@ -127,6 +136,8 @@
       docker compose --project-directory {{ netbox_zabbix_sync_project_dir }} run --rm
       netbox-zabbix-sync /opt/netbox/venv/bin/python
       /usr/local/libexec/netbox-zabbix-sync.py --verbose
+  register: netbox_zabbix_sync_preflight
+  failed_when: netbox_zabbix_sync_preflight.rc not in ([0, 2] if netbox_zabbix_sync_profile_transitions | length > 0 else [0])
   changed_when: false
   when:
     - netbox_zabbix_sync_enabled | bool
@@ -152,11 +163,12 @@
       docker compose --project-directory {{ netbox_zabbix_sync_project_dir }} run --rm
       netbox-zabbix-sync /opt/netbox/venv/bin/python
       /usr/local/libexec/netbox-zabbix-sync.py
-  changed_when: false
   register: netbox_zabbix_sync_validation
+  failed_when: netbox_zabbix_sync_validation.rc not in ([0, 2] if netbox_zabbix_sync_profile_transitions | length > 0 else [0])
+  changed_when: false
   retries: 10
   delay: 10
-  until: netbox_zabbix_sync_validation.rc == 0
+  until: netbox_zabbix_sync_validation.rc in ([0, 2] if netbox_zabbix_sync_profile_transitions | length > 0 else [0])
   when:
     - netbox_zabbix_sync_enabled | bool
     - not ansible_check_mode

@@ -1,6 +1,8 @@
 # NetBox-Zabbix synchronization role
 
 Optional explicit selection: [monitoring profile custom field](../../docs/deployment/netbox-monitoring-profile-field.md).
+Optional safe existing-host transitions: [additive profile reconciliation](../../docs/deployment/netbox-profile-transitions.md).
+Optional owned technical groups for signed Grafana queries: [technical profile groups](../../docs/deployment/grafana-technical-profile-groups.md). Disabled by default; group names must be dedicated and pre-created. Local groups are preserved.
 The default remains exact Platform slug mapping when enabled. The new opt-in
 supports a single-select field (Linux/Windows/ICMP), explicit transactional schema
 preparation and multiple templates per profile. It never silently retemplates an

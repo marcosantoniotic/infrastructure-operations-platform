@@ -29,7 +29,147 @@ MANAGED_TAG_KEYS = {
     "netbox_object_type",
     "netbox_monitoring_profile",
     "netbox_monitoring_source",
+    "netbox_profile_reconciliation",
+    "netbox_technical_group",
 }
+
+
+def load_technical_groups(profiles, field_config):
+    enabled = os.environ.get("NETBOX_TECHNICAL_GROUPS_ENABLED", "false").lower()
+    if enabled not in {"true", "false"}:
+        raise RuntimeError("Technical group switch must be true or false")
+    config = unique_json(os.environ.get("NETBOX_TECHNICAL_GROUPS", "{}"))
+    if not isinstance(config, dict):
+        raise RuntimeError("Technical groups require a profile/name map")
+    if enabled == "false":
+        if config:
+            raise RuntimeError("Technical group map requires explicit opt-in")
+        return {}
+    if not profiles or field_config is None or set(config) != set(profiles):
+        raise RuntimeError("Technical groups require complete explicit custom-field profiles")
+    if any(not valid_name(v, 200) or v != v.strip() for v in config.values()):
+        raise RuntimeError("Invalid technical group name")
+    if len(set(config.values())) != len(config) or set(config.values()) & {p["group"] for p in profiles.values()}:
+        raise RuntimeError("Technical groups must be distinct from profile groups")
+    return config
+
+
+def technical_group_plan(host, profile, catalogue, base_groups=None):
+    """Replace only the previous group proven owned by our per-host marker."""
+    host = host or {}
+    markers = [t.get("value", "") for t in host.get("tags", []) if t.get("tag") == "netbox_technical_group"]
+    if not catalogue:
+        if markers:
+            raise RuntimeError("Refusing removal of installed technical-group protection")
+        return None
+    if profile not in catalogue or len(markers) > 1:
+        raise RuntimeError("Invalid technical-group profile or duplicate ownership marker")
+    ids = {str(v) for v in catalogue.values()}
+    if len(ids) != len(catalogue) or any(not v.isdigit() or int(v) < 1 for v in ids):
+        raise RuntimeError("Invalid or duplicate technical-group identity")
+    current = {str(g["groupid"]) for g in host.get("hostgroups", [])}
+    previous = None
+    if markers:
+        parts = markers[0].split(":")
+        if len(parts) != 3 or parts[0] != "v1" or parts[1] not in catalogue:
+            raise RuntimeError("Invalid technical-group ownership marker")
+        previous = parts[2]
+        if previous != str(catalogue[parts[1]]) or previous not in current:
+            raise RuntimeError("Technical-group remap or missing owned membership requires explicit recovery")
+    if current & ids != ({previous} if previous else set()):
+        raise RuntimeError("Unowned technical-group membership; refusing takeover")
+    desired = {str(g["groupid"]) for g in base_groups} if base_groups is not None else set(current)
+    if previous:
+        desired.discard(previous)
+    target = str(catalogue[profile])
+    desired.add(target)
+    if desired & ids != {target}:
+        raise RuntimeError("Technical-group plan would mix profiles")
+    marker = "v1:" + profile + ":" + target
+    if len(marker) > 255:
+        raise RuntimeError("Technical-group marker exceeds tag size")
+    return {"groups": [{"groupid": v} for v in sorted(desired)], "marker": marker,
+            "changed": desired != current or markers != [marker]}
+
+
+def load_profile_transitions(profiles, field_config):
+    """Additive-only, explicit edges. Never unlink/clear a template or guess readiness."""
+    edges = unique_json(os.environ.get("NETBOX_PROFILE_TRANSITIONS", "[]"))
+    ready = unique_json(os.environ.get("NETBOX_PROFILE_READY", "{}"))
+    if not isinstance(edges, list) or not isinstance(ready, dict):
+        raise RuntimeError("Invalid profile transition policy")
+    if (edges or ready) and (not profiles or field_config is None):
+        raise RuntimeError("Profile transitions require explicit custom-field selection")
+    pairs = set()
+    for edge in edges:
+        if (not isinstance(edge, dict) or set(edge) != {"from", "to"}
+                or not all(isinstance(edge[k], str) and edge[k] in profiles for k in ("from", "to"))
+                or edge["from"] == edge["to"]):
+            raise RuntimeError("Invalid profile transition edge")
+        pair = (edge["from"], edge["to"])
+        if pair in pairs:
+            raise RuntimeError("Duplicate profile transition edge")
+        pairs.add(pair)
+    for key, value in ready.items():
+        if (not isinstance(key, str) or not re.fullmatch(r"(?:dcim\.device|virtualization\.virtualmachine):[1-9][0-9]*", key)
+                or not isinstance(value, dict) or set(value) != {"profile", "hostid"}
+                or not isinstance(value["profile"], str) or value["profile"] not in profiles or not isinstance(value["hostid"], str)
+                or not re.fullmatch(r"[1-9][0-9]*", value["hostid"])):
+            raise RuntimeError("Invalid per-host profile readiness attestation")
+    if ready and not pairs:
+        raise RuntimeError("Readiness requires an enabled transition policy")
+    return pairs, ready
+
+
+class ProfilePending(RuntimeError):
+    """Known, safe per-object refusal; not a fatal ownership/schema error."""
+
+
+def profile_fingerprint(host):
+    return (host["hostid"], host["host"], host["name"], str(host["status"]), str(host.get("tls_accept")),
+            sorted(str(g["groupid"]) for g in host.get("hostgroups", [])),
+            sorted(str(t["templateid"]) for t in host.get("parentTemplates", [])),
+            normalized(host.get("tags", [])),
+            sorted(tuple(str(i.get(k, "")) for k in ("interfaceid", "type", "main", "ip", "dns", "port", "useip"))
+                   for i in host.get("interfaces", [])))
+
+
+def additive_profile_update(api, host, obj, old, new, profiles, edges, ready, template_keys, agent_profiles):
+    if (old, new) not in edges:
+        raise ProfilePending("transition-not-authorized")
+    previous, desired = profiles.get(old), profiles[new]
+    if previous is None:
+        raise ProfilePending("previous-profile-unknown")
+    if desired.get("passive_agent"):
+        raise ProfilePending("passive-agent-transition-not-supported")
+    current_groups = {str(g["groupid"]) for g in host.get("hostgroups", [])}
+    current_templates = {str(t["templateid"]) for t in host.get("parentTemplates", [])}
+    old_templates, new_templates = set(previous["templateids"]), set(desired["templateids"])
+    if previous["groupid"] not in current_groups or not old_templates.issubset(current_templates):
+        raise ProfilePending("previous-profile-drift")
+    if not old_templates.issubset(new_templates):
+        raise ProfilePending("template-removal-requires-reviewed-migration")
+    if str(obj.custom_field_data.get(os.environ["NETBOX_ZABBIX_HOSTID_FIELD"]) or "") != str(host["hostid"]):
+        raise ProfilePending("missing-confirmed-host-link")
+    if new in agent_profiles:
+        attestation = ready.get(":".join(identity(obj)))
+        if attestation != {"profile": new, "hostid": str(host["hostid"])}:
+            raise ProfilePending("agent-readiness-not-attested")
+        # Active agent transport may accept PSK/certificates, never plaintext.
+        if str(host.get("tls_accept")) not in {"2", "4", "6"}:
+            raise ProfilePending("secure-active-agent-channel-required")
+    added = new_templates - current_templates
+    if added:
+        items = api.call("item.get", {"output": ["key_"], "hostids": [host["hostid"]]})
+        rules = api.call("discoveryrule.get", {"output": ["key_"], "hostids": [host["hostid"]],
+                                             "selectItems": ["key_"]})
+        existing_keys = {i["key_"] for i in items + rules + [i for r in rules for i in r.get("items", [])]}
+        if existing_keys & {key for tid in added for key in template_keys[tid]}:
+            raise ProfilePending("existing-item-or-discovery-key-collision")
+    # Remove ONLY the previous managed group. Extra groups/templates stay linked.
+    groups = (current_groups - {previous["groupid"]}) | {desired["groupid"]}
+    return {"groups": [{"groupid": g} for g in sorted(groups)],
+            "templates": [{"templateid": t} for t in sorted(current_templates | new_templates)]}
 
 
 def unique_json(raw: str) -> Any:
@@ -302,6 +442,8 @@ def main() -> int:
         parser.error("--apply, --validate-platform-config and --prepare-monitoring-field are mutually exclusive")
     platform_map, profile_config = load_platform_mapping()
     field_config = load_field_selection(profile_config)
+    transitions, readiness = load_profile_transitions(profile_config, field_config)
+    technical_config = load_technical_groups(profile_config, field_config)
     if args.validate_platform_config:
         return 0
     setup_netbox()
@@ -339,10 +481,17 @@ def main() -> int:
         "groupid": unique_id(api, "hostgroup.get", "groupid", config["group"]),
         "templateids": [unique_id(api, "template.get", "templateid", name) for name in template_names(config)],
     } for name, config in profile_config.items()}
+    technical_ids = {name: unique_id(api, "hostgroup.get", "groupid", group)
+                     for name, group in technical_config.items()}
+    base_ids = {str(groupid), str(vm_groupid)} | {str(p["groupid"]) for p in profiles.values()}
+    if len(set(technical_ids.values())) != len(technical_ids) or set(map(str, technical_ids.values())) & base_ids:
+        raise RuntimeError("Technical group catalogue overlaps base groups")
     # This implementation manages the default address interface, not SNMP,
     # IPMI or JMX transports. Resolve incompatibilities for ALL profiles before
     # creating even the first host. No credential/interface auto-conversion.
-    for profile in profiles.values():
+    template_keys = {}
+    agent_profiles = set()
+    for profile_name, profile in profiles.items():
         if len(profile["templateids"]) != len(set(profile["templateids"])):
             raise RuntimeError("Duplicate resolved template identity in monitoring profile")
         keys = {}
@@ -351,6 +500,11 @@ def main() -> int:
             rules = api.call("discoveryrule.get", {"output": ["type", "key_", "itemid"], "selectItems": ["type", "key_", "itemid"],
                                                   "templateids": [tid]})
             interface_items = items + rules + [i for rule in rules for i in rule.get("items", [])]
+            template_keys[tid] = {i["key_"] for i in interface_items if i.get("key_")}
+            if any(str(i.get("type")) == "7" for i in interface_items):
+                agent_profiles.add(profile_name)
+            if any(str(i.get("type")) == "0" for i in interface_items):
+                profile["passive_agent"] = True
             if not items or any(str(i["type"]) in {"1", "4", "6", "12", "16", "17", "20"} for i in interface_items):
                 raise RuntimeError("Mapped template requires an unsupported interface; only agent/ICMP profiles are supported")
             for item in interface_items:
@@ -377,7 +531,7 @@ def main() -> int:
         return groupid, [templateid], None
 
     hosts = api.call("host.get", {
-        "output": ["hostid", "host", "name", "status"],
+        "output": ["hostid", "host", "name", "status", "tls_accept"],
         "selectTags": "extend", "selectInterfaces": "extend",
         "selectHostGroups": ["groupid"], "selectParentTemplates": ["templateid"],
     })
@@ -389,9 +543,15 @@ def main() -> int:
         if key in managed:
             raise RuntimeError("Multiple Zabbix hosts claim the same NetBox object")
         managed[key] = host
+    if any(t.get("tag") == "netbox_profile_reconciliation" and
+           (t.get("value") != "additive-v1" or not transitions)
+           for host in managed.values() for t in host.get("tags", [])):
+        raise RuntimeError("Refusing to remove installed profile reconciliation protection")
     if not profiles and any(t.get("tag") == "netbox_monitoring_profile" for h in managed.values() for t in h.get("tags", [])):
         raise RuntimeError("Refusing to silently remove installed platform mapping")
     by_name = {host["host"]: host for host in hosts}
+    if not technical_ids and any(t.get("tag") == "netbox_technical_group" for h in managed.values() for t in h.get("tags", [])):
+        raise RuntimeError("Refusing removal of installed technical-group protection")
     desired_ids: set[tuple[str, str]] = set()
     changes = 0
 
@@ -405,8 +565,17 @@ def main() -> int:
     # Preflight the entire set before any API or metadata write: no partial collision takeover.
     planned_names: dict[str, tuple[str, str]] = {}
     planned_profiles = {}
+    profile_updates = {}
+    technical_updates = {}
+    pending = {}
     for obj in objects:
-        expected_group, expected_template, profile_name = target(obj)
+        try:
+            expected_group, expected_template, profile_name = target(obj)
+        except RuntimeError:
+            if not transitions:
+                raise
+            pending[identity(obj)] = "invalid-monitoring-profile"
+            continue
         planned_profiles[identity(obj)] = (expected_group, expected_template, profile_name)
         if profile_name is not None:
             LOG.debug("PROFILE host=%s platform=%s profile=%s group=%s template=%s", host_name(obj),
@@ -424,18 +593,43 @@ def main() -> int:
         if stored and (not existing or stored != str(existing["hostid"])):
             raise RuntimeError(f"Conflicting stored Zabbix ID for {host_name(obj)}")
         if existing:
-            if str(expected_group) not in {str(g["groupid"]) for g in existing.get("hostgroups", [])}:
-                raise RuntimeError("Existing managed host is outside the configured group")
-            if not set(expected_template).issubset({str(t["templateid"]) for t in existing.get("parentTemplates", [])}):
-                raise RuntimeError("Existing host template differs; an explicit migration is required")
             old_profile = next((t.get("value", "") for t in existing.get("tags", [])
                                 if t.get("tag") == "netbox_monitoring_profile"), None)
-            if old_profile is not None and old_profile != profile_name:
-                raise RuntimeError("Existing monitoring profile differs; an explicit migration is required")
+            marker = next((t.get("value", "") for t in existing.get("tags", [])
+                           if t.get("tag") == "netbox_profile_reconciliation"), None)
+            if marker is not None and (marker != "additive-v1" or not transitions):
+                raise RuntimeError("Refusing to remove installed profile reconciliation protection")
+            try:
+                if old_profile is not None and old_profile != profile_name and transitions:
+                    profile_updates[identity(obj)] = additive_profile_update(
+                        api, existing, obj, old_profile, profile_name, profiles, transitions,
+                        readiness, template_keys, agent_profiles)
+                else:
+                    if str(expected_group) not in {str(g["groupid"]) for g in existing.get("hostgroups", [])}:
+                        raise ProfilePending("Existing managed host is outside the configured group")
+                    if not set(expected_template).issubset({str(t["templateid"]) for t in existing.get("parentTemplates", [])}):
+                        raise ProfilePending("Existing host template differs; an explicit migration is required")
+                    if old_profile is not None and old_profile != profile_name:
+                        raise ProfilePending("Existing monitoring profile differs; an explicit migration is required")
+            except ProfilePending as exc:
+                if not transitions:
+                    raise
+                pending[identity(obj)] = str(exc)
             interface = primary_agent_interface(existing)
             if profiles and (interface is None or str(interface.get("port")) != "10050"
                              or str(interface.get("useip")) != "1" or interface.get("dns", "") != ""):
                 raise RuntimeError("Existing profile address interface differs; explicit migration required")
+    # Preflight technical memberships before any object write.
+    for obj in objects:
+        key = identity(obj)
+        if key in pending:
+            continue
+        existing = managed.get(key)
+        base = profile_updates.get(key, {}).get("groups")
+        if existing is None:
+            base = [{"groupid": planned_profiles[key][0]}]
+        technical_updates[key] = technical_group_plan(existing, planned_profiles[key][2], technical_ids, base)
+
     def in_scope(host: dict[str, Any], key: tuple[str, str]) -> bool:
         tags = {t["tag"]: t.get("value", "") for t in host.get("tags", [])}
         if sites and tags.get("netbox_site") not in sites:
@@ -460,8 +654,13 @@ def main() -> int:
         if old_source is not None and old_source != source_marker:
             raise RuntimeError("Refusing to remove or change installed monitoring custom-field source")
     ensure_custom_field(field_name, args.apply, include_vms)
+    # Pending objects remain desired: never classify a refusal as an orphan.
+    desired_ids.update(identity(obj) for obj in objects)
     for device in objects:
         netbox_id = identity(device)
+        if netbox_id in pending:
+            LOG.warning("PROFILE-PENDING object=%s reason=%s", ":".join(netbox_id), pending[netbox_id])
+            continue
         target_group, target_template, profile_name = planned_profiles[netbox_id]
         technical_name = host_name(device)
         desired_ids.add(netbox_id)
@@ -476,6 +675,14 @@ def main() -> int:
             continue
 
         tags = managed_tags(device, profile_name, source_marker)
+        technical = technical_updates.get(netbox_id)
+        if technical:
+            tags.append({"tag": "netbox_technical_group", "value": technical["marker"]})
+        marker = ("additive-v1" if netbox_id in profile_updates else
+                  next((t["value"] for t in (existing or {}).get("tags", [])
+                        if t["tag"] == "netbox_profile_reconciliation"), None))
+        if marker:
+            tags.append({"tag": "netbox_profile_reconciliation", "value": marker})
         status = 0 if str(device.status) == "active" else 1
         if existing is None:
             changes += 1
@@ -483,7 +690,7 @@ def main() -> int:
             if args.apply:
                 result = api.call("host.create", {
                     "host": technical_name, "name": device.name, "status": status,
-                    "groups": [{"groupid": target_group}], "templates": [{"templateid": tid} for tid in target_template],
+                    "groups": technical["groups"] if technical else [{"groupid": target_group}], "templates": [{"templateid": tid} for tid in target_template],
                     "interfaces": [{"type": 1, "main": 1, "useip": 1, "ip": ip, "dns": "", "port": "10050"}],
                     "tags": tags,
                 })
@@ -491,6 +698,9 @@ def main() -> int:
             continue
 
         update: dict[str, Any] = {"hostid": existing["hostid"]}
+        update.update(profile_updates.get(netbox_id, {}))
+        if technical and {str(g["groupid"]) for g in technical["groups"]} != {str(g["groupid"]) for g in existing.get("hostgroups", [])}:
+            update["groups"] = technical["groups"]
         if existing["host"] != technical_name or existing["name"] != device.name:
             update.update({"host": technical_name, "name": device.name})
         if int(existing["status"]) != status:
@@ -508,6 +718,15 @@ def main() -> int:
             changes += 1
             LOG.info("UPDATE host=%s ip=%s", device.name, ip)
             if args.apply:
+                if netbox_id in profile_updates or (technical and technical["changed"]):
+                    fresh = api.call("host.get", {"hostids": [existing["hostid"]],
+                        "output": ["hostid", "host", "name", "status", "tls_accept"],
+                        "selectTags": "extend", "selectInterfaces": "extend",
+                        "selectHostGroups": ["groupid"], "selectParentTemplates": ["templateid"]})
+                    if len(fresh) != 1 or profile_fingerprint(fresh[0]) != profile_fingerprint(existing):
+                        pending[netbox_id] = "concurrent-host-change"
+                        LOG.warning("PROFILE-PENDING object=%s reason=concurrent-host-change", ":".join(netbox_id))
+                        continue
                 if len(update) > 1:
                     api.call("host.update", update)
                 if interface is None:
@@ -526,10 +745,10 @@ def main() -> int:
             if args.apply:
                 api.call("host.update", {"hostid": host["hostid"], "status": 1})
 
-    LOG.info("Synchronization complete mode=%s devices=%d changes=%d vms=%d",
+    LOG.info("Synchronization complete mode=%s devices=%d changes=%d vms=%d pending=%d",
              "apply" if args.apply else "dry-run", sum(k[0] == "dcim.device" for k in desired_ids),
-             changes, sum(k[0] == "virtualization.virtualmachine" for k in desired_ids))
-    return 0
+             changes, sum(k[0] == "virtualization.virtualmachine" for k in desired_ids), len(pending))
+    return 2 if pending else 0
 
 
 if __name__ == "__main__":
