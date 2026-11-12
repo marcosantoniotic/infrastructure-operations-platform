@@ -131,12 +131,16 @@ verify_backup() {
   restore_database=glpi_restore_validation
   verify_password="$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
   cleanup_resources() {
-    docker rm -f "$database_container" "$data_container" >/dev/null 2>&1 || true
+    docker rm -f --volumes "$database_container" "$data_container" >/dev/null 2>&1 || true
     docker volume rm -f "$data_volume" >/dev/null 2>&1 || true
   }
+  for name in "$database_container" "$data_container"; do
+    if docker container inspect "$name" >/dev/null 2>&1; then exit 1; fi
+  done
+  if docker volume inspect "$data_volume" >/dev/null 2>&1; then exit 1; fi
   trap cleanup_resources EXIT INT TERM
 
-  docker run --detach --rm --name "$database_container" \
+  docker run --detach --rm --network none --name "$database_container" \
     --env "MARIADB_ROOT_PASSWORD=${verify_password}" \
     --env "MARIADB_DATABASE=${restore_database}" \
     "$DATABASE_IMAGE" >/dev/null
@@ -181,7 +185,7 @@ verify_backup() {
     'SELECT COUNT(*) FROM glpi_users;' | grep -Eq '^[1-9][0-9]*$'
 
   docker volume create "$data_volume" >/dev/null
-  docker run --detach --rm --name "$data_container" \
+  docker run --detach --rm --network none --name "$data_container" \
     --volume "${data_volume}:/restore" \
     "$HELPER_IMAGE" sleep 300 >/dev/null
   docker cp "${directory}/application-data.tar.gz" \

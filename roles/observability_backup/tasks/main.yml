@@ -25,6 +25,20 @@
     group: root
     mode: "0755"
 
+- name: Validate Python support for private Grafana recovery context
+  ansible.builtin.command:
+    argv: [python3, -c, "import json, tarfile, sqlite3"]
+  changed_when: false
+  check_mode: false
+
+- name: Install private Grafana recovery context helper
+  ansible.builtin.copy:
+    src: observability-grafana-context.py
+    dest: "{{ observability_backup_context_helper }}"
+    owner: root
+    group: root
+    mode: "0700"
+
 - name: Install observability backup utility
   ansible.builtin.template:
     src: observability-backup.sh.j2

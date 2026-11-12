@@ -117,11 +117,12 @@ verify_backup() {
   database="$DATABASE_NAME"
   verify_password="$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
   cleanup_container() {
-    docker rm -f "$container" >/dev/null 2>&1 || true
+    docker rm -f --volumes "$container" >/dev/null 2>&1 || true
   }
+  if docker container inspect "$container" >/dev/null 2>&1; then exit 1; fi
   trap cleanup_container EXIT INT TERM
 
-  docker run --detach --rm --name "$container" \
+  docker run --detach --rm --network none --name "$container" \
     --env "MYSQL_ROOT_PASSWORD=${verify_password}" \
     --env "MYSQL_DATABASE=${database}" \
     "$MYSQL_IMAGE" >/dev/null

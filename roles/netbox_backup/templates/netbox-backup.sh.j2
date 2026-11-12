@@ -107,11 +107,12 @@ verify_backup() {
   container="netbox-restore-check-${RANDOM}-$$"
   verify_password="$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"
   cleanup_container() {
-    docker rm -f "$container" >/dev/null 2>&1 || true
+    docker rm -f --volumes "$container" >/dev/null 2>&1 || true
   }
+  if docker container inspect "$container" >/dev/null 2>&1; then exit 1; fi
   trap cleanup_container EXIT INT TERM
 
-  docker run --detach --rm --name "$container" \
+  docker run --detach --rm --network none --name "$container" \
     --env "POSTGRES_PASSWORD=${verify_password}" \
     --env POSTGRES_DB=restore_validation \
     --env POSTGRES_USER=restore_validator \

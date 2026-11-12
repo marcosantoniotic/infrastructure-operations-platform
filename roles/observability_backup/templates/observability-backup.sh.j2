@@ -12,6 +12,7 @@ readonly GRAFANA_IMAGE="{{ observability_backup_grafana_image }}"
 readonly HELPER_IMAGE="{{ observability_backup_helper_image }}"
 readonly METRICS_DIR="{{ observability_backup_metrics_dir }}"
 readonly METRICS_FILE="${METRICS_DIR}/observability_backup.prom"
+readonly CONTEXT_HELPER="{{ observability_backup_context_helper }}"
 
 write_metrics() {
   local run_success="$1" success_timestamp="${2:-}"
@@ -75,6 +76,8 @@ create_backup() {
     '{% raw %}{{range .Mounts}}{{if eq .Destination "/var/lib/grafana"}}{{.Name}}{{end}}{{end}}{% endraw %}' \
     "$grafana_container")"
   [[ -n "$prometheus_volume" && -n "$grafana_volume" ]]
+  # Validate static coverage before stopping either production service.
+  "$CONTEXT_HELPER" preflight --container "$grafana_container" --project "$PROJECT_DIR"
 
   recover_services() {
     cd "$PROJECT_DIR"
@@ -89,12 +92,14 @@ create_backup() {
   trap cleanup_partial ERR INT TERM
 
   docker compose stop "$GRAFANA_SERVICE" "$PROMETHEUS_SERVICE" >/dev/null
-  docker run --rm --user 0 --volume "${prometheus_volume}:/prometheus" \
+  docker run --rm --network none --user 0 --volume "${prometheus_volume}:/prometheus" \
     --entrypoint tar "$HELPER_IMAGE" \
     -C /prometheus -czf - . > "${staging}/prometheus-data.tar.gz"
-  docker run --rm --user 0 --volume "${grafana_volume}:/var/lib/grafana" \
+  docker run --rm --network none --user 0 --volume "${grafana_volume}:/var/lib/grafana" \
     --entrypoint tar "$HELPER_IMAGE" \
     -C /var/lib/grafana -czf - . > "${staging}/grafana-data.tar.gz"
+  "$CONTEXT_HELPER" capture --container "$grafana_container" \
+    --project "$PROJECT_DIR" --output "${staging}/grafana-context.tar.gz"
 
   recover_services
   wait_for_service "$PROMETHEUS_SERVICE" http://127.0.0.1:9090/-/ready
@@ -103,14 +108,14 @@ create_backup() {
   install -m 0600 "${PROJECT_DIR}/compose.yaml" "${staging}/compose.yaml"
   {
     printf 'created_utc=%s\n' "$timestamp"
-    printf 'format=observability-platform-backup-v1\n'
+    printf 'format=observability-platform-backup-v2\n'
     printf 'prometheus_image=%s\n' "$PROMETHEUS_IMAGE"
     printf 'grafana_image=%s\n' "$GRAFANA_IMAGE"
   } > "${staging}/metadata.txt"
 
   (
     cd "$staging"
-    sha256sum prometheus-data.tar.gz grafana-data.tar.gz \
+    sha256sum prometheus-data.tar.gz grafana-data.tar.gz grafana-context.tar.gz \
       compose.yaml metadata.txt > SHA256SUMS
   )
   mv -- "$staging" "$final"
@@ -124,7 +129,7 @@ create_backup() {
 
 verify_backup() {
   local selected directory suffix prometheus_container grafana_container
-  local prometheus_volume grafana_volume prometheus_config
+  local prometheus_volume grafana_volume prometheus_config verification_root
   selected="${1:-$(latest_backup)}"
   if [[ -z "$selected" ]]; then
     log "No observability backup is available for verification."
@@ -142,52 +147,66 @@ verify_backup() {
   )
   tar -tzf "${directory}/prometheus-data.tar.gz" >/dev/null
   tar -tzf "${directory}/grafana-data.tar.gz" >/dev/null
+  [[ -s "${directory}/grafana-context.tar.gz" ]] || {
+    log "Legacy backup has no Grafana context; full functional verification refused."
+    exit 1
+  }
+  grep -Eq ' [*]?grafana-context[.]tar[.]gz$' "${directory}/SHA256SUMS" || {
+    log "Grafana context is not covered by the backup checksum manifest."
+    exit 1
+  }
 
   suffix="${RANDOM}-$$"
   prometheus_container="prometheus-restore-check-${suffix}"
   grafana_container="grafana-restore-check-${suffix}"
   prometheus_volume="prometheus-restore-check-${suffix}"
   grafana_volume="grafana-restore-check-${suffix}"
-  prometheus_config="/var/tmp/prometheus-restore-check-${suffix}.yml"
+  # A collision must never cause cleanup to remove an existing object.
+  for name in "$prometheus_container" "$grafana_container"; do
+    if docker container inspect "$name" >/dev/null 2>&1; then exit 1; fi
+    if docker volume inspect "$name" >/dev/null 2>&1; then exit 1; fi
+  done
+  verification_root="$(mktemp -d /var/tmp/observability-restore-check.XXXXXX)"
+  prometheus_config="${verification_root}/prometheus.yml"
 
   cleanup_verification() {
     docker rm -f "$prometheus_container" "$grafana_container" \
       >/dev/null 2>&1 || true
     docker volume rm "$prometheus_volume" "$grafana_volume" \
       >/dev/null 2>&1 || true
-    rm -f -- "$prometheus_config"
+    if [[ "$verification_root" == /var/tmp/observability-restore-check.* &&
+          "$(dirname -- "$verification_root")" == /var/tmp &&
+          ! -L "$verification_root" ]]; then
+      rm -rf -- "$verification_root"
+    fi
   }
   trap cleanup_verification EXIT INT TERM
 
   docker volume create "$prometheus_volume" >/dev/null
   docker volume create "$grafana_volume" >/dev/null
-  docker run --rm --user 0 \
+  docker run --rm --interactive --network none --user 0 \
     --volume "${prometheus_volume}:/restore" \
-    --volume "${directory}:/backup:ro,Z" \
     "$HELPER_IMAGE" \
-    tar -xzf /backup/prometheus-data.tar.gz -C /restore
-  docker run --rm --user 0 \
+    tar -xzf - -C /restore < "${directory}/prometheus-data.tar.gz"
+  docker run --rm --interactive --network none --user 0 \
     --volume "${grafana_volume}:/restore" \
-    --volume "${directory}:/backup:ro,Z" \
     "$HELPER_IMAGE" \
-    tar -xzf /backup/grafana-data.tar.gz -C /restore
+    tar -xzf - -C /restore < "${directory}/grafana-data.tar.gz"
 
   printf '%s\n' \
     'global:' \
     '  scrape_interval: 1m' \
     > "$prometheus_config"
   chmod 0644 "$prometheus_config"
-  docker run --detach --name "$prometheus_container" \
+  docker run --detach --network none --name "$prometheus_container" \
     --volume "${prometheus_volume}:/prometheus" \
     --volume "${prometheus_config}:/etc/prometheus/restore.yml:ro,Z" \
     "$PROMETHEUS_IMAGE" \
     --config.file=/etc/prometheus/restore.yml \
     --storage.tsdb.path=/prometheus >/dev/null
-  docker run --detach --name "$grafana_container" \
-    --volume "${grafana_volume}:/var/lib/grafana" \
-    --env GF_ANALYTICS_REPORTING_ENABLED=false \
-    --env GF_ANALYTICS_CHECK_FOR_UPDATES=false \
-    "$GRAFANA_IMAGE" >/dev/null
+  "$CONTEXT_HELPER" start --archive "${directory}/grafana-context.tar.gz" \
+    --workspace "$verification_root" --name "$grafana_container" \
+    --volume "$grafana_volume"
 
   for _ in {1..60}; do
     if docker exec "$prometheus_container" \
@@ -209,6 +228,8 @@ verify_backup() {
   docker exec "$grafana_container" \
     wget --quiet --output-document=- http://127.0.0.1:3000/api/health \
     | grep -q '"database"[[:space:]]*:[[:space:]]*"ok"'
+  "$CONTEXT_HELPER" validate --workspace "$verification_root" \
+    --name "$grafana_container" --volume "$grafana_volume"
 
   cleanup_verification
   trap - EXIT INT TERM
