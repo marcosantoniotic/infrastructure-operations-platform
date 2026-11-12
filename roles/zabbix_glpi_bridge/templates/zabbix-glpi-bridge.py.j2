@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import secrets
+import signal
 import sqlite3
 import threading
 import time
@@ -640,6 +641,30 @@ def validate_event_flow() -> None:
     LOG.info("Event flow passed event=%s ticket=%s", event_id, first["ticket_id"])
 
 
+def serve_bridge(port: int) -> None:
+    # Non-daemon request threads are drained by server_close(), not discarded.
+    with ThreadingHTTPServer(("0.0.0.0", port), Handler) as server:
+        server.daemon_threads = False
+        stopping = threading.Event()
+
+        def request_shutdown(signum, frame):
+            if not stopping.is_set():
+                stopping.set()
+                # shutdown() must not run on the serve_forever() thread.
+                threading.Thread(target=server.shutdown, name="bridge-shutdown").start()
+
+        previous = {sig: signal.signal(sig, request_shutdown)
+                    for sig in (signal.SIGTERM, signal.SIGINT)}
+        try:
+            LOG.info("Bridge listening on internal port %d", port)
+            server.serve_forever(poll_interval=0.1)
+        finally:
+            server.server_close()
+            for sig, handler in previous.items():
+                signal.signal(sig, handler)
+    LOG.info("Bridge stopped; active request threads drained")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=["serve", "configure-zabbix", "self-test", "check-glpi-oauth", "validate-event-flow"])
@@ -657,8 +682,7 @@ def main() -> int:
     else:
         connect_db().close()
         port = int(os.environ["BRIDGE_LISTEN_PORT"])
-        LOG.info("Bridge listening on internal port %d", port)
-        ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
+        serve_bridge(port)
     return 0
 
 
