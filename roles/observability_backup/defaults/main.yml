@@ -11,3 +11,4 @@ observability_backup_helper_image: alpine:3.23.4
 observability_backup_run_now: false
 observability_backup_verify_restore: false
 observability_backup_metrics_dir: /var/lib/node_exporter/textfile_collector
+observability_backup_context_helper: /usr/local/sbin/observability-grafana-context
