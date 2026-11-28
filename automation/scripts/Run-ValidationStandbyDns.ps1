@@ -13,6 +13,7 @@ $requirements = Join-Path $projectRoot 'requirements.yml'
 $playbook = Join-Path $projectRoot 'playbooks\dns-standby.yml'
 $role = Join-Path $projectRoot 'roles\dns_standby'
 $preflight = Join-Path $PSScriptRoot 'Run-ValidationPreflight.ps1'
+$bootstrapPolicy = Join-Path $validationRoot 'dns-bootstrap-policy.json'
 
 foreach ($path in @($privateKey, $configPath, $requirements, $playbook, $preflight)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Required file not found: $path" }
@@ -38,6 +39,20 @@ dns_standby_allowed_networks:
 dns_standby_admin_networks:
   - "$allowedNetwork"
 "@
+if (Test-Path -LiteralPath $bootstrapPolicy) {
+    $policy = Get-Content -LiteralPath $bootstrapPolicy -Raw | ConvertFrom-Json
+    if ($policy.enabled -ne $true -or @($policy.resolvers).Count -eq 0) {
+        throw 'Invalid private bootstrap policy. Do not silently disable an installed guard.'
+    }
+    $resolverLines = foreach ($resolver in $policy.resolvers) {
+        $address = [Net.IPAddress]::Parse([string]$resolver)
+        if ($address.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork) {
+            throw 'This validation bootstrap policy requires IPv4 resolver addresses.'
+        }
+        "  - '$address'"
+    }
+    $vars += "`ndns_standby_bootstrap_guard: true`ndns_standby_expected_bootstrap_dns:`n" + ($resolverLines -join "`n") + "`n"
+}
 [IO.File]::WriteAllText($groupVars, $vars, [Text.UTF8Encoding]::new($false))
 
 & ssh.exe @options $controller "install -d -m 0755 $remoteRoot/roles $remoteRoot/playbooks $remoteRoot/inventories/validation/group_vars/all"

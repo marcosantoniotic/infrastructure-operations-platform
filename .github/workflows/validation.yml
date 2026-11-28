@@ -16,6 +16,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dns-bootstrap-guard:
+    name: AdGuard bootstrap guard (${{ matrix.ansible }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        ansible: ['2.14.18', '2.19.7']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.11'
+      - run: python -m pip install ansible-core==${{ matrix.ansible }} PyYAML==6.0.3
+      - run: python scripts/tests/test_dns_bootstrap_guard.py
+
   repository:
     name: Repository and PowerShell validation
     runs-on: ubuntu-latest
