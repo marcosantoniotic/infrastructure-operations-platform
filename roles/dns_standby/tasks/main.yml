@@ -11,6 +11,9 @@
       Standby DNS requires explicit client and administration networks and a
       pinned stable AdGuard Home image.
 
+- name: Check installed bootstrap protection before any changes
+  ansible.builtin.import_tasks: bootstrap-preflight.yml
+
 - name: Assert Docker is running
   ansible.builtin.service:
     name: docker
@@ -63,11 +66,6 @@
   loop: >-
     {{ dns_standby_admin_networks |
        product([dns_standby_initial_admin_port, dns_standby_admin_port]) | list }}
-
-- name: Inspect AdGuard Home operational configuration
-  ansible.builtin.stat:
-    path: "{{ dns_standby_project_dir }}/conf/AdGuardHome.yaml"
-  register: dns_standby_configuration
 
 - name: Deploy standby DNS project
   community.docker.docker_compose_v2:

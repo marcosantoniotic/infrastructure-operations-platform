@@ -6,3 +6,5 @@ dns_standby_admin_networks: []
 dns_standby_dns_port: 53
 dns_standby_initial_admin_port: 3000
 dns_standby_admin_port: 80
+dns_standby_bootstrap_guard: false
+dns_standby_expected_bootstrap_dns: []
