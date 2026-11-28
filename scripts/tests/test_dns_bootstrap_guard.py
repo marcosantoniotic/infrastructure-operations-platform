@@ -3,6 +3,8 @@ import base64
 from pathlib import Path
 import sys
 import unittest
+import tempfile
+import subprocess
 import yaml
 from ansible.parsing.dataloader import DataLoader
 from ansible.template import Templar
@@ -14,7 +16,8 @@ except ImportError:  # ansible-core 2.14 on the validation controller
 
 def expressions(tasks):
     guard = next(t for t in tasks if 'block' in t and 'bootstrap' in t['name'])
-    return guard['block'][-1]['ansible.builtin.assert']['that']
+    return next(t['ansible.builtin.assert']['that'] for t in guard['block']
+                if t['name'].startswith('Refuse a deploy'))
 
 
 class BootstrapGuard(unittest.TestCase):
@@ -34,7 +37,7 @@ class BootstrapGuard(unittest.TestCase):
     def setUp(self):
         if self.expressions is None:
             self.expressions = expressions(yaml.safe_load(
-                (Path(__file__).resolve().parents[2] / 'roles/dns_standby/tasks/main.yml').read_text()))
+                (Path(__file__).resolve().parents[2] / 'roles/dns_standby/tasks/bootstrap-preflight.yml').read_text()))
         self.config = {'dns': {
             'bootstrap_dns': ['192.0.2.10', '192.0.2.11'],
             'upstream_dns': ['https://resolver.example/dns-query'],
@@ -58,6 +61,55 @@ class BootstrapGuard(unittest.TestCase):
     def test_tls_bypass_rejected(self):
         self.config['dns']['insecure_skip_verify'] = True
         self.assertFalse(self.permits(self.config))
+
+    def test_upstream_file_rejected(self):
+        self.config['dns']['upstream_dns_file'] = '/tmp/alternate-upstreams'
+        self.assertFalse(self.permits(self.config))
+
+    def test_fallback_rejected(self):
+        self.config['dns']['fallback_dns'] = ['192.0.2.99']
+        self.assertFalse(self.permits(self.config))
+
+    def test_explicit_empty_alternatives(self):
+        self.config['dns'].update(upstream_dns_file='', fallback_dns=[])
+        self.assertTrue(self.permits(self.config))
+
+
+class InstalledGuard(unittest.TestCase):
+    def test_real_preflight_lifecycle(self):
+        task = Path(__file__).resolve().parents[2] / 'roles/dns_standby/tasks/bootstrap-preflight.yml'
+        with tempfile.TemporaryDirectory(prefix='dns-guard-') as folder:
+            root = Path(folder)
+            config = root / 'conf/AdGuardHome.yaml'
+            config.parent.mkdir()
+            config.write_text(yaml.safe_dump({'dns': {
+                'bootstrap_dns': ['192.0.2.10', '192.0.2.11'],
+                'upstream_dns': ['https://resolver.example/dns-query'],
+            }}))
+            before = config.read_bytes()
+            play = root / 'test.yml'
+
+            def run(enabled, expected=True):
+                variables = {'dns_standby_project_dir': str(root),
+                             'dns_standby_bootstrap_guard': enabled,
+                             'dns_standby_expected_bootstrap_dns': ['192.0.2.10', '192.0.2.11'] if expected else []}
+                play.write_text(yaml.safe_dump([{'hosts': 'localhost', 'gather_facts': False,
+                    'vars': variables, 'tasks': [{'ansible.builtin.import_tasks': str(task)}]}]))
+                result = subprocess.run(['ansible-playbook', '-i', 'localhost,', '-c', 'local', str(play)],
+                                        capture_output=True, text=True, timeout=60)
+                self.assertEqual(config.read_bytes(), before)
+                return result
+
+            self.assertEqual(run(False).returncode, 0)  # legacy untouched
+            marker = root / '.bootstrap-protected.json'
+            self.assertFalse(marker.exists())
+            self.assertEqual(run(True).returncode, 0)
+            original = marker.stat().st_mtime_ns
+            self.assertEqual(run(True).returncode, 0)
+            self.assertEqual(marker.stat().st_mtime_ns, original)  # idempotent
+            self.assertNotEqual(run(False).returncode, 0)  # removed wrapper policy
+            self.assertNotEqual(run(True, expected=False).returncode, 0)  # incomplete policy
+            self.assertTrue(marker.exists())
 
 
 if __name__ == '__main__':

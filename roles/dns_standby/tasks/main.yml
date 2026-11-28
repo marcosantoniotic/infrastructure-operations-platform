@@ -11,6 +11,9 @@
       Standby DNS requires explicit client and administration networks and a
       pinned stable AdGuard Home image.
 
+- name: Check installed bootstrap protection before any changes
+  ansible.builtin.import_tasks: bootstrap-preflight.yml
+
 - name: Assert Docker is running
   ansible.builtin.service:
     name: docker
@@ -63,38 +66,6 @@
   loop: >-
     {{ dns_standby_admin_networks |
        product([dns_standby_initial_admin_port, dns_standby_admin_port]) | list }}
-
-- name: Inspect AdGuard Home operational configuration
-  ansible.builtin.stat:
-    path: "{{ dns_standby_project_dir }}/conf/AdGuardHome.yaml"
-  register: dns_standby_configuration
-
-- name: Validate explicitly protected AdGuard bootstrap before deployment
-  when: dns_standby_bootstrap_guard | bool
-  block:
-    - name: Require an initialized instance and explicit bootstrap policy
-      ansible.builtin.assert:
-        that:
-          - dns_standby_configuration.stat.exists
-          - dns_standby_expected_bootstrap_dns is sequence
-          - dns_standby_expected_bootstrap_dns is not string
-          - dns_standby_expected_bootstrap_dns | length > 0
-
-    - name: Read protected AdGuard configuration without logging credentials
-      ansible.builtin.slurp:
-        src: "{{ dns_standby_project_dir }}/conf/AdGuardHome.yaml"
-      register: dns_standby_protected_config
-      no_log: true
-
-    - name: Refuse a deploy that would conceal bootstrap or TLS drift
-      ansible.builtin.assert:
-        that:
-          - (dns_standby_protected_config.content | b64decode | from_yaml).dns.bootstrap_dns == dns_standby_expected_bootstrap_dns
-          - (dns_standby_protected_config.content | b64decode | from_yaml).dns.upstream_dns | length > 0
-          - (dns_standby_protected_config.content | b64decode | from_yaml).dns.upstream_dns | reject('match', '^https://') | list | length == 0
-          - not ((dns_standby_protected_config.content | b64decode | from_yaml).dns | default({})).get('insecure_skip_verify', false) | bool
-        fail_msg: Protected DNS bootstrap or HTTPS policy drifted; stop and reconcile explicitly.
-      no_log: true
 
 - name: Deploy standby DNS project
   community.docker.docker_compose_v2:

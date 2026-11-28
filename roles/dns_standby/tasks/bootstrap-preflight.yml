@@ -1,0 +1,51 @@
+---
+- name: Inspect installed bootstrap protection marker
+  ansible.builtin.stat:
+    path: "{{ dns_standby_project_dir }}/.bootstrap-protected.json"
+  register: dns_standby_marker
+
+- name: Refuse silent removal of installed bootstrap protection
+  ansible.builtin.assert:
+    that:
+      - not dns_standby_marker.stat.exists or (dns_standby_bootstrap_guard | bool)
+    fail_msg: Installed bootstrap protection requires its explicit inventory policy.
+
+- name: Inspect AdGuard Home operational configuration
+  ansible.builtin.stat:
+    path: "{{ dns_standby_project_dir }}/conf/AdGuardHome.yaml"
+  register: dns_standby_configuration
+
+- name: Validate explicitly protected AdGuard bootstrap before deployment
+  when: dns_standby_bootstrap_guard | bool
+  block:
+    - name: Require an initialized instance and explicit bootstrap policy
+      ansible.builtin.assert:
+        that:
+          - dns_standby_configuration.stat.exists
+          - dns_standby_expected_bootstrap_dns is sequence
+          - dns_standby_expected_bootstrap_dns is not string
+          - dns_standby_expected_bootstrap_dns | length > 0
+
+    - name: Read protected AdGuard configuration without logging credentials
+      ansible.builtin.slurp:
+        src: "{{ dns_standby_project_dir }}/conf/AdGuardHome.yaml"
+      register: dns_standby_protected_config
+      no_log: true
+
+    - name: Refuse a deploy that would conceal bootstrap or TLS drift
+      ansible.builtin.assert:
+        that:
+          - (dns_standby_protected_config.content | b64decode | from_yaml).dns.bootstrap_dns == dns_standby_expected_bootstrap_dns
+          - (dns_standby_protected_config.content | b64decode | from_yaml).dns.upstream_dns | length > 0
+          - (dns_standby_protected_config.content | b64decode | from_yaml).dns.upstream_dns | reject('match', '^https://') | list | length == 0
+          - ((dns_standby_protected_config.content | b64decode | from_yaml).dns).get('upstream_dns_file', '') == ''
+          - ((dns_standby_protected_config.content | b64decode | from_yaml).dns).get('fallback_dns', []) == []
+          - not ((dns_standby_protected_config.content | b64decode | from_yaml).dns).get('insecure_skip_verify', false) | bool
+        fail_msg: Protected DNS bootstrap or HTTPS policy drifted; stop and reconcile explicitly.
+      no_log: true
+
+    - name: Record protection before deployment to survive interrupted runs
+      ansible.builtin.copy:
+        dest: "{{ dns_standby_project_dir }}/.bootstrap-protected.json"
+        content: "{{ {'schema': 1, 'protected': true} | to_nice_json }}\n"
+        mode: "0600"
